@@ -22,36 +22,39 @@ const (
 	Accepted
 )
 
-type MessageData struct {
-	receivedEcho map[*actor.PID]bool
+type MessageState struct {
+	receivedEcho  map[*actor.PID]bool
 	receivedReady map[*actor.PID]bool
-	echoCount map[ValueType]int
-	readyCount map[ValueType]int
-	stage Stage
+	echoCount     map[ValueType]int
+	readyCount    map[ValueType]int
+	stage         Stage
 }
 
-func NewMessageData() *MessageData {
-	md := new(MessageData)
-	md.receivedEcho = make(map[*actor.PID]bool)
-	md.receivedReady = make(map[*actor.PID]bool)
-	md.echoCount = make(map[ValueType]int)
-	md.readyCount = make(map[ValueType]int)
-	md.stage = Init
-	return md
+func NewMessageState() *MessageState {
+	ms := new(MessageState)
+	ms.receivedEcho = make(map[*actor.PID]bool)
+	ms.receivedReady = make(map[*actor.PID]bool)
+	ms.echoCount = make(map[ValueType]int)
+	ms.readyCount = make(map[ValueType]int)
+	ms.stage = Init
+	return ms
 }
 
 type Process struct {
-	currPid *actor.PID
-	pids []*actor.PID
-	messagesInfo map[*actor.PID]map[int32]*MessageData
+	currPid          *actor.PID
+	pids             []*actor.PID
+	acceptedMessages map[*actor.PID]map[int32]ValueType
+	messagesLog      map[*actor.PID]map[int32]*MessageState
 }
 
 func (p *Process) InitProcess(currPid *actor.PID, pids []*actor.PID) {
 	p.currPid = currPid
 	p.pids = pids
-	p.messagesInfo = make(map[*actor.PID]map[int32]*MessageData)
+	p.acceptedMessages = make(map[*actor.PID]map[int32]ValueType)
+	p.messagesLog = make(map[*actor.PID]map[int32]*MessageState)
 	for _, pid := range pids {
-		p.messagesInfo[pid] = make(map[int32]*MessageData)
+		p.acceptedMessages[pid] = make(map[int32]ValueType)
+		p.messagesLog[pid] = make(map[int32]*MessageState)
 	}
 }
 
@@ -66,23 +69,23 @@ func (p *Process) broadcast(context actor.SenderContext, message *messages.Messa
 func (p *Process) broadcastEcho(
 	context actor.SenderContext,
 	initialMessage *messages.Message,
-	msgData *MessageData) {
+	msgState *MessageState) {
 	p.broadcast(
 		context,
 		&messages.Message{
-			Stage: messages.Message_ECHO,
-			Value: initialMessage.Value,
+			Stage:     messages.Message_ECHO,
+			Value:     initialMessage.Value,
 			SeqNumber: initialMessage.SeqNumber,
-			Author: initialMessage.Author,
+			Author:    initialMessage.Author,
 		})
-	msgData.stage = SentEcho
-	msgData.echoCount[ValueType(initialMessage.Value)]++
+	msgState.stage = SentEcho
+	msgState.echoCount[ValueType(initialMessage.Value)]++
 }
 
 func (p *Process) broadcastReady(
 	context actor.SenderContext,
 	initialMessage *messages.Message,
-	msgData *MessageData) {
+	msgState *MessageState) {
 	p.broadcast(
 		context,
 		&messages.Message{
@@ -91,14 +94,15 @@ func (p *Process) broadcastReady(
 			SeqNumber: initialMessage.SeqNumber,
 			Author:    initialMessage.Author,
 		})
-	msgData.stage = SentReady
-	msgData.readyCount[ValueType(initialMessage.Value)]++
-	p.checkForAccept(initialMessage, msgData)
+	msgState.stage = SentReady
+	msgState.readyCount[ValueType(initialMessage.Value)]++
+	p.checkForAccept(initialMessage, msgState)
 }
 
-func (p *Process) checkForAccept(msg *messages.Message, msgData *MessageData) {
-	if msgData.readyCount[ValueType(msg.Value)] >= MessagesForAccept {
-		msgData.stage = Accepted
+func (p *Process) checkForAccept(msg *messages.Message, msgState *MessageState) {
+	if msgState.readyCount[ValueType(msg.Value)] >= MessagesForAccept {
+		msgState.stage = Accepted
+		p.acceptedMessages[msg.Author][msg.SeqNumber] = ValueType(msg.Value)
 		fmt.Printf(
 			"%s accepted value %d with seq number %d\n",
 			p.currPid.String(), msg.Value, msg.SeqNumber)
@@ -106,8 +110,8 @@ func (p *Process) checkForAccept(msg *messages.Message, msgData *MessageData) {
 }
 
 func (p *Process) initMessageState(msg *messages.Message) {
-	if p.messagesInfo[msg.Author][msg.SeqNumber] == nil {
-		p.messagesInfo[msg.Author][msg.SeqNumber] = NewMessageData()
+	if p.messagesLog[msg.Author][msg.SeqNumber] == nil {
+		p.messagesLog[msg.Author][msg.SeqNumber] = NewMessageState()
 	}
 }
 
@@ -118,47 +122,46 @@ func (p *Process) Receive(context actor.Context) {
 	}
 	p.initMessageState(msg)
 
-	msgData := p.messagesInfo[msg.Author][msg.SeqNumber]
+	msgState := p.messagesLog[msg.Author][msg.SeqNumber]
 	senderId := context.Sender()
 	value := ValueType(msg.Value)
-	//fmt.Printf("%s received message from %s\n", p.currPid.String(), senderId.String())
 
 	switch msg.Stage {
 	case messages.Message_INITIAL:
-		if msgData.stage == Init {
-			p.broadcastEcho(context, msg, msgData)
+		if msgState.stage == Init {
+			p.broadcastEcho(context, msg, msgState)
 		}
 	case messages.Message_ECHO:
-		if msgData.stage == SentReady || msgData.receivedEcho[senderId] {
+		if msgState.stage == SentReady || msgState.receivedEcho[senderId] {
 			return
 		}
-		msgData.receivedEcho[senderId] = true
-		msgData.echoCount[value]++
+		msgState.receivedEcho[senderId] = true
+		msgState.echoCount[value]++
 
-		if msgData.echoCount[value] >= MessagesForEcho {
-			if msgData.stage == Init {
-				p.broadcastEcho(context, msg, msgData)
+		if msgState.echoCount[value] >= MessagesForEcho {
+			if msgState.stage == Init {
+				p.broadcastEcho(context, msg, msgState)
 			}
-			if msgData.stage == SentEcho {
-				p.broadcastReady(context, msg, msgData)
+			if msgState.stage == SentEcho {
+				p.broadcastReady(context, msg, msgState)
 			}
 		}
 	case messages.Message_READY:
-		if msgData.stage == Accepted || msgData.receivedReady[senderId] {
+		if msgState.stage == Accepted || msgState.receivedReady[senderId] {
 			return
 		}
-		msgData.receivedReady[senderId] = true
-		msgData.readyCount[value]++
+		msgState.receivedReady[senderId] = true
+		msgState.readyCount[value]++
 
-		if msgData.readyCount[value] >= MessagesForReady {
-			if msgData.stage == Init {
-				p.broadcastEcho(context, msg, msgData)
+		if msgState.readyCount[value] >= MessagesForReady {
+			if msgState.stage == Init {
+				p.broadcastEcho(context, msg, msgState)
 			}
-			if msgData.stage == SentEcho {
-				p.broadcastReady(context, msg, msgData)
+			if msgState.stage == SentEcho {
+				p.broadcastReady(context, msg, msgState)
 			}
 		}
-		p.checkForAccept(msg, msgData)
+		p.checkForAccept(msg, msgState)
 	}
 }
 
@@ -171,7 +174,7 @@ func (p *Process) Broadcast(context actor.SenderContext, value int32, seqNumber 
 	}
 	p.broadcast(context, message)
 
-	msgData := NewMessageData()
-	p.messagesInfo[p.currPid][seqNumber] = msgData
-	p.broadcastEcho(context, message, msgData)
+	msgState := NewMessageState()
+	p.messagesLog[p.currPid][seqNumber] = msgState
+	p.broadcastEcho(context, message, msgState)
 }
