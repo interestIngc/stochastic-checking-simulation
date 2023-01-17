@@ -14,3 +14,14 @@ message Message {
   int32 seqNumber = 3;
   actor.PID author = 4;
 }
+
+message ProtocolMessage {
+  enum Stage {
+    ECHO = 0;
+    VERIFY = 1;
+  }
+  Stage stage = 1;
+  int32 value = 2;
+  int32 seqNumber = 3;
+  actor.PID author = 4;
+}

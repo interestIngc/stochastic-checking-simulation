@@ -70,6 +70,52 @@ func (Message_Stage) EnumDescriptor() ([]byte, []int) {
 	return file_messages_proto_rawDescGZIP(), []int{0, 0}
 }
 
+type ProtocolMessage_Stage int32
+
+const (
+	ProtocolMessage_ECHO   ProtocolMessage_Stage = 0
+	ProtocolMessage_VERIFY ProtocolMessage_Stage = 1
+)
+
+// Enum value maps for ProtocolMessage_Stage.
+var (
+	ProtocolMessage_Stage_name = map[int32]string{
+		0: "ECHO",
+		1: "VERIFY",
+	}
+	ProtocolMessage_Stage_value = map[string]int32{
+		"ECHO":   0,
+		"VERIFY": 1,
+	}
+)
+
+func (x ProtocolMessage_Stage) Enum() *ProtocolMessage_Stage {
+	p := new(ProtocolMessage_Stage)
+	*p = x
+	return p
+}
+
+func (x ProtocolMessage_Stage) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ProtocolMessage_Stage) Descriptor() protoreflect.EnumDescriptor {
+	return file_messages_proto_enumTypes[1].Descriptor()
+}
+
+func (ProtocolMessage_Stage) Type() protoreflect.EnumType {
+	return &file_messages_proto_enumTypes[1]
+}
+
+func (x ProtocolMessage_Stage) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ProtocolMessage_Stage.Descriptor instead.
+func (ProtocolMessage_Stage) EnumDescriptor() ([]byte, []int) {
+	return file_messages_proto_rawDescGZIP(), []int{1, 0}
+}
+
 type Message struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -141,6 +187,77 @@ func (x *Message) GetAuthor() *actor.PID {
 	return nil
 }
 
+type ProtocolMessage struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Stage     ProtocolMessage_Stage `protobuf:"varint,1,opt,name=stage,proto3,enum=messages.ProtocolMessage_Stage" json:"stage,omitempty"`
+	Value     int32                 `protobuf:"varint,2,opt,name=value,proto3" json:"value,omitempty"`
+	SeqNumber int32                 `protobuf:"varint,3,opt,name=seqNumber,proto3" json:"seqNumber,omitempty"`
+	Author    *actor.PID            `protobuf:"bytes,4,opt,name=author,proto3" json:"author,omitempty"`
+}
+
+func (x *ProtocolMessage) Reset() {
+	*x = ProtocolMessage{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_messages_proto_msgTypes[1]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ProtocolMessage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtocolMessage) ProtoMessage() {}
+
+func (x *ProtocolMessage) ProtoReflect() protoreflect.Message {
+	mi := &file_messages_proto_msgTypes[1]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtocolMessage.ProtoReflect.Descriptor instead.
+func (*ProtocolMessage) Descriptor() ([]byte, []int) {
+	return file_messages_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *ProtocolMessage) GetStage() ProtocolMessage_Stage {
+	if x != nil {
+		return x.Stage
+	}
+	return ProtocolMessage_ECHO
+}
+
+func (x *ProtocolMessage) GetValue() int32 {
+	if x != nil {
+		return x.Value
+	}
+	return 0
+}
+
+func (x *ProtocolMessage) GetSeqNumber() int32 {
+	if x != nil {
+		return x.SeqNumber
+	}
+	return 0
+}
+
+func (x *ProtocolMessage) GetAuthor() *actor.PID {
+	if x != nil {
+		return x.Author
+	}
+	return nil
+}
+
 var File_messages_proto protoreflect.FileDescriptor
 
 var file_messages_proto_rawDesc = []byte{
@@ -158,10 +275,22 @@ var file_messages_proto_rawDesc = []byte{
 	0x49, 0x44, 0x52, 0x06, 0x61, 0x75, 0x74, 0x68, 0x6f, 0x72, 0x22, 0x29, 0x0a, 0x05, 0x53, 0x74,
 	0x61, 0x67, 0x65, 0x12, 0x0b, 0x0a, 0x07, 0x49, 0x4e, 0x49, 0x54, 0x49, 0x41, 0x4c, 0x10, 0x00,
 	0x12, 0x08, 0x0a, 0x04, 0x45, 0x43, 0x48, 0x4f, 0x10, 0x01, 0x12, 0x09, 0x0a, 0x05, 0x52, 0x45,
-	0x41, 0x44, 0x59, 0x10, 0x02, 0x42, 0x29, 0x5a, 0x27, 0x73, 0x74, 0x6f, 0x63, 0x68, 0x61, 0x73,
-	0x74, 0x69, 0x63, 0x2d, 0x63, 0x68, 0x65, 0x63, 0x6b, 0x69, 0x6e, 0x67, 0x2d, 0x73, 0x69, 0x6d,
-	0x75, 0x6c, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2f, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x73,
-	0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x41, 0x44, 0x59, 0x10, 0x02, 0x22, 0xbf, 0x01, 0x0a, 0x0f, 0x50, 0x72, 0x6f, 0x74, 0x6f, 0x63,
+	0x6f, 0x6c, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x12, 0x35, 0x0a, 0x05, 0x73, 0x74, 0x61,
+	0x67, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0e, 0x32, 0x1f, 0x2e, 0x6d, 0x65, 0x73, 0x73, 0x61,
+	0x67, 0x65, 0x73, 0x2e, 0x50, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x4d, 0x65, 0x73, 0x73,
+	0x61, 0x67, 0x65, 0x2e, 0x53, 0x74, 0x61, 0x67, 0x65, 0x52, 0x05, 0x73, 0x74, 0x61, 0x67, 0x65,
+	0x12, 0x14, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x05, 0x52,
+	0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x12, 0x1c, 0x0a, 0x09, 0x73, 0x65, 0x71, 0x4e, 0x75, 0x6d,
+	0x62, 0x65, 0x72, 0x18, 0x03, 0x20, 0x01, 0x28, 0x05, 0x52, 0x09, 0x73, 0x65, 0x71, 0x4e, 0x75,
+	0x6d, 0x62, 0x65, 0x72, 0x12, 0x22, 0x0a, 0x06, 0x61, 0x75, 0x74, 0x68, 0x6f, 0x72, 0x18, 0x04,
+	0x20, 0x01, 0x28, 0x0b, 0x32, 0x0a, 0x2e, 0x61, 0x63, 0x74, 0x6f, 0x72, 0x2e, 0x50, 0x49, 0x44,
+	0x52, 0x06, 0x61, 0x75, 0x74, 0x68, 0x6f, 0x72, 0x22, 0x1d, 0x0a, 0x05, 0x53, 0x74, 0x61, 0x67,
+	0x65, 0x12, 0x08, 0x0a, 0x04, 0x45, 0x43, 0x48, 0x4f, 0x10, 0x00, 0x12, 0x0a, 0x0a, 0x06, 0x56,
+	0x45, 0x52, 0x49, 0x46, 0x59, 0x10, 0x01, 0x42, 0x29, 0x5a, 0x27, 0x73, 0x74, 0x6f, 0x63, 0x68,
+	0x61, 0x73, 0x74, 0x69, 0x63, 0x2d, 0x63, 0x68, 0x65, 0x63, 0x6b, 0x69, 0x6e, 0x67, 0x2d, 0x73,
+	0x69, 0x6d, 0x75, 0x6c, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2f, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67,
+	0x65, 0x73, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -176,21 +305,25 @@ func file_messages_proto_rawDescGZIP() []byte {
 	return file_messages_proto_rawDescData
 }
 
-var file_messages_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_messages_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
+var file_messages_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_messages_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
 var file_messages_proto_goTypes = []interface{}{
-	(Message_Stage)(0), // 0: messages.Message.Stage
-	(*Message)(nil),    // 1: messages.Message
-	(*actor.PID)(nil),  // 2: actor.PID
+	(Message_Stage)(0),         // 0: messages.Message.Stage
+	(ProtocolMessage_Stage)(0), // 1: messages.ProtocolMessage.Stage
+	(*Message)(nil),            // 2: messages.Message
+	(*ProtocolMessage)(nil),    // 3: messages.ProtocolMessage
+	(*actor.PID)(nil),          // 4: actor.PID
 }
 var file_messages_proto_depIdxs = []int32{
 	0, // 0: messages.Message.stage:type_name -> messages.Message.Stage
-	2, // 1: messages.Message.author:type_name -> actor.PID
-	2, // [2:2] is the sub-list for method output_type
-	2, // [2:2] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	4, // 1: messages.Message.author:type_name -> actor.PID
+	1, // 2: messages.ProtocolMessage.stage:type_name -> messages.ProtocolMessage.Stage
+	4, // 3: messages.ProtocolMessage.author:type_name -> actor.PID
+	4, // [4:4] is the sub-list for method output_type
+	4, // [4:4] is the sub-list for method input_type
+	4, // [4:4] is the sub-list for extension type_name
+	4, // [4:4] is the sub-list for extension extendee
+	0, // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_messages_proto_init() }
@@ -211,14 +344,26 @@ func file_messages_proto_init() {
 				return nil
 			}
 		}
+		file_messages_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ProtocolMessage); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_messages_proto_rawDesc,
-			NumEnums:      1,
-			NumMessages:   1,
+			NumEnums:      2,
+			NumMessages:   2,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

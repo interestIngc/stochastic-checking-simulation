@@ -4,22 +4,21 @@ import (
 	"fmt"
 	"github.com/asynkron/protoactor-go/actor"
 	"math"
+	"stochastic-checking-simulation/config"
 	"stochastic-checking-simulation/messages"
-	"stochastic-checking-simulation/utils"
 )
 
 type Stage int32
 type ValueType int32
 
-var MessagesForEcho = int(math.Ceil(float64(utils.ProcessCount + utils.FaultyProcesses + 1) / float64(2)))
-const MessagesForReady = utils.FaultyProcesses + 1
-const MessagesForAccept = 2 * utils.FaultyProcesses + 1
+var MessagesForEcho = int(math.Ceil(float64(config.ProcessCount + config.FaultyProcesses + 1) / float64(2)))
+const MessagesForReady = config.FaultyProcesses + 1
+const MessagesForAccept = 2 * config.FaultyProcesses + 1
 
 const (
 	Init Stage = iota
 	SentEcho
 	SentReady
-	Accepted
 )
 
 type MessageState struct {
@@ -43,6 +42,7 @@ func NewMessageState() *MessageState {
 type Process struct {
 	currPid          *actor.PID
 	pids             []*actor.PID
+	msgCounter       int32
 	acceptedMessages map[*actor.PID]map[int32]ValueType
 	messagesLog      map[*actor.PID]map[int32]*MessageState
 }
@@ -50,6 +50,7 @@ type Process struct {
 func (p *Process) InitProcess(currPid *actor.PID, pids []*actor.PID) {
 	p.currPid = currPid
 	p.pids = pids
+	p.msgCounter = 0
 	p.acceptedMessages = make(map[*actor.PID]map[int32]ValueType)
 	p.messagesLog = make(map[*actor.PID]map[int32]*MessageState)
 	for _, pid := range pids {
@@ -100,18 +101,14 @@ func (p *Process) broadcastReady(
 }
 
 func (p *Process) checkForAccept(msg *messages.Message, msgState *MessageState) {
-	if msgState.readyCount[ValueType(msg.Value)] >= MessagesForAccept {
-		msgState.stage = Accepted
-		p.acceptedMessages[msg.Author][msg.SeqNumber] = ValueType(msg.Value)
+	value := ValueType(msg.Value)
+	if msgState.readyCount[value] >= MessagesForAccept {
+		p.acceptedMessages[msg.Author][msg.SeqNumber] = value
+		delete(p.messagesLog[msg.Author], msg.SeqNumber)
+
 		fmt.Printf(
 			"%s accepted value %d with seq number %d\n",
-			p.currPid.String(), msg.Value, msg.SeqNumber)
-	}
-}
-
-func (p *Process) initMessageState(msg *messages.Message) {
-	if p.messagesLog[msg.Author][msg.SeqNumber] == nil {
-		p.messagesLog[msg.Author][msg.SeqNumber] = NewMessageState()
+			p.currPid.String(), value, msg.SeqNumber)
 	}
 }
 
@@ -120,11 +117,22 @@ func (p *Process) Receive(context actor.Context) {
 	if !ok {
 		return
 	}
-	p.initMessageState(msg)
-
-	msgState := p.messagesLog[msg.Author][msg.SeqNumber]
 	senderId := context.Sender()
 	value := ValueType(msg.Value)
+
+	acceptedValue, accepted := p.acceptedMessages[msg.Author][msg.SeqNumber]
+	if accepted {
+		if acceptedValue != value {
+			fmt.Printf("%s: Detected a duplicated seq number attack\n", p.currPid.Id)
+		}
+		return
+	}
+
+	msgState := p.messagesLog[msg.Author][msg.SeqNumber]
+	if msgState == nil {
+		msgState = NewMessageState()
+		p.messagesLog[msg.Author][msg.SeqNumber] = msgState
+	}
 
 	switch msg.Stage {
 	case messages.Message_INITIAL:
@@ -147,7 +155,7 @@ func (p *Process) Receive(context actor.Context) {
 			}
 		}
 	case messages.Message_READY:
-		if msgState.stage == Accepted || msgState.receivedReady[senderId] {
+		if msgState.receivedReady[senderId] {
 			return
 		}
 		msgState.receivedReady[senderId] = true
@@ -165,16 +173,18 @@ func (p *Process) Receive(context actor.Context) {
 	}
 }
 
-func (p *Process) Broadcast(context actor.SenderContext, value int32, seqNumber int32) {
+func (p *Process) Broadcast(context actor.SenderContext, value int32) {
 	message := &messages.Message{
 		Stage:     messages.Message_INITIAL,
 		Author:    p.currPid,
-		SeqNumber: seqNumber,
+		SeqNumber: p.msgCounter,
 		Value:     value,
 	}
 	p.broadcast(context, message)
 
 	msgState := NewMessageState()
-	p.messagesLog[p.currPid][seqNumber] = msgState
+	p.messagesLog[p.currPid][p.msgCounter] = msgState
 	p.broadcastEcho(context, message, msgState)
+
+	p.msgCounter++
 }
