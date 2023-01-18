@@ -7,28 +7,33 @@ import (
 	"stochastic-checking-simulation/config"
 	"stochastic-checking-simulation/hashing"
 	"stochastic-checking-simulation/messages"
+	"stochastic-checking-simulation/utils"
 )
 
 type CorrectProcess struct {
 	currPid          *actor.PID
-	pids             []*actor.PID
+	pids             map[string]*actor.PID
 	msgCounter       int32
-	acceptedMessages map[*actor.PID]map[int32]ValueType
-	messagesLog      map[*actor.PID]map[int32]*MessageState
+	acceptedMessages map[string]map[int32]ValueType
+	messagesLog      map[string]map[int32]*MessageState
 	wSelector        *hashing.WitnessesSelector
 	historyHash      *hashing.HistoryHash
 }
 
 func (p *CorrectProcess) InitCorrectProcess(currPid *actor.PID, pids []*actor.PID) {
 	p.currPid = currPid
-	p.pids = pids
 	p.msgCounter = 0
-	p.acceptedMessages = make(map[*actor.PID]map[int32]ValueType)
-	p.messagesLog = make(map[*actor.PID]map[int32]*MessageState)
+	p.pids = make(map[string]*actor.PID)
+	p.acceptedMessages = make(map[string]map[int32]ValueType)
+	p.messagesLog = make(map[string]map[int32]*MessageState)
 
-	for _, pid := range pids {
-		p.acceptedMessages[pid] = make(map[int32]ValueType)
-		p.messagesLog[pid] = make(map[int32]*MessageState)
+	ids := make([]string, len(pids))
+	for i, pid := range pids {
+		id := utils.PidToString(pid)
+		ids[i] = id
+		p.pids[id] = pid
+		p.acceptedMessages[id] = make(map[int32]ValueType)
+		p.messagesLog[id] = make(map[int32]*MessageState)
 	}
 
 	var hasher hashing.Hasher
@@ -38,7 +43,7 @@ func (p *CorrectProcess) InitCorrectProcess(currPid *actor.PID, pids []*actor.PI
 		hasher = hashing.HashSHA512{}
 	}
 
-	p.wSelector = &hashing.WitnessesSelector{NodeIds: pids, Hasher: hasher}
+	p.wSelector = &hashing.WitnessesSelector{NodeIds: ids, Hasher: hasher}
 	binCapacity := uint(math.Pow(2, float64(config.NodeIdSize / config.NumberOfBins)))
 	p.historyHash = hashing.NewHistoryHash(config.NumberOfBins, binCapacity, hasher)
 }
@@ -50,27 +55,28 @@ func (p *CorrectProcess) broadcast(context actor.SenderContext, message *message
 }
 
 func (p *CorrectProcess) verify(
-	context actor.SenderContext, senderId *actor.PID, msg *messages.ProtocolMessage) bool {
+	context actor.SenderContext, sender string, msg *messages.ProtocolMessage) bool {
 	value := ValueType(msg.Value)
 	msgState := p.messagesLog[msg.Author][msg.SeqNumber]
+
 	acceptedValue, accepted := p.acceptedMessages[msg.Author][msg.SeqNumber]
 	if accepted {
 		if acceptedValue != value {
-			fmt.Printf("%s: Detected a duplicated seq number attack\n", p.currPid.Address)
+			//fmt.Printf("%s: Detected a duplicated seq number attack\n", p.currPid.Address)
 			return false
 		}
 	} else if msgState != nil {
-		if msgState.witnessSet.Contains(senderId) && !msgState.receivedEcho[senderId] {
-			msgState.receivedEcho[senderId] = true
+		if msgState.witnessSet[sender] && !msgState.receivedEcho[sender] {
+			msgState.receivedEcho[sender] = true
 			msgState.echoCount[value]++
 			if msgState.echoCount[value] >= config.WitnessThreshold {
 				p.acceptedMessages[msg.Author][msg.SeqNumber] = value
 				p.historyHash.Insert(
-					hashing.TransactionToBytes(msg.Author, msg.SeqNumber))
+					utils.TransactionToBytes(msg.Author, msg.SeqNumber))
 				p.messagesLog[msg.Author][msg.SeqNumber] = nil
 				fmt.Printf(
 					"%s: Accepted transaction with seq number %d and value %d from %s\n",
-					p.currPid.Id, msg.SeqNumber, msg.Value, msg.Author.Id)
+					utils.PidToString(p.currPid), msg.SeqNumber, msg.Value, msg.Author)
 			}
 		}
 	} else {
@@ -84,8 +90,8 @@ func (p *CorrectProcess) verify(
 			SeqNumber: msg.SeqNumber,
 			Value: msg.Value,
 		}
-		for _, w := range msgState.witnessSet.Values() {
-			context.RequestWithCustomSender(w, message, p.currPid)
+		for id := range msgState.witnessSet {
+			context.RequestWithCustomSender(p.pids[id], message, p.currPid)
 		}
 	}
 	return true
@@ -96,7 +102,7 @@ func (p *CorrectProcess) Receive(context actor.Context) {
 	if !ok {
 		return
 	}
-	senderId := context.Sender()
+	senderId := utils.PidToString(context.Sender())
 
 	doBroadcast := p.verify(context, senderId, msg)
 
@@ -113,12 +119,13 @@ func (p *CorrectProcess) Receive(context actor.Context) {
 }
 
 func (p *CorrectProcess) Broadcast(context actor.SenderContext, value int32) {
+	id := utils.PidToString(p.currPid)
 	msg := &messages.ProtocolMessage{
 		Stage: messages.ProtocolMessage_ECHO,
-		Author: p.currPid,
+		Author: id,
 		SeqNumber: p.msgCounter,
 		Value: value,
 	}
-	p.verify(context, p.currPid, msg)
+	p.verify(context, id, msg)
 	p.msgCounter++
 }

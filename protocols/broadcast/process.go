@@ -6,6 +6,7 @@ import (
 	"math"
 	"stochastic-checking-simulation/config"
 	"stochastic-checking-simulation/messages"
+	"stochastic-checking-simulation/utils"
 )
 
 type Stage int32
@@ -108,7 +109,7 @@ func (p *Process) checkForAccept(msg *messages.Message, msgState *MessageState) 
 
 		fmt.Printf(
 			"%s accepted value %d with seq number %d\n",
-			p.currPid.String(), value, msg.SeqNumber)
+			utils.PidToString(p.currPid), value, msg.SeqNumber)
 	}
 }
 

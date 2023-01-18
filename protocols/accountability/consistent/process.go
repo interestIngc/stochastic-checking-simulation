@@ -9,14 +9,14 @@ type Process interface {
 type ValueType int32
 
 type MessageState struct {
-	receivedEcho  map[*actor.PID]bool
+	receivedEcho  map[string]bool
 	echoCount     map[ValueType]int
-	witnessSet    *actor.PIDSet
+	witnessSet    map[string]bool
 }
 
 func NewMessageState() *MessageState {
 	ms := new(MessageState)
-	ms.receivedEcho = make(map[*actor.PID]bool)
+	ms.receivedEcho = make(map[string]bool)
 	ms.echoCount = make(map[ValueType]int)
 	return ms
 }

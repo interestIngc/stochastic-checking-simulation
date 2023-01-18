@@ -2,14 +2,14 @@ package hashing
 
 import (
 	"fmt"
-	"github.com/asynkron/protoactor-go/actor"
 	"math/rand"
 	"sort"
 	"stochastic-checking-simulation/config"
+	"stochastic-checking-simulation/utils"
 )
 
 type WitnessesSelector struct {
-	NodeIds []*actor.PID
+	NodeIds []string
 	Hasher  Hasher
 }
 
@@ -33,16 +33,16 @@ func (bd byDist) Less(i, j int) bool {
 }
 
 func (ws *WitnessesSelector) GetWitnessSet(
-		author *actor.PID, seqNumber int32, historyHash *HistoryHash,
-	) *actor.PIDSet {
-	transaction := TransactionToBytes(author, seqNumber)
+		author string, seqNumber int32, historyHash *HistoryHash,
+	) map[string]bool {
+	transaction := utils.TransactionToBytes(author, seqNumber)
 	transactionRing := multiRingFromBytes(256, historyHash.binNum, ws.Hasher.Hash(transaction))
 
 	distances := make([]dist, len(ws.NodeIds))
 	for i, pid := range ws.NodeIds {
 		historyHashRingCopy := historyHash.bins.copy()
-		pidHash := ws.Hasher.Hash([]byte(pid.String()))
-		rd := rand.New(rand.NewSource(int64(toUint64(pidHash))))
+		pidHash := ws.Hasher.Hash([]byte(pid))
+		rd := rand.New(rand.NewSource(int64(utils.ToUint64(pidHash))))
 		rd.Shuffle(
 			int(historyHashRingCopy.dimension),
 			func(i, j int) {
@@ -62,9 +62,9 @@ func (ws *WitnessesSelector) GetWitnessSet(
 
 	sort.Sort(byDist(distances))
 
-	witnessSet := actor.NewPIDSet()
+	witnessSet := make(map[string]bool)
 	for i := 0; i < config.WitnessSetSize; i++ {
-		witnessSet.Add(ws.NodeIds[distances[i].ind])
+		witnessSet[ws.NodeIds[distances[i].ind]] = true
 	}
 	return witnessSet
 }

@@ -7,7 +7,7 @@ const FaultyProcesses = 20
 
 // Accountability
 
-const WitnessSetSize = 16
-const WitnessThreshold = 4
+const WitnessSetSize = 2
+const WitnessThreshold = 2
 const NodeIdSize = 256
 const NumberOfBins = 32

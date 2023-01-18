@@ -2,8 +2,8 @@ package consistent
 
 import (
 	"github.com/asynkron/protoactor-go/actor"
-	"stochastic-checking-simulation/config"
 	"stochastic-checking-simulation/messages"
+	"stochastic-checking-simulation/utils"
 )
 
 type FaultyProcess struct {
@@ -24,9 +24,9 @@ func (p *FaultyProcess) Receive(context actor.Context) {
 
 	switch msg.Stage {
 	case messages.ProtocolMessage_ECHO:
-		p.process.verify(context, senderId, msg)
+		p.process.verify(context, utils.PidToString(senderId), msg)
 	case messages.ProtocolMessage_VERIFY:
-		if msg.Author == p.process.currPid {
+		if msg.Author == utils.PidToString(p.process.currPid) {
 			context.RequestWithCustomSender(
 				senderId,
 				messages.ProtocolMessage{
@@ -36,7 +36,7 @@ func (p *FaultyProcess) Receive(context actor.Context) {
 					Value: msg.Value,
 				},
 				p.process.currPid)
-		} else if p.process.verify(context, senderId, msg) {
+		} else if p.process.verify(context, utils.PidToString(senderId), msg) {
 				p.process.broadcast(
 					context,
 					&messages.ProtocolMessage{
@@ -50,7 +50,7 @@ func (p *FaultyProcess) Receive(context actor.Context) {
 }
 
 func (p *FaultyProcess) Broadcast(context actor.SenderContext, value1 int32, value2 int32) {
-	author := p.process.currPid
+	author := utils.PidToString(p.process.currPid)
 	seqNumber := p.process.msgCounter
 	p.process.msgCounter++
 
@@ -62,11 +62,14 @@ func (p *FaultyProcess) Broadcast(context actor.SenderContext, value1 int32, val
 			p.process.historyHash,
 		)
 	p.process.messagesLog[author][seqNumber] = msgState
-	
-	witnessSetPids := msgState.witnessSet.Values()
-	for i := 0; i < config.WitnessSetSize / 2; i++ {
+
+	i := 0
+	for witness := range msgState.witnessSet {
+		if i == len(msgState.witnessSet) / 2 {
+			break
+		}
 		context.RequestWithCustomSender(
-			witnessSetPids[i],
+			p.process.pids[witness],
 			&messages.ProtocolMessage{
 				Stage:     messages.ProtocolMessage_VERIFY,
 				Author:    author,
@@ -74,10 +77,11 @@ func (p *FaultyProcess) Broadcast(context actor.SenderContext, value1 int32, val
 				Value:     value1,
 			},
 			p.process.currPid)
+		i++
 	}
-	for i := config.WitnessSetSize / 2; i < config.WitnessSetSize; i++ {
+	for witness := range msgState.witnessSet {
 		context.RequestWithCustomSender(
-			witnessSetPids[i],
+			p.process.pids[witness],
 			&messages.ProtocolMessage{
 				Stage:     messages.ProtocolMessage_VERIFY,
 				Author:    author,

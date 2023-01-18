@@ -23,5 +23,5 @@ message ProtocolMessage {
   Stage stage = 1;
   int32 value = 2;
   int32 seqNumber = 3;
-  actor.PID author = 4;
+  string author = 4;
 }

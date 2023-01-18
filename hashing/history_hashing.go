@@ -1,5 +1,7 @@
 package hashing
 
+import "stochastic-checking-simulation/utils"
+
 type HistoryHash struct {
 	binNum uint
 	binCapacity uint
@@ -17,7 +19,7 @@ func NewHistoryHash(binNum uint, binCapacity uint, hasher Hasher) *HistoryHash {
 }
 
 func (hh *HistoryHash) Insert(bytes []byte) {
-	h := toUint64(hh.hasher.Hash(bytes))
+	h := utils.ToUint64(hh.hasher.Hash(bytes))
 	binIndex := h % uint64(hh.binNum)
 	direction := 1
 	if (h & uint64(hh.binNum)) == 0 {
