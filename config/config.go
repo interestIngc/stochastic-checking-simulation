@@ -9,7 +9,5 @@ const FaultyProcesses = 20
 
 const WitnessSetSize = 16
 const WitnessThreshold = 4
-
-// Cryptographic algorithm
-
-const CryptoAlgorithm = "sha256"
+const NodeIdSize = 256
+const NumberOfBins = 32

@@ -11,7 +11,7 @@ type ValueType int32
 type MessageState struct {
 	receivedEcho  map[*actor.PID]bool
 	echoCount     map[ValueType]int
-	witnessSet    []*actor.PID
+	witnessSet    *actor.PIDSet
 }
 
 func NewMessageState() *MessageState {

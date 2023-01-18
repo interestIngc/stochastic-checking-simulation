@@ -44,7 +44,5 @@ func main() {
 
 	faultyProcesses[0].Broadcast(system.Root, 0, 5)
 
-	//processes[0].Broadcast(system.Root, int32(5))
-
 	_, _ = console.ReadLine()
 }

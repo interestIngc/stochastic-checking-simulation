@@ -34,7 +34,7 @@ func (bd byDist) Less(i, j int) bool {
 
 func (ws *WitnessesSelector) GetWitnessSet(
 		author *actor.PID, seqNumber int32, historyHash *HistoryHash,
-	) []*actor.PID {
+	) *actor.PIDSet {
 	transaction := TransactionToBytes(author, seqNumber)
 	transactionRing := multiRingFromBytes(256, historyHash.binNum, ws.Hasher.Hash(transaction))
 
@@ -62,9 +62,9 @@ func (ws *WitnessesSelector) GetWitnessSet(
 
 	sort.Sort(byDist(distances))
 
-	witnessSet := make([]*actor.PID, config.WitnessSetSize)
+	witnessSet := actor.NewPIDSet()
 	for i := 0; i < config.WitnessSetSize; i++ {
-		witnessSet[i] = ws.NodeIds[distances[i].ind]
+		witnessSet.Add(ws.NodeIds[distances[i].ind])
 	}
 	return witnessSet
 }

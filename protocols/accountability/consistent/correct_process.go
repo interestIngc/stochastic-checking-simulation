@@ -3,6 +3,7 @@ package consistent
 import (
 	"fmt"
 	"github.com/asynkron/protoactor-go/actor"
+	"math"
 	"stochastic-checking-simulation/config"
 	"stochastic-checking-simulation/hashing"
 	"stochastic-checking-simulation/messages"
@@ -31,15 +32,15 @@ func (p *CorrectProcess) InitCorrectProcess(currPid *actor.PID, pids []*actor.PI
 	}
 
 	var hasher hashing.Hasher
-	if config.CryptoAlgorithm == "sha256" {
+	if config.NodeIdSize == 256 {
 		hasher = hashing.HashSHA256{}
 	} else {
 		hasher = hashing.HashSHA512{}
 	}
 
 	p.wSelector = &hashing.WitnessesSelector{NodeIds: pids, Hasher: hasher}
-	binNum := uint(len(pids) / 8)
-	p.historyHash = hashing.NewHistoryHash(binNum, 256, hasher)
+	binCapacity := uint(math.Pow(2, float64(config.NodeIdSize / config.NumberOfBins)))
+	p.historyHash = hashing.NewHistoryHash(config.NumberOfBins, binCapacity, hasher)
 }
 
 func (p *CorrectProcess) broadcast(context actor.SenderContext, message *messages.ProtocolMessage) {
@@ -55,11 +56,11 @@ func (p *CorrectProcess) verify(
 	acceptedValue, accepted := p.acceptedMessages[msg.Author][msg.SeqNumber]
 	if accepted {
 		if acceptedValue != value {
-			//fmt.Printf("%s: Detected a duplicated seq number attack\n", p.currPid.Id)
+			fmt.Printf("%s: Detected a duplicated seq number attack\n", p.currPid.Address)
 			return false
 		}
 	} else if msgState != nil {
-		if !msgState.receivedEcho[senderId] {
+		if msgState.witnessSet.Contains(senderId) && !msgState.receivedEcho[senderId] {
 			msgState.receivedEcho[senderId] = true
 			msgState.echoCount[value]++
 			if msgState.echoCount[value] >= config.WitnessThreshold {
@@ -83,7 +84,7 @@ func (p *CorrectProcess) verify(
 			SeqNumber: msg.SeqNumber,
 			Value: msg.Value,
 		}
-		for _, w := range msgState.witnessSet {
+		for _, w := range msgState.witnessSet.Values() {
 			context.RequestWithCustomSender(w, message, p.currPid)
 		}
 	}

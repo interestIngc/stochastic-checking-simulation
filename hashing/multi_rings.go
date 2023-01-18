@@ -60,7 +60,7 @@ func multiRingDistance(r1 *MultiRing, r2 *MultiRing, norm float64) (float64, err
 func multiRingFromBytes(modulo uint, dimension uint, bytes []byte) *MultiRing {
 	mr := NewMultiRing(modulo, dimension)
 	for i := 0; i < len(bytes); i++ {
-		mr.vector[i] = int(bytes[i])
+		mr.vector[i] = int(bytes[i]) % int(modulo)
 	}
 	return mr
 }

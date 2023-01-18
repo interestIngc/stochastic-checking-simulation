@@ -62,10 +62,11 @@ func (p *FaultyProcess) Broadcast(context actor.SenderContext, value1 int32, val
 			p.process.historyHash,
 		)
 	p.process.messagesLog[author][seqNumber] = msgState
-
+	
+	witnessSetPids := msgState.witnessSet.Values()
 	for i := 0; i < config.WitnessSetSize / 2; i++ {
 		context.RequestWithCustomSender(
-			msgState.witnessSet[i],
+			witnessSetPids[i],
 			&messages.ProtocolMessage{
 				Stage:     messages.ProtocolMessage_VERIFY,
 				Author:    author,
@@ -76,7 +77,7 @@ func (p *FaultyProcess) Broadcast(context actor.SenderContext, value1 int32, val
 	}
 	for i := config.WitnessSetSize / 2; i < config.WitnessSetSize; i++ {
 		context.RequestWithCustomSender(
-			msgState.witnessSet[i],
+			witnessSetPids[i],
 			&messages.ProtocolMessage{
 				Stage:     messages.ProtocolMessage_VERIFY,
 				Author:    author,
