@@ -9,8 +9,6 @@ import (
 	"net"
 	"stochastic-checking-simulation/config"
 	"stochastic-checking-simulation/messages"
-	"stochastic-checking-simulation/protocols/accountability/consistent"
-	"stochastic-checking-simulation/protocols/broadcast"
 	"stochastic-checking-simulation/utils"
 	"strconv"
 	"strings"
@@ -20,9 +18,9 @@ var (
 	nodesStr = flag.String(
 		"nodes", "",
 		"a string representing bindings host:port separated by comma, e.g. 127.0.0.1:8081,127.0.0.1:8082")
-	address = flag.String("address", "", "current node's address, e.g. 127.0.0.1:8081")
-	nameServerAddr = flag.String("nameserver", "", "address of the name server, e.g. 127.0.0.1:8080")
-	protocol = flag.String("protocol", "accountability",
+	address        = flag.String("address", "", "current node's address, e.g. 127.0.0.1:8081")
+	mainServerAddr = flag.String("mainserver", "", "address of the main server, e.g. 127.0.0.1:8080")
+	protocol       = flag.String("protocol", "accountability",
 		"A protocol to run, either accountability or broadcast")
 )
 
@@ -52,7 +50,7 @@ func main() {
 		pids[i] = actor.NewPID(nodes[i], "pid")
 	}
 
-	nameServer := actor.NewPID(*nameServerAddr,"nameserver")
+	mainServer := actor.NewPID(*mainServerAddr,"mainserver")
 
 	system := actor.NewActorSystem()
 	remoteConfig := remote.Configure(host, port)
@@ -60,7 +58,7 @@ func main() {
 	remoter.Start()
 
 	if *protocol == "accountability" {
-		process := &consistent.CorrectProcess{}
+		process := &CorrectProcess{}
 		currPid, e :=
 			system.Root.SpawnNamed(
 				actor.PropsFromProducer(
@@ -75,9 +73,9 @@ func main() {
 		}
 		process.InitCorrectProcess(currPid, pids)
 		fmt.Printf("%s: started\n", utils.PidToString(currPid))
-		system.Root.RequestWithCustomSender(nameServer, &messages.Started{}, currPid)
+		system.Root.RequestWithCustomSender(mainServer, &messages.Started{}, currPid)
 	} else {
-		process := &broadcast.Process{}
+		process := &BrachaProcess{}
 		currPid, e :=
 			system.Root.SpawnNamed(
 				actor.PropsFromProducer(
@@ -90,9 +88,9 @@ func main() {
 			fmt.Printf("Error while generating pid happened: %s\n", e)
 			return
 		}
-		process.InitProcess(currPid, pids)
+		process.InitBrachaProcess(currPid, pids)
 		fmt.Printf("%s: started\n", utils.PidToString(currPid))
-		system.Root.RequestWithCustomSender(nameServer, &messages.Started{}, currPid)
+		system.Root.RequestWithCustomSender(mainServer, &messages.Started{}, currPid)
 	}
 
 	_, _ = console.ReadLine()

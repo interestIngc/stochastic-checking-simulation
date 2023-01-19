@@ -11,15 +11,15 @@ import (
 )
 
 var (
-	nameServerAddr = flag.String("nameserver", "", "address of the name server, e.g. 127.0.0.1:8080")
+	mainServerAddr = flag.String("mainserver", "", "address of the main server, e.g. 127.0.0.1:8080")
 )
 
 func main() {
 	flag.Parse()
 
-	host, portStr, e := net.SplitHostPort(*nameServerAddr)
+	host, portStr, e := net.SplitHostPort(*mainServerAddr)
 	if e != nil {
-		fmt.Printf("Could not split %s into host and port\n", *nameServerAddr)
+		fmt.Printf("Could not split %s into host and port\n", *mainServerAddr)
 		return
 	}
 	port, e := strconv.Atoi(portStr)
@@ -33,21 +33,21 @@ func main() {
 	remoter := remote.NewRemote(system, remoteConfig)
 	remoter.Start()
 
-	server := &NameServer{}
+	server := &MainServer{}
 	pid, e := system.Root.SpawnNamed(
 		actor.PropsFromProducer(
 			func() actor.Actor {
 				return server
 			}),
-			"nameserver",
+			"mainserver",
 	)
 	if e != nil {
-		fmt.Printf("Could not start a name server: %s\n", e)
+		fmt.Printf("Could not start a main server: %s\n", e)
 		return
 	}
 
-	server.InitNameServer(pid)
-	fmt.Printf("Nameserver started at: %s\n", *nameServerAddr)
+	server.InitMainServer(pid)
+	fmt.Printf("Main server started at: %s\n", *mainServerAddr)
 
 	_, _ = console.ReadLine()
 }

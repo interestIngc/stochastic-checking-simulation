@@ -1,4 +1,4 @@
-package broadcast
+package main
 
 import (
 	"fmt"
@@ -10,7 +10,6 @@ import (
 )
 
 type Stage int32
-type ValueType int64
 
 var MessagesForEcho = int(math.Ceil(float64(config.ProcessCount + config.FaultyProcesses + 1) / float64(2)))
 const MessagesForReady = config.FaultyProcesses + 1
@@ -22,16 +21,16 @@ const (
 	SentReady
 )
 
-type MessageState struct {
+type messageState struct {
 	receivedEcho  map[string]bool
 	receivedReady map[string]bool
 	echoCount     map[ValueType]int
-	readyCount    map[ValueType]int
-	stage         Stage
+	readyCount map[ValueType]int
+	stage      Stage
 }
 
-func NewMessageState() *MessageState {
-	ms := new(MessageState)
+func newMessageState() *messageState {
+	ms := new(messageState)
 	ms.receivedEcho = make(map[string]bool)
 	ms.receivedReady = make(map[string]bool)
 	ms.echoCount = make(map[ValueType]int)
@@ -40,38 +39,38 @@ func NewMessageState() *MessageState {
 	return ms
 }
 
-type Process struct {
+type BrachaProcess struct {
 	currPid          *actor.PID
 	pids             map[string]*actor.PID
 	msgCounter       int64
 	acceptedMessages map[string]map[int64]ValueType
-	messagesLog      map[string]map[int64]*MessageState
+	messagesLog      map[string]map[int64]*messageState
 }
 
-func (p *Process) InitProcess(currPid *actor.PID, pids []*actor.PID) {
+func (p *BrachaProcess) InitBrachaProcess(currPid *actor.PID, pids []*actor.PID) {
 	p.currPid = currPid
 	p.pids = make(map[string]*actor.PID)
 	p.msgCounter = 0
 	p.acceptedMessages = make(map[string]map[int64]ValueType)
-	p.messagesLog = make(map[string]map[int64]*MessageState)
+	p.messagesLog = make(map[string]map[int64]*messageState)
 	for _, pid := range pids {
 		id := utils.PidToString(pid)
 		p.pids[id] = pid
 		p.acceptedMessages[id] = make(map[int64]ValueType)
-		p.messagesLog[id] = make(map[int64]*MessageState)
+		p.messagesLog[id] = make(map[int64]*messageState)
 	}
 }
 
-func (p *Process) broadcast(context actor.SenderContext, message *messages.BroadcastMessage) {
+func (p *BrachaProcess) broadcast(context actor.SenderContext, message *messages.BroadcastMessage) {
 	for _, pid := range p.pids {
 		context.RequestWithCustomSender(pid, message, p.currPid)
 	}
 }
 
-func (p *Process) broadcastEcho(
+func (p *BrachaProcess) broadcastEcho(
 	context actor.SenderContext,
 	initialMessage *messages.BroadcastMessage,
-	msgState *MessageState) {
+	msgState *messageState) {
 	p.broadcast(
 		context,
 		&messages.BroadcastMessage{
@@ -83,10 +82,10 @@ func (p *Process) broadcastEcho(
 	msgState.stage = SentEcho
 }
 
-func (p *Process) broadcastReady(
+func (p *BrachaProcess) broadcastReady(
 	context actor.SenderContext,
 	initialMessage *messages.BroadcastMessage,
-	msgState *MessageState) {
+	msgState *messageState) {
 	p.broadcast(
 		context,
 		&messages.BroadcastMessage{
@@ -98,7 +97,7 @@ func (p *Process) broadcastReady(
 	msgState.stage = SentReady
 }
 
-func (p *Process) checkForAccept(msg *messages.BroadcastMessage, msgState *MessageState) {
+func (p *BrachaProcess) checkForAccept(msg *messages.BroadcastMessage, msgState *messageState) {
 	value := ValueType(msg.Value)
 	if msgState.readyCount[value] >= MessagesForAccept {
 		p.acceptedMessages[msg.Author][msg.SeqNumber] = value
@@ -110,7 +109,7 @@ func (p *Process) checkForAccept(msg *messages.BroadcastMessage, msgState *Messa
 	}
 }
 
-func (p *Process) Receive(context actor.Context) {
+func (p *BrachaProcess) Receive(context actor.Context) {
 	message := context.Message()
 	switch message.(type) {
 	case *messages.Broadcast:
@@ -131,7 +130,7 @@ func (p *Process) Receive(context actor.Context) {
 
 		msgState := p.messagesLog[msg.Author][msg.SeqNumber]
 		if msgState == nil {
-			msgState = NewMessageState()
+			msgState = newMessageState()
 			p.messagesLog[msg.Author][msg.SeqNumber] = msgState
 		}
 
@@ -175,7 +174,7 @@ func (p *Process) Receive(context actor.Context) {
 	}
 }
 
-func (p *Process) Broadcast(context actor.SenderContext, value int64) {
+func (p *BrachaProcess) Broadcast(context actor.SenderContext, value int64) {
 	id := utils.PidToString(p.currPid)
 	message := &messages.BroadcastMessage{
 		Stage:     messages.BroadcastMessage_INITIAL,
