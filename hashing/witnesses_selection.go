@@ -36,7 +36,8 @@ func (ws *WitnessesSelector) GetWitnessSet(
 		author string, seqNumber int32, historyHash *HistoryHash,
 	) map[string]bool {
 	transaction := utils.TransactionToBytes(author, seqNumber)
-	transactionRing := multiRingFromBytes(256, historyHash.binNum, ws.Hasher.Hash(transaction))
+	transactionRing := multiRingFromBytes(
+		256, historyHash.binNum, ws.Hasher.Hash(transaction))
 
 	distances := make([]dist, len(ws.NodeIds))
 	for i, pid := range ws.NodeIds {

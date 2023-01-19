@@ -3,6 +3,7 @@ package hashing
 import (
 	"errors"
 	"math"
+	"stochastic-checking-simulation/utils"
 )
 
 type MultiRing struct {
@@ -28,10 +29,7 @@ func (r *MultiRing) copy() *MultiRing {
 }
 
 func (r *MultiRing) set(i uint64, value int) {
-	for value < 0 {
-		value += int(r.modulo)
-	}
-	r.vector[i] = value % int(r.modulo)
+	r.vector[i] = (value + int(r.modulo)) % int(r.modulo)
 }
 
 func (r *MultiRing) add(i uint64, value int) {
@@ -59,8 +57,16 @@ func multiRingDistance(r1 *MultiRing, r2 *MultiRing, norm float64) (float64, err
 
 func multiRingFromBytes(modulo uint, dimension uint, bytes []byte) *MultiRing {
 	mr := NewMultiRing(modulo, dimension)
-	for i := 0; i < len(bytes); i++ {
-		mr.vector[i] = int(bytes[i]) % int(modulo)
+	bytesPerDimension := uint(len(bytes) / int(dimension))
+	if bytesPerDimension > 8 {
+		bytesPerDimension = 8
+	}
+	value := make([]byte, 8)
+	for i := uint(0); i < dimension; i++ {
+		for j := uint(0); j < bytesPerDimension; j++ {
+			value[j] = bytes[i * bytesPerDimension + j]
+		}
+		mr.set(uint64(i), int(utils.ToUint64(value)))
 	}
 	return mr
 }

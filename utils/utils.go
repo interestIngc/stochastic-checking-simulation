@@ -11,7 +11,7 @@ func PidToString(pid *actor.PID) string {
 }
 
 func ToUint64(bytes []byte) uint64 {
-	return binary.LittleEndian.Uint64(bytes[:])
+	return binary.LittleEndian.Uint64(bytes)
 }
 
 func TransactionToBytes(author string, seqNumber int32) []byte {
