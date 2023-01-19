@@ -33,7 +33,7 @@ func (bd byDist) Less(i, j int) bool {
 }
 
 func (ws *WitnessesSelector) GetWitnessSet(
-		author string, seqNumber int32, historyHash *HistoryHash,
+		author string, seqNumber int64, historyHash *HistoryHash,
 	) map[string]bool {
 	transaction := utils.TransactionToBytes(author, seqNumber)
 	transactionRing := multiRingFromBytes(

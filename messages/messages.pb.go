@@ -7,7 +7,6 @@
 package messages
 
 import (
-	_ "github.com/asynkron/protoactor-go/actor"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -21,53 +20,53 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type Message_Stage int32
+type BroadcastMessage_Stage int32
 
 const (
-	Message_INITIAL Message_Stage = 0
-	Message_ECHO    Message_Stage = 1
-	Message_READY   Message_Stage = 2
+	BroadcastMessage_INITIAL BroadcastMessage_Stage = 0
+	BroadcastMessage_ECHO    BroadcastMessage_Stage = 1
+	BroadcastMessage_READY   BroadcastMessage_Stage = 2
 )
 
-// Enum value maps for Message_Stage.
+// Enum value maps for BroadcastMessage_Stage.
 var (
-	Message_Stage_name = map[int32]string{
+	BroadcastMessage_Stage_name = map[int32]string{
 		0: "INITIAL",
 		1: "ECHO",
 		2: "READY",
 	}
-	Message_Stage_value = map[string]int32{
+	BroadcastMessage_Stage_value = map[string]int32{
 		"INITIAL": 0,
 		"ECHO":    1,
 		"READY":   2,
 	}
 )
 
-func (x Message_Stage) Enum() *Message_Stage {
-	p := new(Message_Stage)
+func (x BroadcastMessage_Stage) Enum() *BroadcastMessage_Stage {
+	p := new(BroadcastMessage_Stage)
 	*p = x
 	return p
 }
 
-func (x Message_Stage) String() string {
+func (x BroadcastMessage_Stage) String() string {
 	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
 }
 
-func (Message_Stage) Descriptor() protoreflect.EnumDescriptor {
+func (BroadcastMessage_Stage) Descriptor() protoreflect.EnumDescriptor {
 	return file_messages_proto_enumTypes[0].Descriptor()
 }
 
-func (Message_Stage) Type() protoreflect.EnumType {
+func (BroadcastMessage_Stage) Type() protoreflect.EnumType {
 	return &file_messages_proto_enumTypes[0]
 }
 
-func (x Message_Stage) Number() protoreflect.EnumNumber {
+func (x BroadcastMessage_Stage) Number() protoreflect.EnumNumber {
 	return protoreflect.EnumNumber(x)
 }
 
-// Deprecated: Use Message_Stage.Descriptor instead.
-func (Message_Stage) EnumDescriptor() ([]byte, []int) {
-	return file_messages_proto_rawDescGZIP(), []int{0, 0}
+// Deprecated: Use BroadcastMessage_Stage.Descriptor instead.
+func (BroadcastMessage_Stage) EnumDescriptor() ([]byte, []int) {
+	return file_messages_proto_rawDescGZIP(), []int{3, 0}
 }
 
 type ProtocolMessage_Stage int32
@@ -113,22 +112,17 @@ func (x ProtocolMessage_Stage) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ProtocolMessage_Stage.Descriptor instead.
 func (ProtocolMessage_Stage) EnumDescriptor() ([]byte, []int) {
-	return file_messages_proto_rawDescGZIP(), []int{1, 0}
+	return file_messages_proto_rawDescGZIP(), []int{4, 0}
 }
 
-type Message struct {
+type Started struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
-
-	Stage     Message_Stage `protobuf:"varint,1,opt,name=stage,proto3,enum=messages.Message_Stage" json:"stage,omitempty"`
-	Value     int32         `protobuf:"varint,2,opt,name=value,proto3" json:"value,omitempty"`
-	SeqNumber int32         `protobuf:"varint,3,opt,name=seqNumber,proto3" json:"seqNumber,omitempty"`
-	Author    string        `protobuf:"bytes,4,opt,name=author,proto3" json:"author,omitempty"`
 }
 
-func (x *Message) Reset() {
-	*x = Message{}
+func (x *Started) Reset() {
+	*x = Started{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_messages_proto_msgTypes[0]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -136,13 +130,13 @@ func (x *Message) Reset() {
 	}
 }
 
-func (x *Message) String() string {
+func (x *Started) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*Message) ProtoMessage() {}
+func (*Started) ProtoMessage() {}
 
-func (x *Message) ProtoReflect() protoreflect.Message {
+func (x *Started) ProtoReflect() protoreflect.Message {
 	mi := &file_messages_proto_msgTypes[0]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -154,33 +148,178 @@ func (x *Message) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use Message.ProtoReflect.Descriptor instead.
-func (*Message) Descriptor() ([]byte, []int) {
+// Deprecated: Use Started.ProtoReflect.Descriptor instead.
+func (*Started) Descriptor() ([]byte, []int) {
 	return file_messages_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *Message) GetStage() Message_Stage {
-	if x != nil {
-		return x.Stage
-	}
-	return Message_INITIAL
+type Broadcast struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Value int64 `protobuf:"varint,1,opt,name=value,proto3" json:"value,omitempty"`
 }
 
-func (x *Message) GetValue() int32 {
+func (x *Broadcast) Reset() {
+	*x = Broadcast{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_messages_proto_msgTypes[1]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *Broadcast) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Broadcast) ProtoMessage() {}
+
+func (x *Broadcast) ProtoReflect() protoreflect.Message {
+	mi := &file_messages_proto_msgTypes[1]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Broadcast.ProtoReflect.Descriptor instead.
+func (*Broadcast) Descriptor() ([]byte, []int) {
+	return file_messages_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *Broadcast) GetValue() int64 {
 	if x != nil {
 		return x.Value
 	}
 	return 0
 }
 
-func (x *Message) GetSeqNumber() int32 {
+type FaultyBroadcast struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Value1 int64 `protobuf:"varint,1,opt,name=value1,proto3" json:"value1,omitempty"`
+	Value2 int64 `protobuf:"varint,2,opt,name=value2,proto3" json:"value2,omitempty"`
+}
+
+func (x *FaultyBroadcast) Reset() {
+	*x = FaultyBroadcast{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_messages_proto_msgTypes[2]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *FaultyBroadcast) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FaultyBroadcast) ProtoMessage() {}
+
+func (x *FaultyBroadcast) ProtoReflect() protoreflect.Message {
+	mi := &file_messages_proto_msgTypes[2]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FaultyBroadcast.ProtoReflect.Descriptor instead.
+func (*FaultyBroadcast) Descriptor() ([]byte, []int) {
+	return file_messages_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *FaultyBroadcast) GetValue1() int64 {
+	if x != nil {
+		return x.Value1
+	}
+	return 0
+}
+
+func (x *FaultyBroadcast) GetValue2() int64 {
+	if x != nil {
+		return x.Value2
+	}
+	return 0
+}
+
+type BroadcastMessage struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Stage     BroadcastMessage_Stage `protobuf:"varint,1,opt,name=stage,proto3,enum=messages.BroadcastMessage_Stage" json:"stage,omitempty"`
+	Value     int64                  `protobuf:"varint,2,opt,name=value,proto3" json:"value,omitempty"`
+	SeqNumber int64                  `protobuf:"varint,3,opt,name=seqNumber,proto3" json:"seqNumber,omitempty"`
+	Author    string                 `protobuf:"bytes,4,opt,name=author,proto3" json:"author,omitempty"`
+}
+
+func (x *BroadcastMessage) Reset() {
+	*x = BroadcastMessage{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_messages_proto_msgTypes[3]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *BroadcastMessage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BroadcastMessage) ProtoMessage() {}
+
+func (x *BroadcastMessage) ProtoReflect() protoreflect.Message {
+	mi := &file_messages_proto_msgTypes[3]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BroadcastMessage.ProtoReflect.Descriptor instead.
+func (*BroadcastMessage) Descriptor() ([]byte, []int) {
+	return file_messages_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *BroadcastMessage) GetStage() BroadcastMessage_Stage {
+	if x != nil {
+		return x.Stage
+	}
+	return BroadcastMessage_INITIAL
+}
+
+func (x *BroadcastMessage) GetValue() int64 {
+	if x != nil {
+		return x.Value
+	}
+	return 0
+}
+
+func (x *BroadcastMessage) GetSeqNumber() int64 {
 	if x != nil {
 		return x.SeqNumber
 	}
 	return 0
 }
 
-func (x *Message) GetAuthor() string {
+func (x *BroadcastMessage) GetAuthor() string {
 	if x != nil {
 		return x.Author
 	}
@@ -193,15 +332,15 @@ type ProtocolMessage struct {
 	unknownFields protoimpl.UnknownFields
 
 	Stage     ProtocolMessage_Stage `protobuf:"varint,1,opt,name=stage,proto3,enum=messages.ProtocolMessage_Stage" json:"stage,omitempty"`
-	Value     int32                 `protobuf:"varint,2,opt,name=value,proto3" json:"value,omitempty"`
-	SeqNumber int32                 `protobuf:"varint,3,opt,name=seqNumber,proto3" json:"seqNumber,omitempty"`
+	Value     int64                 `protobuf:"varint,2,opt,name=value,proto3" json:"value,omitempty"`
+	SeqNumber int64                 `protobuf:"varint,3,opt,name=seqNumber,proto3" json:"seqNumber,omitempty"`
 	Author    string                `protobuf:"bytes,4,opt,name=author,proto3" json:"author,omitempty"`
 }
 
 func (x *ProtocolMessage) Reset() {
 	*x = ProtocolMessage{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_messages_proto_msgTypes[1]
+		mi := &file_messages_proto_msgTypes[4]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -214,7 +353,7 @@ func (x *ProtocolMessage) String() string {
 func (*ProtocolMessage) ProtoMessage() {}
 
 func (x *ProtocolMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_messages_proto_msgTypes[1]
+	mi := &file_messages_proto_msgTypes[4]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -227,7 +366,7 @@ func (x *ProtocolMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProtocolMessage.ProtoReflect.Descriptor instead.
 func (*ProtocolMessage) Descriptor() ([]byte, []int) {
-	return file_messages_proto_rawDescGZIP(), []int{1}
+	return file_messages_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *ProtocolMessage) GetStage() ProtocolMessage_Stage {
@@ -237,14 +376,14 @@ func (x *ProtocolMessage) GetStage() ProtocolMessage_Stage {
 	return ProtocolMessage_ECHO
 }
 
-func (x *ProtocolMessage) GetValue() int32 {
+func (x *ProtocolMessage) GetValue() int64 {
 	if x != nil {
 		return x.Value
 	}
 	return 0
 }
 
-func (x *ProtocolMessage) GetSeqNumber() int32 {
+func (x *ProtocolMessage) GetSeqNumber() int64 {
 	if x != nil {
 		return x.SeqNumber
 	}
@@ -262,34 +401,41 @@ var File_messages_proto protoreflect.FileDescriptor
 
 var file_messages_proto_rawDesc = []byte{
 	0x0a, 0x0e, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x73, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f,
-	0x12, 0x08, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x73, 0x1a, 0x0b, 0x61, 0x63, 0x74, 0x6f,
-	0x72, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x22, 0xaf, 0x01, 0x0a, 0x07, 0x4d, 0x65, 0x73, 0x73,
-	0x61, 0x67, 0x65, 0x12, 0x2d, 0x0a, 0x05, 0x73, 0x74, 0x61, 0x67, 0x65, 0x18, 0x01, 0x20, 0x01,
-	0x28, 0x0e, 0x32, 0x17, 0x2e, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x73, 0x2e, 0x4d, 0x65,
-	0x73, 0x73, 0x61, 0x67, 0x65, 0x2e, 0x53, 0x74, 0x61, 0x67, 0x65, 0x52, 0x05, 0x73, 0x74, 0x61,
-	0x67, 0x65, 0x12, 0x14, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28,
-	0x05, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x12, 0x1c, 0x0a, 0x09, 0x73, 0x65, 0x71, 0x4e,
-	0x75, 0x6d, 0x62, 0x65, 0x72, 0x18, 0x03, 0x20, 0x01, 0x28, 0x05, 0x52, 0x09, 0x73, 0x65, 0x71,
-	0x4e, 0x75, 0x6d, 0x62, 0x65, 0x72, 0x12, 0x16, 0x0a, 0x06, 0x61, 0x75, 0x74, 0x68, 0x6f, 0x72,
-	0x18, 0x04, 0x20, 0x01, 0x28, 0x09, 0x52, 0x06, 0x61, 0x75, 0x74, 0x68, 0x6f, 0x72, 0x22, 0x29,
-	0x0a, 0x05, 0x53, 0x74, 0x61, 0x67, 0x65, 0x12, 0x0b, 0x0a, 0x07, 0x49, 0x4e, 0x49, 0x54, 0x49,
-	0x41, 0x4c, 0x10, 0x00, 0x12, 0x08, 0x0a, 0x04, 0x45, 0x43, 0x48, 0x4f, 0x10, 0x01, 0x12, 0x09,
-	0x0a, 0x05, 0x52, 0x45, 0x41, 0x44, 0x59, 0x10, 0x02, 0x22, 0xb3, 0x01, 0x0a, 0x0f, 0x50, 0x72,
-	0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x12, 0x35, 0x0a,
-	0x05, 0x73, 0x74, 0x61, 0x67, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0e, 0x32, 0x1f, 0x2e, 0x6d,
-	0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x73, 0x2e, 0x50, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c,
-	0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x2e, 0x53, 0x74, 0x61, 0x67, 0x65, 0x52, 0x05, 0x73,
-	0x74, 0x61, 0x67, 0x65, 0x12, 0x14, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x02, 0x20,
-	0x01, 0x28, 0x05, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x12, 0x1c, 0x0a, 0x09, 0x73, 0x65,
-	0x71, 0x4e, 0x75, 0x6d, 0x62, 0x65, 0x72, 0x18, 0x03, 0x20, 0x01, 0x28, 0x05, 0x52, 0x09, 0x73,
-	0x65, 0x71, 0x4e, 0x75, 0x6d, 0x62, 0x65, 0x72, 0x12, 0x16, 0x0a, 0x06, 0x61, 0x75, 0x74, 0x68,
-	0x6f, 0x72, 0x18, 0x04, 0x20, 0x01, 0x28, 0x09, 0x52, 0x06, 0x61, 0x75, 0x74, 0x68, 0x6f, 0x72,
-	0x22, 0x1d, 0x0a, 0x05, 0x53, 0x74, 0x61, 0x67, 0x65, 0x12, 0x08, 0x0a, 0x04, 0x45, 0x43, 0x48,
-	0x4f, 0x10, 0x00, 0x12, 0x0a, 0x0a, 0x06, 0x56, 0x45, 0x52, 0x49, 0x46, 0x59, 0x10, 0x01, 0x42,
-	0x29, 0x5a, 0x27, 0x73, 0x74, 0x6f, 0x63, 0x68, 0x61, 0x73, 0x74, 0x69, 0x63, 0x2d, 0x63, 0x68,
-	0x65, 0x63, 0x6b, 0x69, 0x6e, 0x67, 0x2d, 0x73, 0x69, 0x6d, 0x75, 0x6c, 0x61, 0x74, 0x69, 0x6f,
-	0x6e, 0x2f, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x73, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74,
-	0x6f, 0x33,
+	0x12, 0x08, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x73, 0x22, 0x09, 0x0a, 0x07, 0x53, 0x74,
+	0x61, 0x72, 0x74, 0x65, 0x64, 0x22, 0x21, 0x0a, 0x09, 0x42, 0x72, 0x6f, 0x61, 0x64, 0x63, 0x61,
+	0x73, 0x74, 0x12, 0x14, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28,
+	0x03, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x22, 0x41, 0x0a, 0x0f, 0x46, 0x61, 0x75, 0x6c,
+	0x74, 0x79, 0x42, 0x72, 0x6f, 0x61, 0x64, 0x63, 0x61, 0x73, 0x74, 0x12, 0x16, 0x0a, 0x06, 0x76,
+	0x61, 0x6c, 0x75, 0x65, 0x31, 0x18, 0x01, 0x20, 0x01, 0x28, 0x03, 0x52, 0x06, 0x76, 0x61, 0x6c,
+	0x75, 0x65, 0x31, 0x12, 0x16, 0x0a, 0x06, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x32, 0x18, 0x02, 0x20,
+	0x01, 0x28, 0x03, 0x52, 0x06, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x32, 0x22, 0xc1, 0x01, 0x0a, 0x10,
+	0x42, 0x72, 0x6f, 0x61, 0x64, 0x63, 0x61, 0x73, 0x74, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65,
+	0x12, 0x36, 0x0a, 0x05, 0x73, 0x74, 0x61, 0x67, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0e, 0x32,
+	0x20, 0x2e, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x73, 0x2e, 0x42, 0x72, 0x6f, 0x61, 0x64,
+	0x63, 0x61, 0x73, 0x74, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x2e, 0x53, 0x74, 0x61, 0x67,
+	0x65, 0x52, 0x05, 0x73, 0x74, 0x61, 0x67, 0x65, 0x12, 0x14, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75,
+	0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x03, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x12, 0x1c,
+	0x0a, 0x09, 0x73, 0x65, 0x71, 0x4e, 0x75, 0x6d, 0x62, 0x65, 0x72, 0x18, 0x03, 0x20, 0x01, 0x28,
+	0x03, 0x52, 0x09, 0x73, 0x65, 0x71, 0x4e, 0x75, 0x6d, 0x62, 0x65, 0x72, 0x12, 0x16, 0x0a, 0x06,
+	0x61, 0x75, 0x74, 0x68, 0x6f, 0x72, 0x18, 0x04, 0x20, 0x01, 0x28, 0x09, 0x52, 0x06, 0x61, 0x75,
+	0x74, 0x68, 0x6f, 0x72, 0x22, 0x29, 0x0a, 0x05, 0x53, 0x74, 0x61, 0x67, 0x65, 0x12, 0x0b, 0x0a,
+	0x07, 0x49, 0x4e, 0x49, 0x54, 0x49, 0x41, 0x4c, 0x10, 0x00, 0x12, 0x08, 0x0a, 0x04, 0x45, 0x43,
+	0x48, 0x4f, 0x10, 0x01, 0x12, 0x09, 0x0a, 0x05, 0x52, 0x45, 0x41, 0x44, 0x59, 0x10, 0x02, 0x22,
+	0xb3, 0x01, 0x0a, 0x0f, 0x50, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x4d, 0x65, 0x73, 0x73,
+	0x61, 0x67, 0x65, 0x12, 0x35, 0x0a, 0x05, 0x73, 0x74, 0x61, 0x67, 0x65, 0x18, 0x01, 0x20, 0x01,
+	0x28, 0x0e, 0x32, 0x1f, 0x2e, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x73, 0x2e, 0x50, 0x72,
+	0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x2e, 0x53, 0x74,
+	0x61, 0x67, 0x65, 0x52, 0x05, 0x73, 0x74, 0x61, 0x67, 0x65, 0x12, 0x14, 0x0a, 0x05, 0x76, 0x61,
+	0x6c, 0x75, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x03, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65,
+	0x12, 0x1c, 0x0a, 0x09, 0x73, 0x65, 0x71, 0x4e, 0x75, 0x6d, 0x62, 0x65, 0x72, 0x18, 0x03, 0x20,
+	0x01, 0x28, 0x03, 0x52, 0x09, 0x73, 0x65, 0x71, 0x4e, 0x75, 0x6d, 0x62, 0x65, 0x72, 0x12, 0x16,
+	0x0a, 0x06, 0x61, 0x75, 0x74, 0x68, 0x6f, 0x72, 0x18, 0x04, 0x20, 0x01, 0x28, 0x09, 0x52, 0x06,
+	0x61, 0x75, 0x74, 0x68, 0x6f, 0x72, 0x22, 0x1d, 0x0a, 0x05, 0x53, 0x74, 0x61, 0x67, 0x65, 0x12,
+	0x08, 0x0a, 0x04, 0x45, 0x43, 0x48, 0x4f, 0x10, 0x00, 0x12, 0x0a, 0x0a, 0x06, 0x56, 0x45, 0x52,
+	0x49, 0x46, 0x59, 0x10, 0x01, 0x42, 0x29, 0x5a, 0x27, 0x73, 0x74, 0x6f, 0x63, 0x68, 0x61, 0x73,
+	0x74, 0x69, 0x63, 0x2d, 0x63, 0x68, 0x65, 0x63, 0x6b, 0x69, 0x6e, 0x67, 0x2d, 0x73, 0x69, 0x6d,
+	0x75, 0x6c, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2f, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x73,
+	0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -305,15 +451,18 @@ func file_messages_proto_rawDescGZIP() []byte {
 }
 
 var file_messages_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_messages_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_messages_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_messages_proto_goTypes = []interface{}{
-	(Message_Stage)(0),         // 0: messages.Message.Stage
-	(ProtocolMessage_Stage)(0), // 1: messages.ProtocolMessage.Stage
-	(*Message)(nil),            // 2: messages.Message
-	(*ProtocolMessage)(nil),    // 3: messages.ProtocolMessage
+	(BroadcastMessage_Stage)(0), // 0: messages.BroadcastMessage.Stage
+	(ProtocolMessage_Stage)(0),  // 1: messages.ProtocolMessage.Stage
+	(*Started)(nil),             // 2: messages.Started
+	(*Broadcast)(nil),           // 3: messages.Broadcast
+	(*FaultyBroadcast)(nil),     // 4: messages.FaultyBroadcast
+	(*BroadcastMessage)(nil),    // 5: messages.BroadcastMessage
+	(*ProtocolMessage)(nil),     // 6: messages.ProtocolMessage
 }
 var file_messages_proto_depIdxs = []int32{
-	0, // 0: messages.Message.stage:type_name -> messages.Message.Stage
+	0, // 0: messages.BroadcastMessage.stage:type_name -> messages.BroadcastMessage.Stage
 	1, // 1: messages.ProtocolMessage.stage:type_name -> messages.ProtocolMessage.Stage
 	2, // [2:2] is the sub-list for method output_type
 	2, // [2:2] is the sub-list for method input_type
@@ -329,7 +478,7 @@ func file_messages_proto_init() {
 	}
 	if !protoimpl.UnsafeEnabled {
 		file_messages_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*Message); i {
+			switch v := v.(*Started); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -341,6 +490,42 @@ func file_messages_proto_init() {
 			}
 		}
 		file_messages_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*Broadcast); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_messages_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*FaultyBroadcast); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_messages_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*BroadcastMessage); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_messages_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*ProtocolMessage); i {
 			case 0:
 				return &v.state
@@ -359,7 +544,7 @@ func file_messages_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_messages_proto_rawDesc,
 			NumEnums:      2,
-			NumMessages:   2,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

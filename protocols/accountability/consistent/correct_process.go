@@ -13,9 +13,9 @@ import (
 type CorrectProcess struct {
 	currPid          *actor.PID
 	pids             map[string]*actor.PID
-	msgCounter       int32
-	acceptedMessages map[string]map[int32]ValueType
-	messagesLog      map[string]map[int32]*MessageState
+	msgCounter       int64
+	acceptedMessages map[string]map[int64]ValueType
+	messagesLog      map[string]map[int64]*MessageState
 	wSelector        *hashing.WitnessesSelector
 	historyHash      *hashing.HistoryHash
 }
@@ -24,16 +24,16 @@ func (p *CorrectProcess) InitCorrectProcess(currPid *actor.PID, pids []*actor.PI
 	p.currPid = currPid
 	p.msgCounter = 0
 	p.pids = make(map[string]*actor.PID)
-	p.acceptedMessages = make(map[string]map[int32]ValueType)
-	p.messagesLog = make(map[string]map[int32]*MessageState)
+	p.acceptedMessages = make(map[string]map[int64]ValueType)
+	p.messagesLog = make(map[string]map[int64]*MessageState)
 
 	ids := make([]string, len(pids))
 	for i, pid := range pids {
 		id := utils.PidToString(pid)
 		ids[i] = id
 		p.pids[id] = pid
-		p.acceptedMessages[id] = make(map[int32]ValueType)
-		p.messagesLog[id] = make(map[int32]*MessageState)
+		p.acceptedMessages[id] = make(map[int64]ValueType)
+		p.messagesLog[id] = make(map[int64]*MessageState)
 	}
 
 	var hasher hashing.Hasher
@@ -98,27 +98,32 @@ func (p *CorrectProcess) verify(
 }
 
 func (p *CorrectProcess) Receive(context actor.Context) {
-	msg, ok := context.Message().(*messages.ProtocolMessage)
-	if !ok {
-		return
-	}
-	senderId := utils.PidToString(context.Sender())
+	message := context.Message()
 
-	doBroadcast := p.verify(context, senderId, msg)
+	switch message.(type) {
+	case *messages.Broadcast:
+		msg := message.(*messages.Broadcast)
+		p.Broadcast(context, msg.Value)
+	case *messages.ProtocolMessage:
+		msg := message.(*messages.ProtocolMessage)
+		senderId := utils.PidToString(context.Sender())
 
-	if msg.Stage == messages.ProtocolMessage_VERIFY && doBroadcast {
-		p.broadcast(
-			context,
-			&messages.ProtocolMessage{
-				Stage: messages.ProtocolMessage_ECHO,
-				Author: msg.Author,
-				SeqNumber: msg.SeqNumber,
-				Value: msg.Value,
-			})
+		doBroadcast := p.verify(context, senderId, msg)
+
+		if msg.Stage == messages.ProtocolMessage_VERIFY && doBroadcast {
+			p.broadcast(
+				context,
+				&messages.ProtocolMessage{
+					Stage: messages.ProtocolMessage_ECHO,
+					Author: msg.Author,
+					SeqNumber: msg.SeqNumber,
+					Value: msg.Value,
+				})
+		}
 	}
 }
 
-func (p *CorrectProcess) Broadcast(context actor.SenderContext, value int32) {
+func (p *CorrectProcess) Broadcast(context actor.SenderContext, value int64) {
 	id := utils.PidToString(p.currPid)
 	msg := &messages.ProtocolMessage{
 		Stage: messages.ProtocolMessage_ECHO,

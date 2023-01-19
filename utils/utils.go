@@ -14,9 +14,9 @@ func ToUint64(bytes []byte) uint64 {
 	return binary.LittleEndian.Uint64(bytes)
 }
 
-func TransactionToBytes(author string, seqNumber int32) []byte {
-	bytes := make([]byte, 4)
-	binary.LittleEndian.PutUint32(bytes, uint32(seqNumber))
+func TransactionToBytes(author string, seqNumber int64) []byte {
+	bytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(bytes, uint64(seqNumber))
 	return addBytes([]byte(author), bytes)
 }
 

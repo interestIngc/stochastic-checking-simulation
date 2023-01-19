@@ -6,7 +6,7 @@ type Process interface {
 	Receive(actor.Context)
 }
 
-type ValueType int32
+type ValueType int64
 
 type MessageState struct {
 	receivedEcho  map[string]bool
