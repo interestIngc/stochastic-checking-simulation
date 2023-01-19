@@ -23,8 +23,8 @@ const (
 )
 
 type MessageState struct {
-	receivedEcho  map[*actor.PID]bool
-	receivedReady map[*actor.PID]bool
+	receivedEcho  map[string]bool
+	receivedReady map[string]bool
 	echoCount     map[ValueType]int
 	readyCount    map[ValueType]int
 	stage         Stage
@@ -32,8 +32,8 @@ type MessageState struct {
 
 func NewMessageState() *MessageState {
 	ms := new(MessageState)
-	ms.receivedEcho = make(map[*actor.PID]bool)
-	ms.receivedReady = make(map[*actor.PID]bool)
+	ms.receivedEcho = make(map[string]bool)
+	ms.receivedReady = make(map[string]bool)
 	ms.echoCount = make(map[ValueType]int)
 	ms.readyCount = make(map[ValueType]int)
 	ms.stage = Init
@@ -42,21 +42,23 @@ func NewMessageState() *MessageState {
 
 type Process struct {
 	currPid          *actor.PID
-	pids             []*actor.PID
+	pids             map[string]*actor.PID
 	msgCounter       int32
-	acceptedMessages map[*actor.PID]map[int32]ValueType
-	messagesLog      map[*actor.PID]map[int32]*MessageState
+	acceptedMessages map[string]map[int32]ValueType
+	messagesLog      map[string]map[int32]*MessageState
 }
 
 func (p *Process) InitProcess(currPid *actor.PID, pids []*actor.PID) {
 	p.currPid = currPid
-	p.pids = pids
+	p.pids = make(map[string]*actor.PID)
 	p.msgCounter = 0
-	p.acceptedMessages = make(map[*actor.PID]map[int32]ValueType)
-	p.messagesLog = make(map[*actor.PID]map[int32]*MessageState)
+	p.acceptedMessages = make(map[string]map[int32]ValueType)
+	p.messagesLog = make(map[string]map[int32]*MessageState)
 	for _, pid := range pids {
-		p.acceptedMessages[pid] = make(map[int32]ValueType)
-		p.messagesLog[pid] = make(map[int32]*MessageState)
+		id := utils.PidToString(pid)
+		p.pids[id] = pid
+		p.acceptedMessages[id] = make(map[int32]ValueType)
+		p.messagesLog[id] = make(map[int32]*MessageState)
 	}
 }
 
@@ -118,7 +120,7 @@ func (p *Process) Receive(context actor.Context) {
 	if !ok {
 		return
 	}
-	senderId := context.Sender()
+	sender := utils.PidToString(context.Sender())
 	value := ValueType(msg.Value)
 
 	acceptedValue, accepted := p.acceptedMessages[msg.Author][msg.SeqNumber]
@@ -141,10 +143,10 @@ func (p *Process) Receive(context actor.Context) {
 			p.broadcastEcho(context, msg, msgState)
 		}
 	case messages.Message_ECHO:
-		if msgState.stage == SentReady || msgState.receivedEcho[senderId] {
+		if msgState.stage == SentReady || msgState.receivedEcho[sender] {
 			return
 		}
-		msgState.receivedEcho[senderId] = true
+		msgState.receivedEcho[sender] = true
 		msgState.echoCount[value]++
 
 		if msgState.echoCount[value] >= MessagesForEcho {
@@ -156,10 +158,10 @@ func (p *Process) Receive(context actor.Context) {
 			}
 		}
 	case messages.Message_READY:
-		if msgState.receivedReady[senderId] {
+		if msgState.receivedReady[sender] {
 			return
 		}
-		msgState.receivedReady[senderId] = true
+		msgState.receivedReady[sender] = true
 		msgState.readyCount[value]++
 
 		if msgState.readyCount[value] >= MessagesForReady {
@@ -175,16 +177,17 @@ func (p *Process) Receive(context actor.Context) {
 }
 
 func (p *Process) Broadcast(context actor.SenderContext, value int32) {
+	id := utils.PidToString(p.currPid)
 	message := &messages.Message{
 		Stage:     messages.Message_INITIAL,
-		Author:    p.currPid,
+		Author:    id,
 		SeqNumber: p.msgCounter,
 		Value:     value,
 	}
 	p.broadcast(context, message)
 
 	msgState := NewMessageState()
-	p.messagesLog[p.currPid][p.msgCounter] = msgState
+	p.messagesLog[id][p.msgCounter] = msgState
 	p.broadcastEcho(context, message, msgState)
 
 	p.msgCounter++

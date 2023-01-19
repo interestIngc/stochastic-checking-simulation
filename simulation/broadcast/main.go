@@ -31,7 +31,7 @@ func main() {
 		processes[i].InitProcess(pids[i], pids)
 	}
 
-	processes[0].Broadcast(system.Root, int32(5))
+	processes[0].Broadcast(system.Root, 5)
 
 	//for seq := 0; seq < 4; seq++ {
 	//	for i := 0; i < config.ProcessCount; i++ {
