@@ -22,6 +22,11 @@ var (
 	mainServerAddr = flag.String("mainserver", "", "address of the main server, e.g. 127.0.0.1:8080")
 	protocol       = flag.String("protocol", "accountability",
 		"A protocol to run, either accountability or broadcast")
+	faultyProcesses = flag.Int("f", 0, "max number of faulty processes in the system")
+	witnessSetSize = flag.Int("w", 0, "size of the witness set")
+	witnessThreshold = flag.Int("u", 0, "witnesses threshold to accept a transaction")
+	nodeIdSize = flag.Int("node_id_size", 256, "node id size, default is 256")
+	numberOfBins = flag.Int("number_of_bins", 32, "number of bins in history hash, default is 32")
 )
 
 func main() {
@@ -33,17 +38,19 @@ func main() {
 		fmt.Printf("Could not split %s into host and port\n", *address)
 		return
 	}
-	if len(nodes) != config.ProcessCount {
-		fmt.Printf(
-			"Number of bindings defined in nodes flag must be equal to the number of processes in the system\n")
-		return
-	}
 
 	port, e := strconv.Atoi(portStr)
 	if e != nil {
 		fmt.Printf("Could not convert port string representation into int: %s\n", e)
 		return
 	}
+
+	config.ProcessCount = len(nodes)
+	config.FaultyProcesses = *faultyProcesses
+	config.WitnessSetSize = *witnessSetSize
+	config.WitnessThreshold = *witnessThreshold
+	config.NodeIdSize = *nodeIdSize
+	config.NumberOfBins = *numberOfBins
 
 	pids := make([]*actor.PID, len(nodes))
 	for i := 0; i < len(nodes); i++ {

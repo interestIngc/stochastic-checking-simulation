@@ -2,12 +2,12 @@ package config
 
 // Broadcast
 
-const ProcessCount = 256
-const FaultyProcesses = 20
+var ProcessCount = 256
+var FaultyProcesses = 20
 
 // Accountability
 
-const WitnessSetSize = 16
-const WitnessThreshold = 4
-const NodeIdSize = 256
-const NumberOfBins = 32
+var WitnessSetSize = 16
+var WitnessThreshold = 4
+var NodeIdSize = 256
+var NumberOfBins = 32

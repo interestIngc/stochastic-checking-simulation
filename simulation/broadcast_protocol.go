@@ -12,8 +12,8 @@ import (
 type Stage int32
 
 var MessagesForEcho = int(math.Ceil(float64(config.ProcessCount + config.FaultyProcesses + 1) / float64(2)))
-const MessagesForReady = config.FaultyProcesses + 1
-const MessagesForAccept = 2 * config.FaultyProcesses + 1
+var MessagesForReady = config.FaultyProcesses + 1
+var MessagesForAccept = 2 * config.FaultyProcesses + 1
 
 const (
 	Init Stage = iota

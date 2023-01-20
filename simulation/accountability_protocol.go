@@ -58,7 +58,7 @@ func (p *CorrectProcess) InitCorrectProcess(currPid *actor.PID, pids []*actor.PI
 
 	p.wSelector = &hashing.WitnessesSelector{NodeIds: ids, Hasher: hasher}
 	binCapacity := uint(math.Pow(2, float64(config.NodeIdSize / config.NumberOfBins)))
-	p.historyHash = hashing.NewHistoryHash(config.NumberOfBins, binCapacity, hasher)
+	p.historyHash = hashing.NewHistoryHash(uint(config.NumberOfBins), binCapacity, hasher)
 }
 
 func (p *CorrectProcess) broadcast(context actor.SenderContext, message *messages.ProtocolMessage) {
