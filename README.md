@@ -3,43 +3,44 @@
 ## Command to start the main server (must be called before starting nodes)
 
 ```
-go run mainserver/server.go mainserver/main.go --mainserver @{MainServerAddress} --n @{N} --f @{F} --w @{W} --u @{U} --node_id_size @{NodeIdSize} --number_of_bins @{NumberOfBins}
+go run mainserver/server.go mainserver/main.go --mainserver @{MainServerAddress} --n @{N}
 ```
 
 ### Where
 @{MainServerAddress} - address of the main server, e.g. 127.0.0.1:8080  
 @{N} - the number of processes in the system (excluding the main server)  
-@{F} - the max number of faulty processes in the system  
-@{W} - size of the witness set  
-@{U} - witnesses threshold to accept a transaction  
-@{NodeIdSize} - node id size, default is 256 (optional)  
-@{NumberOfBins} - number of bins in history hash, default is 32 (optional)
 
 ### Example command
 
 ```
-go run mainserver/server.go mainserver/main.go --mainserver 127.0.0.1:8080 --n 2 --f 0 --w 2 --u 2
+go run mainserver/server.go mainserver/main.go --mainserver 127.0.0.1:8080 --n 2
 ```
 
 ## Command to start a node:
 
 ```
-go run simulation/*.go --nodes @{Nodes} --mainserver @{MainServerAddress} --protocol @{Protocol} --address @{NodeAddress} --f @{F} --w @{W} --u @{U} --node_id_size @{NodeIdSize} --number_of_bins @{NumberOfBins}
+go run simulation/main.go --nodes @{Nodes} --mainserver @{MainServerAddress} --protocol @{Protocol} \
+--address @{NodeAddress} --f @{F} --w @{W} --v @{V} --u @{U} \
+--node_id_size @{NodeIdSize} --number_of_bins @{NumberOfBins}
 ```
 
 ### Where
-@{Nodes} is a string representing bindings host:port separated by comma, e.g. 127.0.0.1:8081,127.0.0.1:8082  
-@{MainServerAddress} is address of the main server, e.g. 127.0.0.1:8080  
-@{Protocol} is a protocol to run, either accountability or broadcast  
-@{NodeAddress} is current node's address, e.g. 127.0.0.1:8081  
-@{F} - the max number of faulty processes in the system  
-@{W} - size of the witness set  
+@{Nodes} - string representing bindings host:port separated by comma, e.g. 127.0.0.1:8081,127.0.0.1:8082   
+@{MainServerAddress} - address of the main server, e.g. 127.0.0.1:8080  
+@{Protocol} - a protocol to run, one of: reliable_accountability, consistent_accountability, bracha, 
+default reliable_accountability (optional)  
+@{NodeAddress} - current node's address, e.g. 127.0.0.1:8081  
+@{F} - max number of faulty processes in the system  
+@{W} - size of the own witness set W  
+@{V} - size of the pot witness set V  
 @{U} - witnesses threshold to accept a transaction  
-@{NodeIdSize} - node id size, default is 256 (optional)  
-@{NumberOfBins} - number of bins in history hash, default is 32 (optional)
+@{NodeIdSize} - node id size, default 256 (optional)  
+@{NumberOfBins} - number of bins in history hash, default 32 (optional)  
 
 ### Example command
 
 ```
-go run simulation/*.go --nodes 127.0.0.1:8081,127.0.0.1:8082 --mainserver 127.0.0.1:8080 --protocol accountability --address 127.0.0.1:8082 --f 0 --w 2 --u 2
+go run simulation/main.go --nodes 127.0.0.1:8081,127.0.0.1:8082 --mainserver 127.0.0.1:8080 \
+--protocol reliable_accountability --address 127.0.0.1:8081 \
+--f 0 --w 2 --v 2 --u 2
 ```

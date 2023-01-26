@@ -34,7 +34,7 @@ type CorrectProcess struct {
 	historyHash      *hashing.HistoryHash
 }
 
-func (p *CorrectProcess) InitCorrectProcess(currPid *actor.PID, pids []*actor.PID) {
+func (p *CorrectProcess) InitProcess(currPid *actor.PID, pids []*actor.PID) {
 	p.currPid = currPid
 	p.msgCounter = 0
 	p.pids = make(map[string]*actor.PID)

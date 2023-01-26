@@ -10,9 +10,9 @@ type FaultyProcess struct {
 	process *CorrectProcess
 }
 
-func (p *FaultyProcess) InitFaultyProcess(currPid *actor.PID, pids []*actor.PID) {
+func (p *FaultyProcess) InitProcess(currPid *actor.PID, pids []*actor.PID) {
 	p.process = &CorrectProcess{}
-	p.process.InitCorrectProcess(currPid, pids)
+	p.process.InitProcess(currPid, pids)
 }
 
 func (p *FaultyProcess) Receive(context actor.Context) {

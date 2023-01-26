@@ -46,10 +46,10 @@ func main() {
 			)
 	}
 	for i := 0; i < config.FaultyProcesses; i++ {
-		faultyProcesses[i].InitFaultyProcess(pids[i], pids)
+		faultyProcesses[i].InitProcess(pids[i], pids)
 	}
 	for i := 0; i < config.ProcessCount - config.FaultyProcesses; i++ {
-		correctProcesses[i].InitCorrectProcess(pids[i + config.FaultyProcesses], pids)
+		correctProcesses[i].InitProcess(pids[i + config.FaultyProcesses], pids)
 	}
 
 	faultyProcesses[0].FaultyBroadcast(system.Root, 0, 5)

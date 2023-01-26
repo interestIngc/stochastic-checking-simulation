@@ -9,7 +9,9 @@ import (
 	"net"
 	"stochastic-checking-simulation/config"
 	"stochastic-checking-simulation/messages"
+	"stochastic-checking-simulation/protocols"
 	"stochastic-checking-simulation/protocols/accountability/consistent"
+	"stochastic-checking-simulation/protocols/accountability/reliable"
 	"stochastic-checking-simulation/protocols/bracha"
 	"stochastic-checking-simulation/utils"
 	"strconv"
@@ -22,9 +24,11 @@ var (
 		"a string representing bindings host:port separated by comma, e.g. 127.0.0.1:8081,127.0.0.1:8082")
 	address        = flag.String("address", "", "current node's address, e.g. 127.0.0.1:8081")
 	mainServerAddr = flag.String("mainserver", "", "address of the main server, e.g. 127.0.0.1:8080")
-	protocol       = flag.String("protocol", "accountability",
-		"A protocol to run, either accountability or broadcast")
+	protocol       = flag.String("protocol", "reliable_accountability",
+		"A protocol to run, one of: reliable_accountability, consistent_accountability, bracha")
 	faultyProcesses = flag.Int("f", 0, "max number of faulty processes in the system")
+	ownWitnessSetSize = flag.Int("w", 0, "size of the own witness set W")
+	potWitnessSetSize = flag.Int("v", 0, "size of the pot witness set V")
 	witnessThreshold = flag.Int("u", 0, "witnesses threshold to accept a transaction")
 	nodeIdSize = flag.Int("node_id_size", 256, "node id size, default is 256")
 	numberOfBins = flag.Int("number_of_bins", 32, "number of bins in history hash, default is 32")
@@ -48,6 +52,8 @@ func main() {
 
 	config.ProcessCount = len(nodes)
 	config.FaultyProcesses = *faultyProcesses
+	config.OwnWitnessSetSize = *ownWitnessSetSize
+	config.PotWitnessSetSize = *potWitnessSetSize
 	config.WitnessThreshold = *witnessThreshold
 	config.NodeIdSize = *nodeIdSize
 	config.NumberOfBins = *numberOfBins
@@ -64,41 +70,31 @@ func main() {
 	remoter := remote.NewRemote(system, remoteConfig)
 	remoter.Start()
 
-	if *protocol == "accountability" {
-		process := &consistent.CorrectProcess{}
-		currPid, e :=
-			system.Root.SpawnNamed(
-				actor.PropsFromProducer(
-					func() actor.Actor {
-						return process
-					}),
-				"pid",
-			)
-		if e != nil {
-			fmt.Printf("Error while generating pid happened: %s\n", e)
-			return
-		}
-		process.InitCorrectProcess(currPid, pids)
-		fmt.Printf("%s: started\n", utils.PidToString(currPid))
-		system.Root.RequestWithCustomSender(mainServer, &messages.Started{}, currPid)
+	var process protocols.Process
+
+	if *protocol == "reliable_accountability" {
+		process = &reliable.Process{}
+	} else if *protocol == "consistent_accountability" {
+		process = &consistent.CorrectProcess{}
 	} else {
-		process := &bracha.Process{}
-		currPid, e :=
-			system.Root.SpawnNamed(
-				actor.PropsFromProducer(
-					func() actor.Actor {
-						return process
-					}),
-				"pid",
-			)
-		if e != nil {
-			fmt.Printf("Error while generating pid happened: %s\n", e)
-			return
-		}
-		process.InitProcess(currPid, pids)
-		fmt.Printf("%s: started\n", utils.PidToString(currPid))
-		system.Root.RequestWithCustomSender(mainServer, &messages.Started{}, currPid)
+		process = &bracha.Process{}
 	}
+
+	currPid, e :=
+		system.Root.SpawnNamed(
+			actor.PropsFromProducer(
+				func() actor.Actor {
+					return process
+				}),
+			"pid",
+		)
+	if e != nil {
+		fmt.Printf("Error while generating pid happened: %s\n", e)
+		return
+	}
+	process.InitProcess(currPid, pids)
+	fmt.Printf("%s: started\n", utils.PidToString(currPid))
+	system.Root.RequestWithCustomSender(mainServer, &messages.Started{}, currPid)
 
 	_, _ = console.ReadLine()
 }

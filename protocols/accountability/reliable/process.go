@@ -161,6 +161,9 @@ func (p *Process) deliver(msgData *messages.MessageData) {
 func (p *Process) Receive(context actor.Context) {
 	message := context.Message()
 	switch message.(type) {
+	case *messages.Broadcast:
+		msg := message.(*messages.Broadcast)
+		p.Broadcast(context, msg.Value)
 	case *messages.ReliableProtocolMessage:
 		msg := message.(*messages.ReliableProtocolMessage)
 		msgData := msg.GetMessageData()
