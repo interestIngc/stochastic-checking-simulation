@@ -34,7 +34,7 @@ func (bd byDist) Less(i, j int) bool {
 
 func (ws *WitnessesSelector) GetWitnessSet(
 		author string, seqNumber int64, historyHash *HistoryHash,
-	) map[string]bool {
+	) (map[string]bool, map[string]bool) {
 	transaction := utils.TransactionToBytes(author, seqNumber)
 	transactionRing := multiRingFromBytes(
 		256, historyHash.binNum, ws.Hasher.Hash(transaction))
@@ -55,7 +55,7 @@ func (ws *WitnessesSelector) GetWitnessSet(
 
 		if e != nil {
 			fmt.Printf("Error while generating a witness set happened: %s\n", e)
-			return nil
+			return nil, nil
 		}
 
 		distances[i] = dist{ind: i, d: d}
@@ -63,9 +63,24 @@ func (ws *WitnessesSelector) GetWitnessSet(
 
 	sort.Sort(byDist(distances))
 
-	witnessSet := make(map[string]bool)
-	for i := 0; i < config.WitnessSetSize; i++ {
-		witnessSet[ws.NodeIds[distances[i].ind]] = true
+	potWitnessSet := make(map[string]bool)
+	ownWitnessSet := make(map[string]bool)
+
+	for i := 0; i < config.PotWitnessSetSize; i++ {
+		id := ws.NodeIds[distances[i].ind]
+		potWitnessSet[id] = true
+		if i < config.OwnWitnessSetSize {
+			ownWitnessSet[id] = true
+		}
 	}
-	return witnessSet
+
+	//for i := 0; i < len(ws.NodeIds) && distances[i].d < config.PotWitnessSetRadius; i++ {
+	//	id := ws.NodeIds[distances[i].ind]
+	//	potWitnessSet[id] = true
+	//	if distances[i].d < config.OwnWitnessSetRadius {
+	//		ownWitnessSet[id] = true
+	//	}
+	//}
+
+	return ownWitnessSet, potWitnessSet
 }

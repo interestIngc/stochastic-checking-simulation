@@ -9,6 +9,8 @@ import (
 	"net"
 	"stochastic-checking-simulation/config"
 	"stochastic-checking-simulation/messages"
+	"stochastic-checking-simulation/protocols/accountability/consistent"
+	"stochastic-checking-simulation/protocols/bracha"
 	"stochastic-checking-simulation/utils"
 	"strconv"
 	"strings"
@@ -23,7 +25,6 @@ var (
 	protocol       = flag.String("protocol", "accountability",
 		"A protocol to run, either accountability or broadcast")
 	faultyProcesses = flag.Int("f", 0, "max number of faulty processes in the system")
-	witnessSetSize = flag.Int("w", 0, "size of the witness set")
 	witnessThreshold = flag.Int("u", 0, "witnesses threshold to accept a transaction")
 	nodeIdSize = flag.Int("node_id_size", 256, "node id size, default is 256")
 	numberOfBins = flag.Int("number_of_bins", 32, "number of bins in history hash, default is 32")
@@ -47,7 +48,6 @@ func main() {
 
 	config.ProcessCount = len(nodes)
 	config.FaultyProcesses = *faultyProcesses
-	config.WitnessSetSize = *witnessSetSize
 	config.WitnessThreshold = *witnessThreshold
 	config.NodeIdSize = *nodeIdSize
 	config.NumberOfBins = *numberOfBins
@@ -65,7 +65,7 @@ func main() {
 	remoter.Start()
 
 	if *protocol == "accountability" {
-		process := &CorrectProcess{}
+		process := &consistent.CorrectProcess{}
 		currPid, e :=
 			system.Root.SpawnNamed(
 				actor.PropsFromProducer(
@@ -82,7 +82,7 @@ func main() {
 		fmt.Printf("%s: started\n", utils.PidToString(currPid))
 		system.Root.RequestWithCustomSender(mainServer, &messages.Started{}, currPid)
 	} else {
-		process := &BrachaProcess{}
+		process := &bracha.Process{}
 		currPid, e :=
 			system.Root.SpawnNamed(
 				actor.PropsFromProducer(
@@ -95,7 +95,7 @@ func main() {
 			fmt.Printf("Error while generating pid happened: %s\n", e)
 			return
 		}
-		process.InitBrachaProcess(currPid, pids)
+		process.InitProcess(currPid, pids)
 		fmt.Printf("%s: started\n", utils.PidToString(currPid))
 		system.Root.RequestWithCustomSender(mainServer, &messages.Started{}, currPid)
 	}
