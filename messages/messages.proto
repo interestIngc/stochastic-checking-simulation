@@ -13,16 +13,21 @@ message FaultyBroadcast {
   int64 value2 = 2;
 }
 
+message MessageData {
+  int64 value = 1;
+  int64 seqNumber = 2;
+  string author = 3;
+}
+
 message BrachaMessage {
   enum Stage {
     INITIAL = 0;
     ECHO = 1;
     READY = 2;
   }
+
   Stage stage = 1;
-  int64 value = 2;
-  int64 seqNumber = 3;
-  string author = 4;
+  MessageData messageData = 2;
 }
 
 message ProtocolMessage {
@@ -44,11 +49,6 @@ message ReliableProtocolMessage {
     READY_FROM_WITNESS = 3;
     READY_FROM_PROCESS = 4;
     VALIDATE = 5;
-  }
-  message MessageData {
-    int64 value = 1;
-    int64 seqNumber = 2;
-    string author = 3;
   }
 
   Stage stage = 1;

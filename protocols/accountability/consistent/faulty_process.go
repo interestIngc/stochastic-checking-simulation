@@ -10,7 +10,7 @@ type FaultyProcess struct {
 	process *CorrectProcess
 }
 
-func (p *FaultyProcess) initFaultyProcess(currPid *actor.PID, pids []*actor.PID) {
+func (p *FaultyProcess) InitFaultyProcess(currPid *actor.PID, pids []*actor.PID) {
 	p.process = &CorrectProcess{}
 	p.process.InitCorrectProcess(currPid, pids)
 }
@@ -20,7 +20,7 @@ func (p *FaultyProcess) Receive(context actor.Context) {
 	switch message.(type) {
 	case *messages.FaultyBroadcast:
 		msg := message.(*messages.FaultyBroadcast)
-		p.Broadcast(context, msg.Value1, msg.Value2)
+		p.FaultyBroadcast(context, msg.Value1, msg.Value2)
 	case *messages.ProtocolMessage:
 		msg := message.(*messages.ProtocolMessage)
 		senderId := context.Sender()
@@ -53,7 +53,11 @@ func (p *FaultyProcess) Receive(context actor.Context) {
 	}
 }
 
-func (p *FaultyProcess) Broadcast(context actor.SenderContext, value1 int64, value2 int64) {
+func (p *FaultyProcess) Broadcast(context actor.SenderContext, value int64) {
+	p.process.Broadcast(context, value)
+}
+
+func (p *FaultyProcess) FaultyBroadcast(context actor.SenderContext, value1 int64, value2 int64) {
 	author := utils.PidToString(p.process.currPid)
 	seqNumber := p.process.msgCounter
 	p.process.msgCounter++

@@ -85,9 +85,9 @@ func (p *CorrectProcess) verify(
 			msgState.echoCount[value]++
 			if msgState.echoCount[value] >= config.WitnessThreshold {
 				p.acceptedMessages[msg.Author][msg.SeqNumber] = value
-				p.historyHash.Insert(
-					utils.TransactionToBytes(msg.Author, msg.SeqNumber))
-				p.messagesLog[msg.Author][msg.SeqNumber] = nil
+				p.historyHash.Insert(utils.TransactionToBytes(msg.Author, msg.SeqNumber))
+				delete(p.messagesLog[msg.Author], msg.SeqNumber)
+
 				fmt.Printf(
 					"%s: Accepted transaction with seq number %d and value %d from %s\n",
 					utils.PidToString(p.currPid), msg.SeqNumber, msg.Value, msg.Author)

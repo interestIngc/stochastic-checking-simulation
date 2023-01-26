@@ -104,7 +104,7 @@ func (p *Process) InitProcess(currPid *actor.PID, pids []*actor.PID) {
 	p.historyHash = hashing.NewHistoryHash(uint(config.NumberOfBins), binCapacity, hasher)
 }
 
-func (p *Process) initMessageState(msgData *messages.ReliableProtocolMessage_MessageData) *messageState {
+func (p *Process) initMessageState(msgData *messages.MessageData) *messageState {
 	msgState := p.messagesLog[msgData.Author][msgData.SeqNumber]
 	if msgState == nil {
 		msgState = newMessageState()
@@ -132,7 +132,7 @@ func (p *Process) broadcastToWitnesses(
 
 func (p *Process) broadcastReadyFromWitness(
 	context actor.SenderContext,
-	msgData *messages.ReliableProtocolMessage_MessageData,
+	msgData *messages.MessageData,
 	msgState *messageState) {
 	p.broadcast(
 		context,
@@ -147,7 +147,7 @@ func (p *Process) isWitness(msgState *messageState) bool {
 	return msgState.potWitnessSet[utils.PidToString(p.currPid)]
 }
 
-func (p *Process) deliver(msgData *messages.ReliableProtocolMessage_MessageData) {
+func (p *Process) deliver(msgData *messages.MessageData) {
 	p.acceptedMessages[msgData.Author][msgData.SeqNumber] = protocols.ValueType(msgData.Value)
 	p.historyHash.Insert(
 		utils.TransactionToBytes(msgData.Author, msgData.SeqNumber))
@@ -275,7 +275,8 @@ func (p *Process) Receive(context actor.Context) {
 
 func (p *Process) Broadcast(context actor.SenderContext, value int64) {
 	id := utils.PidToString(p.currPid)
-	msgData := &messages.ReliableProtocolMessage_MessageData{
+
+	msgData := &messages.MessageData{
 		Author:    id,
 		SeqNumber: p.msgCounter,
 		Value:     value,
@@ -286,7 +287,6 @@ func (p *Process) Broadcast(context actor.SenderContext, value int64) {
 	}
 
 	msgState := p.initMessageState(msgData)
-
 	p.broadcastToWitnesses(context, msg, msgState)
 
 	p.msgCounter++

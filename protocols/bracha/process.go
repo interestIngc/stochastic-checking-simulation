@@ -36,13 +36,13 @@ func newMessageState() *messageState {
 }
 
 type Process struct {
-	currPid          *actor.PID
-	pids             map[string]*actor.PID
-	msgCounter       int64
-	acceptedMessages map[string]map[int64]protocols.ValueType
-	messagesLog      map[string]map[int64]*messageState
-	messagesForEcho  int
-	messagesForReady int
+	currPid           *actor.PID
+	pids              map[string]*actor.PID
+	msgCounter        int64
+	acceptedMessages  map[string]map[int64]protocols.ValueType
+	messagesLog       map[string]map[int64]*messageState
+	messagesForEcho   int
+	messagesForReady  int
 	messagesForAccept int
 }
 
@@ -51,9 +51,9 @@ func (p *Process) InitProcess(currPid *actor.PID, pids []*actor.PID) {
 	p.pids = make(map[string]*actor.PID)
 	p.msgCounter = 0
 
-	p.messagesForEcho = int(math.Ceil(float64(config.ProcessCount + config.FaultyProcesses + 1) / float64(2)))
+	p.messagesForEcho = int(math.Ceil(float64(config.ProcessCount+config.FaultyProcesses+1) / float64(2)))
 	p.messagesForReady = config.FaultyProcesses + 1
-	p.messagesForAccept = 2 * config.FaultyProcesses + 1
+	p.messagesForAccept = 2*config.FaultyProcesses + 1
 
 	p.acceptedMessages = make(map[string]map[int64]protocols.ValueType)
 	p.messagesLog = make(map[string]map[int64]*messageState)
@@ -65,6 +65,15 @@ func (p *Process) InitProcess(currPid *actor.PID, pids []*actor.PID) {
 	}
 }
 
+func (p *Process) initMessageState(msgData *messages.MessageData) *messageState {
+	msgState := p.messagesLog[msgData.Author][msgData.SeqNumber]
+	if msgState == nil {
+		msgState = newMessageState()
+		p.messagesLog[msgData.Author][msgData.SeqNumber] = msgState
+	}
+	return msgState
+}
+
 func (p *Process) broadcast(context actor.SenderContext, message *messages.BrachaMessage) {
 	for _, pid := range p.pids {
 		context.RequestWithCustomSender(pid, message, p.currPid)
@@ -73,44 +82,37 @@ func (p *Process) broadcast(context actor.SenderContext, message *messages.Brach
 
 func (p *Process) broadcastEcho(
 	context actor.SenderContext,
-	initialMessage *messages.BrachaMessage,
+	msgData *messages.MessageData,
 	msgState *messageState) {
 	p.broadcast(
 		context,
 		&messages.BrachaMessage{
 			Stage:     messages.BrachaMessage_ECHO,
-			Value:     initialMessage.Value,
-			SeqNumber: initialMessage.SeqNumber,
-			Author:    initialMessage.Author,
+			MessageData: msgData,
 		})
 	msgState.stage = SentEcho
 }
 
 func (p *Process) broadcastReady(
 	context actor.SenderContext,
-	initialMessage *messages.BrachaMessage,
+	msgData *messages.MessageData,
 	msgState *messageState) {
 	p.broadcast(
 		context,
 		&messages.BrachaMessage{
 			Stage:     messages.BrachaMessage_READY,
-			Value:     initialMessage.Value,
-			SeqNumber: initialMessage.SeqNumber,
-			Author:    initialMessage.Author,
+			MessageData: msgData,
 		})
 	msgState.stage = SentReady
 }
 
-func (p *Process) checkForAccept(msg *messages.BrachaMessage, msgState *messageState) {
-	value := protocols.ValueType(msg.Value)
-	if msgState.readyCount[value] >= p.messagesForAccept {
-		p.acceptedMessages[msg.Author][msg.SeqNumber] = value
-		delete(p.messagesLog[msg.Author], msg.SeqNumber)
+func (p *Process) deliver(msgData *messages.MessageData) {
+	p.acceptedMessages[msgData.Author][msgData.SeqNumber] = protocols.ValueType(msgData.Value)
+	delete(p.messagesLog[msgData.Author], msgData.SeqNumber)
 
-		fmt.Printf(
-			"%s: Accepted transaction with seq number %d and value %d from %s in bracha broadcast\n",
-			utils.PidToString(p.currPid), msg.SeqNumber, msg.Value, msg.Author)
-	}
+	fmt.Printf(
+		"%s: Accepted transaction with seq number %d and value %d from %s in bracha broadcast\n",
+		utils.PidToString(p.currPid), msgData.SeqNumber, msgData.Value, msgData.Author)
 }
 
 func (p *Process) Receive(context actor.Context) {
@@ -121,10 +123,11 @@ func (p *Process) Receive(context actor.Context) {
 		p.Broadcast(context, msg.Value)
 	case *messages.BrachaMessage:
 		msg := message.(*messages.BrachaMessage)
+		msgData := msg.GetMessageData()
 		sender := utils.PidToString(context.Sender())
-		value := protocols.ValueType(msg.Value)
+		value := protocols.ValueType(msgData.Value)
 
-		acceptedValue, accepted := p.acceptedMessages[msg.Author][msg.SeqNumber]
+		acceptedValue, accepted := p.acceptedMessages[msgData.Author][msgData.SeqNumber]
 		if accepted {
 			if acceptedValue != value {
 				fmt.Printf("%s: Detected a duplicated seq number attack\n", p.currPid.Id)
@@ -132,16 +135,12 @@ func (p *Process) Receive(context actor.Context) {
 			return
 		}
 
-		msgState := p.messagesLog[msg.Author][msg.SeqNumber]
-		if msgState == nil {
-			msgState = newMessageState()
-			p.messagesLog[msg.Author][msg.SeqNumber] = msgState
-		}
+		msgState := p.initMessageState(msgData)
 
 		switch msg.Stage {
 		case messages.BrachaMessage_INITIAL:
 			if msgState.stage == Init {
-				p.broadcastEcho(context, msg, msgState)
+				p.broadcastEcho(context, msgData, msgState)
 			}
 		case messages.BrachaMessage_ECHO:
 			if msgState.stage == SentReady || msgState.receivedEcho[sender] {
@@ -152,10 +151,10 @@ func (p *Process) Receive(context actor.Context) {
 
 			if msgState.echoCount[value] >= p.messagesForEcho {
 				if msgState.stage == Init {
-					p.broadcastEcho(context, msg, msgState)
+					p.broadcastEcho(context, msgData, msgState)
 				}
 				if msgState.stage == SentEcho {
-					p.broadcastReady(context, msg, msgState)
+					p.broadcastReady(context, msgData, msgState)
 				}
 			}
 		case messages.BrachaMessage_READY:
@@ -167,25 +166,31 @@ func (p *Process) Receive(context actor.Context) {
 
 			if msgState.readyCount[value] >= p.messagesForReady {
 				if msgState.stage == Init {
-					p.broadcastEcho(context, msg, msgState)
+					p.broadcastEcho(context, msgData, msgState)
 				}
 				if msgState.stage == SentEcho {
-					p.broadcastReady(context, msg, msgState)
+					p.broadcastReady(context, msgData, msgState)
 				}
 			}
-			p.checkForAccept(msg, msgState)
+			if msgState.readyCount[value] >= p.messagesForAccept {
+				p.deliver(msgData)
+			}
 		}
 	}
 }
 
 func (p *Process) Broadcast(context actor.SenderContext, value int64) {
 	id := utils.PidToString(p.currPid)
+
 	message := &messages.BrachaMessage{
 		Stage:     messages.BrachaMessage_INITIAL,
-		Author:    id,
-		SeqNumber: p.msgCounter,
-		Value:     value,
+		MessageData: &messages.MessageData{
+			Author:    id,
+			SeqNumber: p.msgCounter,
+			Value:     value,
+		},
 	}
 	p.broadcast(context, message)
+
 	p.msgCounter++
 }
