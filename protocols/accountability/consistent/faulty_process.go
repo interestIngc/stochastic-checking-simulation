@@ -34,7 +34,7 @@ func (p *FaultyProcess) Receive(context actor.Context) {
 				context.RequestWithCustomSender(
 					senderId,
 					messages.ConsistentProtocolMessage{
-						Stage: messages.ConsistentProtocolMessage_ECHO,
+						Stage:       messages.ConsistentProtocolMessage_ECHO,
 						MessageData: msgData,
 					},
 					p.process.currPid)
@@ -42,7 +42,7 @@ func (p *FaultyProcess) Receive(context actor.Context) {
 				p.process.broadcast(
 					context,
 					&messages.ConsistentProtocolMessage{
-						Stage: messages.ConsistentProtocolMessage_ECHO,
+						Stage:       messages.ConsistentProtocolMessage_ECHO,
 						MessageData: msgData,
 					})
 			}
@@ -70,13 +70,13 @@ func (p *FaultyProcess) FaultyBroadcast(context actor.SenderContext, value1 int6
 
 	i := 0
 	for witness := range msgState.witnessSet {
-		if i == len(msgState.witnessSet) / 2 {
+		if i == len(msgState.witnessSet)/2 {
 			break
 		}
 		context.RequestWithCustomSender(
 			p.process.pids[witness],
 			&messages.ConsistentProtocolMessage{
-				Stage:     messages.ConsistentProtocolMessage_VERIFY,
+				Stage: messages.ConsistentProtocolMessage_VERIFY,
 				MessageData: &messages.MessageData{
 					Author:    author,
 					SeqNumber: seqNumber,
@@ -90,7 +90,7 @@ func (p *FaultyProcess) FaultyBroadcast(context actor.SenderContext, value1 int6
 		context.RequestWithCustomSender(
 			p.process.pids[witness],
 			&messages.ConsistentProtocolMessage{
-				Stage:     messages.ConsistentProtocolMessage_VERIFY,
+				Stage: messages.ConsistentProtocolMessage_VERIFY,
 				MessageData: &messages.MessageData{
 					Author:    author,
 					SeqNumber: seqNumber,

@@ -12,9 +12,9 @@ import (
 )
 
 type messageState struct {
-	receivedEcho  map[string]bool
-	echoCount     map[protocols.ValueType]int
-	witnessSet    map[string]bool
+	receivedEcho map[string]bool
+	echoCount    map[protocols.ValueType]int
+	witnessSet   map[string]bool
 }
 
 func newMessageState() *messageState {
@@ -58,7 +58,7 @@ func (p *CorrectProcess) InitProcess(currPid *actor.PID, pids []*actor.PID) {
 	}
 
 	p.wSelector = &hashing.WitnessesSelector{NodeIds: ids, Hasher: hasher}
-	binCapacity := uint(math.Pow(2, float64(config.NodeIdSize / config.NumberOfBins)))
+	binCapacity := uint(math.Pow(2, float64(config.NodeIdSize/config.NumberOfBins)))
 	p.historyHash = hashing.NewHistoryHash(uint(config.NumberOfBins), binCapacity, hasher)
 }
 
@@ -99,7 +99,7 @@ func (p *CorrectProcess) verify(
 		p.messagesLog[msgData.Author][msgData.SeqNumber] = msgState
 
 		message := &messages.ConsistentProtocolMessage{
-			Stage: messages.ConsistentProtocolMessage_VERIFY,
+			Stage:       messages.ConsistentProtocolMessage_VERIFY,
 			MessageData: msgData,
 		}
 		for id := range msgState.witnessSet {
@@ -127,7 +127,7 @@ func (p *CorrectProcess) Receive(context actor.Context) {
 			p.broadcast(
 				context,
 				&messages.ConsistentProtocolMessage{
-					Stage: messages.ConsistentProtocolMessage_ECHO,
+					Stage:       messages.ConsistentProtocolMessage_ECHO,
 					MessageData: msgData,
 				})
 		}
@@ -141,9 +141,9 @@ func (p *CorrectProcess) Broadcast(context actor.SenderContext, value int64) {
 		context,
 		id,
 		&messages.MessageData{
-			Author: id,
+			Author:    id,
 			SeqNumber: p.msgCounter,
-			Value: value,
+			Value:     value,
 		})
 
 	p.msgCounter++
