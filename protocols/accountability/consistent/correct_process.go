@@ -62,18 +62,18 @@ func (p *CorrectProcess) InitProcess(currPid *actor.PID, pids []*actor.PID) {
 	p.historyHash = hashing.NewHistoryHash(uint(config.NumberOfBins), binCapacity, hasher)
 }
 
-func (p *CorrectProcess) broadcast(context actor.SenderContext, message *messages.ProtocolMessage) {
+func (p *CorrectProcess) broadcast(context actor.SenderContext, message *messages.ConsistentProtocolMessage) {
 	for _, pid := range p.pids {
 		context.RequestWithCustomSender(pid, message, p.currPid)
 	}
 }
 
 func (p *CorrectProcess) verify(
-	context actor.SenderContext, sender string, msg *messages.ProtocolMessage) bool {
-	value := protocols.ValueType(msg.Value)
-	msgState := p.messagesLog[msg.Author][msg.SeqNumber]
+	context actor.SenderContext, sender string, msgData *messages.MessageData) bool {
+	value := protocols.ValueType(msgData.Value)
+	msgState := p.messagesLog[msgData.Author][msgData.SeqNumber]
 
-	acceptedValue, accepted := p.acceptedMessages[msg.Author][msg.SeqNumber]
+	acceptedValue, accepted := p.acceptedMessages[msgData.Author][msgData.SeqNumber]
 	if accepted {
 		if acceptedValue != value {
 			//fmt.Printf("%s: Detected a duplicated seq number attack\n", p.currPid.Address)
@@ -84,25 +84,23 @@ func (p *CorrectProcess) verify(
 			msgState.receivedEcho[sender] = true
 			msgState.echoCount[value]++
 			if msgState.echoCount[value] >= config.WitnessThreshold {
-				p.acceptedMessages[msg.Author][msg.SeqNumber] = value
-				p.historyHash.Insert(utils.TransactionToBytes(msg.Author, msg.SeqNumber))
-				delete(p.messagesLog[msg.Author], msg.SeqNumber)
+				p.acceptedMessages[msgData.Author][msgData.SeqNumber] = value
+				p.historyHash.Insert(utils.TransactionToBytes(msgData.Author, msgData.SeqNumber))
+				delete(p.messagesLog[msgData.Author], msgData.SeqNumber)
 
 				fmt.Printf(
 					"%s: Accepted transaction with seq number %d and value %d from %s\n",
-					utils.PidToString(p.currPid), msg.SeqNumber, msg.Value, msg.Author)
+					utils.PidToString(p.currPid), msgData.SeqNumber, msgData.Value, msgData.Author)
 			}
 		}
 	} else {
 		msgState := newMessageState()
-		msgState.witnessSet, _ = p.wSelector.GetWitnessSet(msg.Author, msg.SeqNumber, p.historyHash)
-		p.messagesLog[msg.Author][msg.SeqNumber] = msgState
+		msgState.witnessSet, _ = p.wSelector.GetWitnessSet(msgData.Author, msgData.SeqNumber, p.historyHash)
+		p.messagesLog[msgData.Author][msgData.SeqNumber] = msgState
 
-		message := &messages.ProtocolMessage{
-			Stage: messages.ProtocolMessage_VERIFY,
-			Author: msg.Author,
-			SeqNumber: msg.SeqNumber,
-			Value: msg.Value,
+		message := &messages.ConsistentProtocolMessage{
+			Stage: messages.ConsistentProtocolMessage_VERIFY,
+			MessageData: msgData,
 		}
 		for id := range msgState.witnessSet {
 			context.RequestWithCustomSender(p.pids[id], message, p.currPid)
@@ -118,20 +116,19 @@ func (p *CorrectProcess) Receive(context actor.Context) {
 	case *messages.Broadcast:
 		msg := message.(*messages.Broadcast)
 		p.Broadcast(context, msg.Value)
-	case *messages.ProtocolMessage:
-		msg := message.(*messages.ProtocolMessage)
+	case *messages.ConsistentProtocolMessage:
+		msg := message.(*messages.ConsistentProtocolMessage)
+		msgData := msg.GetMessageData()
 		senderId := utils.PidToString(context.Sender())
 
-		doBroadcast := p.verify(context, senderId, msg)
+		doBroadcast := p.verify(context, senderId, msgData)
 
-		if msg.Stage == messages.ProtocolMessage_VERIFY && doBroadcast {
+		if msg.Stage == messages.ConsistentProtocolMessage_VERIFY && doBroadcast {
 			p.broadcast(
 				context,
-				&messages.ProtocolMessage{
-					Stage: messages.ProtocolMessage_ECHO,
-					Author: msg.Author,
-					SeqNumber: msg.SeqNumber,
-					Value: msg.Value,
+				&messages.ConsistentProtocolMessage{
+					Stage: messages.ConsistentProtocolMessage_ECHO,
+					MessageData: msgData,
 				})
 		}
 	}
@@ -139,12 +136,15 @@ func (p *CorrectProcess) Receive(context actor.Context) {
 
 func (p *CorrectProcess) Broadcast(context actor.SenderContext, value int64) {
 	id := utils.PidToString(p.currPid)
-	msg := &messages.ProtocolMessage{
-		Stage: messages.ProtocolMessage_ECHO,
-		Author: id,
-		SeqNumber: p.msgCounter,
-		Value: value,
-	}
-	p.verify(context, id, msg)
+
+	p.verify(
+		context,
+		id,
+		&messages.MessageData{
+			Author: id,
+			SeqNumber: p.msgCounter,
+			Value: value,
+		})
+
 	p.msgCounter++
 }
