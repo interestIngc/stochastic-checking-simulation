@@ -5,9 +5,9 @@ import (
 	"github.com/asynkron/protoactor-go/actor"
 	"math"
 	"stochastic-checking-simulation/config"
-	"stochastic-checking-simulation/messages"
-	"stochastic-checking-simulation/protocols"
-	"stochastic-checking-simulation/utils"
+	"stochastic-checking-simulation/impl/messages"
+	"stochastic-checking-simulation/impl/protocols"
+	"stochastic-checking-simulation/impl/utils"
 )
 
 type Stage int32
@@ -87,7 +87,7 @@ func (p *Process) broadcastEcho(
 	p.broadcast(
 		context,
 		&messages.BrachaMessage{
-			Stage:     messages.BrachaMessage_ECHO,
+			Stage:       messages.BrachaMessage_ECHO,
 			MessageData: msgData,
 		})
 	msgState.stage = SentEcho
@@ -100,7 +100,7 @@ func (p *Process) broadcastReady(
 	p.broadcast(
 		context,
 		&messages.BrachaMessage{
-			Stage:     messages.BrachaMessage_READY,
+			Stage:       messages.BrachaMessage_READY,
 			MessageData: msgData,
 		})
 	msgState.stage = SentReady
@@ -183,7 +183,7 @@ func (p *Process) Broadcast(context actor.SenderContext, value int64) {
 	id := utils.PidToString(p.currPid)
 
 	message := &messages.BrachaMessage{
-		Stage:     messages.BrachaMessage_INITIAL,
+		Stage: messages.BrachaMessage_INITIAL,
 		MessageData: &messages.MessageData{
 			Author:    id,
 			SeqNumber: p.msgCounter,

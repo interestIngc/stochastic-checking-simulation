@@ -2,8 +2,8 @@ package consistent
 
 import (
 	"github.com/asynkron/protoactor-go/actor"
-	"stochastic-checking-simulation/messages"
-	"stochastic-checking-simulation/utils"
+	"stochastic-checking-simulation/impl/messages"
+	"stochastic-checking-simulation/impl/utils"
 )
 
 type FaultyProcess struct {

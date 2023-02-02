@@ -5,10 +5,10 @@ import (
 	"github.com/asynkron/protoactor-go/actor"
 	"math"
 	"stochastic-checking-simulation/config"
-	"stochastic-checking-simulation/hashing"
-	"stochastic-checking-simulation/messages"
-	"stochastic-checking-simulation/protocols"
-	"stochastic-checking-simulation/utils"
+	"stochastic-checking-simulation/impl/hashing"
+	"stochastic-checking-simulation/impl/messages"
+	"stochastic-checking-simulation/impl/protocols"
+	"stochastic-checking-simulation/impl/utils"
 )
 
 type messageState struct {

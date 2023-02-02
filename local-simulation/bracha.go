@@ -5,7 +5,7 @@ import (
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/remote"
 	"stochastic-checking-simulation/config"
-	"stochastic-checking-simulation/protocols/bracha"
+	"stochastic-checking-simulation/impl/protocols/bracha"
 )
 
 func main() {

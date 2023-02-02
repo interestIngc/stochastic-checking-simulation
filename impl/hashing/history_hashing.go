@@ -1,12 +1,14 @@
 package hashing
 
-import "stochastic-checking-simulation/utils"
+import (
+	"stochastic-checking-simulation/impl/utils"
+)
 
 type HistoryHash struct {
 	binNum uint
 	binCapacity uint
-	hasher Hasher
-	bins *MultiRing
+	hasher      Hasher
+	bins        *MultiRing
 }
 
 func NewHistoryHash(binNum uint, binCapacity uint, hasher Hasher) *HistoryHash {

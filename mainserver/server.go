@@ -5,7 +5,7 @@ import (
 	"github.com/asynkron/protoactor-go/actor"
 	"math/rand"
 	"stochastic-checking-simulation/config"
-	"stochastic-checking-simulation/messages"
+	"stochastic-checking-simulation/impl/messages"
 )
 
 type MainServer struct {

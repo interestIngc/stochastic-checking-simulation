@@ -3,7 +3,7 @@ package hashing
 import (
 	"errors"
 	"math"
-	"stochastic-checking-simulation/utils"
+	"stochastic-checking-simulation/impl/utils"
 )
 
 type MultiRing struct {

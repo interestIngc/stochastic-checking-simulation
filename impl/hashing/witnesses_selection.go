@@ -5,7 +5,7 @@ import (
 	"math/rand"
 	"sort"
 	"stochastic-checking-simulation/config"
-	"stochastic-checking-simulation/utils"
+	"stochastic-checking-simulation/impl/utils"
 )
 
 type WitnessesSelector struct {

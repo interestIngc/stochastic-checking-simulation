@@ -1,6 +1,6 @@
 syntax = "proto3";
 package messages;
-option go_package = "stochastic-checking-simulation/messages";
+option go_package = "stochastic-checking-simulation/impl/messages";
 
 message Started {}
 
@@ -35,6 +35,7 @@ message ConsistentProtocolMessage {
     ECHO = 0;
     VERIFY = 1;
   }
+
   Stage stage = 1;
   MessageData messageData = 2;
 }

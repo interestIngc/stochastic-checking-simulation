@@ -5,8 +5,8 @@ import (
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/remote"
 	"stochastic-checking-simulation/config"
-	"stochastic-checking-simulation/protocols"
-	"stochastic-checking-simulation/protocols/accountability/consistent"
+	"stochastic-checking-simulation/impl/protocols"
+	"stochastic-checking-simulation/impl/protocols/accountability/consistent"
 )
 
 func main() {
