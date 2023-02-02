@@ -3,7 +3,7 @@
 ## Command to start the main server (must be called before starting nodes)
 
 ```
-go run mainserver/server.go mainserver/main.go --mainserver @{MainServerAddress} --n @{N}
+go run simulation/mainserver/server.go simulation/mainserver/main.go --mainserver @{MainServerAddress} --n @{N}
 ```
 
 ### Where
@@ -13,13 +13,13 @@ go run mainserver/server.go mainserver/main.go --mainserver @{MainServerAddress}
 ### Example command
 
 ```
-go run mainserver/server.go mainserver/main.go --mainserver 127.0.0.1:8080 --n 2
+go run simulation/mainserver/server.go simulation/mainserver/main.go --mainserver 127.0.0.1:8080 --n 2
 ```
 
 ## Command to start a node:
 
 ```
-go run simulation/main.go --nodes @{Nodes} --mainserver @{MainServerAddress} --protocol @{Protocol} \
+go run simulation/node/main.go --nodes @{Nodes} --mainserver @{MainServerAddress} --protocol @{Protocol} \
 --address @{NodeAddress} --f @{F} --w @{W} --v @{V} --u @{U} \
 --node_id_size @{NodeIdSize} --number_of_bins @{NumberOfBins}
 ```
@@ -40,7 +40,7 @@ default reliable_accountability (optional)
 ### Example command
 
 ```
-go run simulation/main.go --nodes 127.0.0.1:8081,127.0.0.1:8082 --mainserver 127.0.0.1:8080 \
+go run simulation/node/main.go --nodes 127.0.0.1:8081,127.0.0.1:8082 --mainserver 127.0.0.1:8080 \
 --protocol reliable_accountability --address 127.0.0.1:8081 \
 --f 0 --w 2 --v 2 --u 2
 ```
