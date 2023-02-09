@@ -1,5 +1,7 @@
 package config
 
+import "time"
+
 // Broadcast
 
 var ProcessCount = 256
@@ -14,5 +16,6 @@ var OwnWitnessSetRadius = 16.0
 var PotWitnessSetRadius = 20.0
 
 var WitnessThreshold = 4
+var RecoverySwitchTimeoutNs time.Duration = 1
 var NodeIdSize = 256
 var NumberOfBins = 32

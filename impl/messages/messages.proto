@@ -42,7 +42,7 @@ message ConsistentProtocolMessage {
 
 message ReliableProtocolMessage {
   enum Stage {
-    INITIAL = 0;
+    NOTIFY = 0;
     ECHO_FROM_WITNESS = 1;
     ECHO_FROM_PROCESS = 2;
     READY_FROM_WITNESS = 3;
@@ -52,4 +52,16 @@ message ReliableProtocolMessage {
 
   Stage stage = 1;
   MessageData messageData = 2;
+}
+
+message RecoveryMessage {
+  enum Stage {
+    RECOVER = 0;
+    REPLY = 1;
+    ECHO = 2;
+    READY = 3;
+  }
+
+  Stage recoveryStage = 1;
+  ReliableProtocolMessage message = 2;
 }
