@@ -16,6 +16,7 @@ import (
 	"stochastic-checking-simulation/impl/utils"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var (
@@ -32,6 +33,13 @@ var (
 	witnessThreshold = flag.Int("u", 0, "witnesses threshold to accept a transaction")
 	nodeIdSize = flag.Int("node_id_size", 256, "node id size, default is 256")
 	numberOfBins = flag.Int("number_of_bins", 32, "number of bins in history hash, default is 32")
+	recoverySwitchTimeoutNs =
+		flag.Int(
+			"recovery_timeout",
+			1000000000,
+			"timeout to wait (ns) for the process after initialising a message " +
+				"before switching to the recovery protocol in case value " +
+				"was not delivered during the given amount of time")
 )
 
 func main() {
@@ -57,6 +65,7 @@ func main() {
 	config.WitnessThreshold = *witnessThreshold
 	config.NodeIdSize = *nodeIdSize
 	config.NumberOfBins = *numberOfBins
+	config.RecoverySwitchTimeoutNs = time.Duration(*recoverySwitchTimeoutNs)
 
 	pids := make([]*actor.PID, len(nodes))
 	for i := 0; i < len(nodes); i++ {

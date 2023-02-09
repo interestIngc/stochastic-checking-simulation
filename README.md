@@ -21,7 +21,7 @@ go run simulation/mainserver/server.go simulation/mainserver/main.go --mainserve
 ```
 go run simulation/node/main.go --nodes @{Nodes} --mainserver @{MainServerAddress} --protocol @{Protocol} \
 --address @{NodeAddress} --f @{F} --w @{W} --v @{V} --u @{U} \
---node_id_size @{NodeIdSize} --number_of_bins @{NumberOfBins}
+--node_id_size @{NodeIdSize} --number_of_bins @{NumberOfBins} --recovery_timeout @{RecoveryTimeout}
 ```
 
 ### Where
@@ -36,11 +36,13 @@ default reliable_accountability (optional)
 @{U} - witnesses threshold to accept a transaction  
 @{NodeIdSize} - node id size, default 256 (optional)  
 @{NumberOfBins} - number of bins in history hash, default 32 (optional)  
+@{RecoveryTimeout} - timeout to wait (ns) for the process after initialising a message 
+before switching to the recovery protocol in case value was not delivered during the given amount of time  
 
 ### Example command
 
 ```
 go run simulation/node/main.go --nodes 127.0.0.1:8081,127.0.0.1:8082 --mainserver 127.0.0.1:8080 \
 --protocol reliable_accountability --address 127.0.0.1:8081 \
---f 0 --w 2 --v 2 --u 2
+--f 0 --w 2 --v 2 --u 2 --recovery_timeout 1000000
 ```
