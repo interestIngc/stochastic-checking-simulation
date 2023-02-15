@@ -5,7 +5,7 @@ import (
 )
 
 type HistoryHash struct {
-	binNum uint
+	binNum      uint
 	binCapacity uint
 	hasher      Hasher
 	bins        *MultiRing

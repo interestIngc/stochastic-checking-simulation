@@ -9,7 +9,7 @@ import (
 )
 
 type MainServer struct {
-	currPid *actor.PID
+	currPid          *actor.PID
 	startedProcesses *actor.PIDSet
 }
 

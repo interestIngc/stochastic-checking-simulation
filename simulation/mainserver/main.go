@@ -13,7 +13,7 @@ import (
 
 var (
 	mainServerAddr = flag.String("mainserver", "", "address of the main server, e.g. 127.0.0.1:8080")
-	processCount = flag.Int("n", 0, "number of processes in the system (excluding the main server)")
+	processCount   = flag.Int("n", 0, "number of processes in the system (excluding the main server)")
 )
 
 func main() {
@@ -43,7 +43,7 @@ func main() {
 			func() actor.Actor {
 				return server
 			}),
-			"mainserver",
+		"mainserver",
 	)
 	if e != nil {
 		fmt.Printf("Could not start a main server: %s\n", e)

@@ -49,6 +49,6 @@ func TestMultiRingFromBytes(t *testing.T) {
 	assert.Equal(t, byteSize, mr.modulo)
 	assert.Equal(t, dimension, mr.dimension)
 	for i := uint(0); i < dimension; i++ {
-		assert.Equal(t, int(i * 10), mr.vector[i])
+		assert.Equal(t, int(i*10), mr.vector[i])
 	}
 }

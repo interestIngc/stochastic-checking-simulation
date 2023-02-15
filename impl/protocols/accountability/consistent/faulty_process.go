@@ -57,9 +57,9 @@ func (p *FaultyProcess) Broadcast(context actor.SenderContext, value int64) {
 func (p *FaultyProcess) FaultyBroadcast(context actor.SenderContext, value1 int64, value2 int64) {
 	msgState := p.process.initMessageState(
 		&messages.MessageData{
-			Author: p.process.pid,
+			Author:    p.process.pid,
 			SeqNumber: p.process.msgCounter,
-			Value: value1,
+			Value:     value1,
 		})
 
 	i := 0

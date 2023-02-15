@@ -15,7 +15,7 @@ type WitnessesSelector struct {
 
 type dist struct {
 	ind int
-	d float64
+	d   float64
 }
 
 type byDist []dist
@@ -33,8 +33,8 @@ func (bd byDist) Less(i, j int) bool {
 }
 
 func (ws *WitnessesSelector) GetWitnessSet(
-		author string, seqNumber int64, historyHash *HistoryHash,
-	) (map[string]bool, map[string]bool) {
+	author string, seqNumber int64, historyHash *HistoryHash,
+) (map[string]bool, map[string]bool) {
 	transaction := utils.TransactionToBytes(author, seqNumber)
 	transactionRing := multiRingFromBytes(
 		256, historyHash.binNum, ws.Hasher.Hash(transaction))

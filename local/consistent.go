@@ -17,7 +17,7 @@ func main() {
 
 	pids := make([]*actor.PID, config.ProcessCount)
 	processes := make([]protocols.Process, config.ProcessCount)
-	correctProcesses := make([]*consistent.CorrectProcess, config.ProcessCount - config.FaultyProcesses)
+	correctProcesses := make([]*consistent.CorrectProcess, config.ProcessCount-config.FaultyProcesses)
 	faultyProcesses := make([]*consistent.FaultyProcess, config.FaultyProcesses)
 
 	for i := 0; i < config.FaultyProcesses; i++ {
@@ -33,11 +33,11 @@ func main() {
 			)
 	}
 
-	for i := 0; i < config.ProcessCount - config.FaultyProcesses; i++ {
+	for i := 0; i < config.ProcessCount-config.FaultyProcesses; i++ {
 		process := &consistent.CorrectProcess{}
 		correctProcesses[i] = process
-		processes[i + config.FaultyProcesses] = process
-		pids[i + config.FaultyProcesses] =
+		processes[i+config.FaultyProcesses] = process
+		pids[i+config.FaultyProcesses] =
 			system.Root.Spawn(
 				actor.PropsFromProducer(
 					func() actor.Actor {
@@ -48,8 +48,8 @@ func main() {
 	for i := 0; i < config.FaultyProcesses; i++ {
 		faultyProcesses[i].InitProcess(pids[i], pids)
 	}
-	for i := 0; i < config.ProcessCount - config.FaultyProcesses; i++ {
-		correctProcesses[i].InitProcess(pids[i + config.FaultyProcesses], pids)
+	for i := 0; i < config.ProcessCount-config.FaultyProcesses; i++ {
+		correctProcesses[i].InitProcess(pids[i+config.FaultyProcesses], pids)
 	}
 
 	faultyProcesses[0].FaultyBroadcast(system.Root, 0, 5)
