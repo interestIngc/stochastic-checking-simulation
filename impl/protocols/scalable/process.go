@@ -62,10 +62,10 @@ func newMessageState() *messageState {
 }
 
 type Process struct {
-	actorPid *actor.PID
-	pid       string
-	actorPids map[string]*actor.PID
-	pids      []string
+	actorPid   *actor.PID
+	pid        string
+	actorPids  map[string]*actor.PID
+	pids       []string
 	msgCounter int64
 
 	deliveredMessages map[string]map[int64]protocols.ValueType
@@ -101,10 +101,11 @@ func (p *Process) generateGossipSample() map[string]bool {
 }
 
 func (p *Process) sample(
-		context actor.SenderContext,
-		stage messages.ScalableProtocolMessage_Stage,
-		msgData *messages.MessageData,
-		size int) map[string]bool {
+	context actor.SenderContext,
+	stage messages.ScalableProtocolMessage_Stage,
+	msgData *messages.MessageData,
+	size int,
+) map[string]bool {
 	sample := make(map[string]bool)
 	random := rand.New(rand.NewSource(time.Now().UnixNano()))
 
@@ -125,7 +126,7 @@ func (p *Process) sample(
 
 func (p *Process) InitProcess(actorPid *actor.PID, actorPids []*actor.PID) {
 	p.actorPid = actorPid
-	p.pid = utils.PidToString(actorPid)
+	p.pid = utils.MakeCustomPid(actorPid)
 	p.pids = make([]string, len(actorPids))
 	p.actorPids = make(map[string]*actor.PID)
 
@@ -135,7 +136,7 @@ func (p *Process) InitProcess(actorPid *actor.PID, actorPids []*actor.PID) {
 	p.messagesLog = make(map[string]map[int64]*messageState)
 
 	for i, currActorPid := range actorPids {
-		pid := utils.PidToString(currActorPid)
+		pid := utils.MakeCustomPid(currActorPid)
 		p.pids[i] = pid
 		p.actorPids[pid] = currActorPid
 		p.deliveredMessages[pid] = make(map[int64]protocols.ValueType)
@@ -145,7 +146,8 @@ func (p *Process) InitProcess(actorPid *actor.PID, actorPids []*actor.PID) {
 
 func (p *Process) initMessageState(
 	context actor.SenderContext,
-	msgData *messages.MessageData) *messageState {
+	msgData *messages.MessageData,
+) *messageState {
 	msgState := p.messagesLog[msgData.Author][msgData.SeqNumber]
 
 	if msgState == nil {
@@ -239,9 +241,9 @@ func (p *Process) broadcastReady(
 }
 
 func (p *Process) maybeSendReadyFromSieve(
-		context actor.SenderContext,
-		msgState *messageState,
-		msgData *messages.MessageData) {
+	context actor.SenderContext,
+	msgState *messageState,
+	msgData *messages.MessageData) {
 	value := protocols.ValueType(msgData.Value)
 
 	if !msgState.sentReadyFromSieve &&
@@ -267,7 +269,7 @@ func (p *Process) Receive(context actor.Context) {
 		value := protocols.ValueType(msgData.Value)
 
 		sender := context.Sender()
-		senderPid := utils.PidToString(sender)
+		senderPid := utils.MakeCustomPid(sender)
 
 		msgState := p.initMessageState(context, msgData)
 

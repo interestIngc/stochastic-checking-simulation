@@ -105,8 +105,10 @@ func newRecoveryMessageState() *recoveryMessageState {
 }
 
 type Process struct {
-	currPid    *actor.PID
-	pids       map[string]*actor.PID
+	actorPid  *actor.PID
+	pid       string
+	actorPids map[string]*actor.PID
+
 	msgCounter int64
 
 	acceptedMessages    map[string]map[int64]protocols.ValueType
@@ -121,9 +123,10 @@ type Process struct {
 	historyHash *hashing.HistoryHash
 }
 
-func (p *Process) InitProcess(currPid *actor.PID, pids []*actor.PID) {
-	p.currPid = currPid
-	p.pids = make(map[string]*actor.PID)
+func (p *Process) InitProcess(actorPid *actor.PID, actorPids []*actor.PID) {
+	p.actorPid = actorPid
+	p.pid = utils.MakeCustomPid(actorPid)
+	p.actorPids = make(map[string]*actor.PID)
 	p.msgCounter = 0
 
 	p.quorumThreshold = int(math.Ceil(float64(config.ProcessCount+config.FaultyProcesses+1) / float64(2)))
@@ -134,15 +137,15 @@ func (p *Process) InitProcess(currPid *actor.PID, pids []*actor.PID) {
 	p.lastSentPMessages = make(map[string]map[int64]*messages.ReliableProtocolMessage)
 	p.recoveryMessagesLog = make(map[string]map[int64]*recoveryMessageState)
 
-	ids := make([]string, len(pids))
-	for i, pid := range pids {
-		id := utils.PidToString(pid)
-		ids[i] = id
-		p.pids[id] = pid
-		p.acceptedMessages[id] = make(map[int64]protocols.ValueType)
-		p.messagesLog[id] = make(map[int64]*messageState)
-		p.lastSentPMessages[id] = make(map[int64]*messages.ReliableProtocolMessage)
-		p.recoveryMessagesLog[id] = make(map[int64]*recoveryMessageState)
+	pids := make([]string, len(actorPids))
+	for i, currActorPid := range actorPids {
+		pid := utils.MakeCustomPid(currActorPid)
+		pids[i] = pid
+		p.actorPids[pid] = currActorPid
+		p.acceptedMessages[pid] = make(map[int64]protocols.ValueType)
+		p.messagesLog[pid] = make(map[int64]*messageState)
+		p.lastSentPMessages[pid] = make(map[int64]*messages.ReliableProtocolMessage)
+		p.recoveryMessagesLog[pid] = make(map[int64]*recoveryMessageState)
 	}
 
 	var hasher hashing.Hasher
@@ -152,7 +155,7 @@ func (p *Process) InitProcess(currPid *actor.PID, pids []*actor.PID) {
 		hasher = hashing.HashSHA512{}
 	}
 
-	p.wSelector = &hashing.WitnessesSelector{NodeIds: ids, Hasher: hasher}
+	p.wSelector = &hashing.WitnessesSelector{NodeIds: pids, Hasher: hasher}
 	binCapacity := uint(math.Pow(2, float64(config.NodeIdSize/config.NumberOfBins)))
 	p.historyHash = hashing.NewHistoryHash(uint(config.NumberOfBins), binCapacity, hasher)
 }
@@ -199,8 +202,8 @@ func (p *Process) getRecoveryMessageState(msgData *messages.MessageData) *recove
 }
 
 func (p *Process) broadcast(context actor.SenderContext, message proto.Message) {
-	for _, pid := range p.pids {
-		context.RequestWithCustomSender(pid, message, p.currPid)
+	for _, pid := range p.actorPids {
+		context.RequestWithCustomSender(pid, message, p.actorPid)
 	}
 }
 
@@ -208,8 +211,8 @@ func (p *Process) broadcastToWitnesses(
 	context actor.SenderContext,
 	message *messages.ReliableProtocolMessage,
 	msgState *messageState) {
-	for id := range msgState.potWitnessSet {
-		context.RequestWithCustomSender(p.pids[id], message, p.currPid)
+	for pid := range msgState.potWitnessSet {
+		context.RequestWithCustomSender(p.actorPids[pid], message, p.actorPid)
 	}
 
 	msgData := message.GetMessageData()
@@ -235,7 +238,7 @@ func (p *Process) broadcastRecover(
 	if lastProcessMessage == nil {
 		fmt.Printf(
 			"%s: Error, no process message for transaction with author: %s and seq number %d was sent\n",
-			utils.PidToString(p.currPid),
+			p.pid,
 			msgData.Author,
 			msgData.SeqNumber)
 	}
@@ -266,14 +269,14 @@ func (p *Process) broadcastReady(
 }
 
 func (p *Process) isWitness(msgState *messageState) bool {
-	return msgState.potWitnessSet[utils.PidToString(p.currPid)]
+	return msgState.potWitnessSet[p.pid]
 }
 
 func (p *Process) accepted(msgData *messages.MessageData) bool {
 	acceptedValue, accepted := p.acceptedMessages[msgData.Author][msgData.SeqNumber]
 	if accepted {
 		if acceptedValue != protocols.ValueType(msgData.Value) {
-			fmt.Printf("%s: Detected a duplicated seq number attack\n", p.currPid.Id)
+			fmt.Printf("%s: Detected a duplicated seq number attack\n", p.pid)
 		}
 	}
 	return accepted
@@ -293,7 +296,7 @@ func (p *Process) deliver(msgData *messages.MessageData) {
 
 	fmt.Printf(
 		"%s: Accepted transaction with seq number %d and value %d from %s\n",
-		utils.PidToString(p.currPid), msgData.SeqNumber, msgData.Value, msgData.Author)
+		p.pid, msgData.SeqNumber, msgData.Value, msgData.Author)
 }
 
 func (p *Process) Receive(context actor.Context) {
@@ -305,7 +308,7 @@ func (p *Process) Receive(context actor.Context) {
 	case *messages.ReliableProtocolMessage:
 		msg := message.(*messages.ReliableProtocolMessage)
 		msgData := msg.GetMessageData()
-		senderId := utils.PidToString(context.Sender())
+		senderPid := utils.MakeCustomPid(context.Sender())
 		value := protocols.ValueType(msgData.Value)
 
 		if p.accepted(msgData) {
@@ -327,7 +330,7 @@ func (p *Process) Receive(context actor.Context) {
 				})
 			msgState.witnessStage = SentEchoFromWitness
 		case messages.ReliableProtocolMessage_ECHO_FROM_WITNESS:
-			if !msgState.ownWitnessSet[senderId] || msgState.stage >= SentEchoFromProcess {
+			if !msgState.ownWitnessSet[senderPid] || msgState.stage >= SentEchoFromProcess {
 				return
 			}
 			p.broadcastToWitnesses(
@@ -341,24 +344,24 @@ func (p *Process) Receive(context actor.Context) {
 		case messages.ReliableProtocolMessage_ECHO_FROM_PROCESS:
 			if !p.isWitness(msgState) ||
 				msgState.witnessStage >= SentReadyFromWitness ||
-				msgState.echoFromProcesses[senderId] {
+				msgState.echoFromProcesses[senderPid] {
 				return
 			}
 
-			msgState.echoFromProcesses[senderId] = true
+			msgState.echoFromProcesses[senderPid] = true
 			msgState.echoFromProcessesStat[value]++
 
 			if msgState.echoFromProcessesStat[value] >= p.quorumThreshold {
 				p.broadcastReadyFromWitness(context, msgData, msgState)
 			}
 		case messages.ReliableProtocolMessage_READY_FROM_WITNESS:
-			if !msgState.ownWitnessSet[senderId] ||
+			if !msgState.ownWitnessSet[senderPid] ||
 				msgState.stage >= SentReadyFromProcess ||
-				msgState.readyFromWitnesses[senderId] {
+				msgState.readyFromWitnesses[senderPid] {
 				return
 			}
 
-			msgState.readyFromWitnesses[senderId] = true
+			msgState.readyFromWitnesses[senderPid] = true
 			msgState.readyFromWitnessesStat[value]++
 
 			if msgState.readyFromWitnessesStat[value] >= config.WitnessThreshold {
@@ -374,11 +377,11 @@ func (p *Process) Receive(context actor.Context) {
 		case messages.ReliableProtocolMessage_READY_FROM_PROCESS:
 			if !p.isWitness(msgState) ||
 				msgState.witnessStage == SentValidate ||
-				msgState.readyFromProcesses[senderId] {
+				msgState.readyFromProcesses[senderPid] {
 				return
 			}
 
-			msgState.readyFromProcesses[senderId] = true
+			msgState.readyFromProcesses[senderPid] = true
 			msgState.readyFromProcessesStat[value]++
 
 			if msgState.witnessStage < SentReadyFromWitness &&
@@ -396,11 +399,11 @@ func (p *Process) Receive(context actor.Context) {
 				msgState.witnessStage = SentValidate
 			}
 		case messages.ReliableProtocolMessage_VALIDATE:
-			if !msgState.ownWitnessSet[senderId] || msgState.validateFromWitnesses[senderId] {
+			if !msgState.ownWitnessSet[senderPid] || msgState.validateFromWitnesses[senderPid] {
 				return
 			}
 
-			msgState.validateFromWitnesses[senderId] = true
+			msgState.validateFromWitnesses[senderPid] = true
 			msgState.validatesStat[value]++
 
 			if msgState.validatesStat[value] >= config.WitnessThreshold {
@@ -414,18 +417,18 @@ func (p *Process) Receive(context actor.Context) {
 		value := protocols.ValueType(msgData.Value)
 
 		sender := context.Sender()
-		senderId := utils.PidToString(sender)
+		senderPid := utils.MakeCustomPid(sender)
 
 		accepted := p.accepted(msgData)
 		recoveryState := p.getRecoveryMessageState(msgData)
 
 		switch msg.RecoveryStage {
 		case messages.RecoveryMessage_RECOVER:
-			if recoveryState.receivedRecover[senderId] || isTaggedWithP(reliableMessage) {
+			if recoveryState.receivedRecover[senderPid] || isTaggedWithP(reliableMessage) {
 				return
 			}
 
-			recoveryState.receivedRecover[senderId] = true
+			recoveryState.receivedRecover[senderPid] = true
 			recoveryState.recoverMessagesStat[value]++
 			if reliableMessage.Stage == messages.ReliableProtocolMessage_READY_FROM_PROCESS {
 				recoveryState.recoverReadyStat[value]++
@@ -438,7 +441,7 @@ func (p *Process) Receive(context actor.Context) {
 						RecoveryStage: messages.RecoveryMessage_REPLY,
 						Message:       reliableMessage,
 					},
-					p.currPid)
+					p.actorPid)
 			}
 			recoverMessagesCnt := len(recoveryState.receivedRecover)
 
@@ -460,22 +463,22 @@ func (p *Process) Receive(context actor.Context) {
 				recoveryState.stage = SentEcho
 			}
 		case messages.RecoveryMessage_REPLY:
-			if recoveryState.receivedReply[senderId] {
+			if recoveryState.receivedReply[senderPid] {
 				return
 			}
 
-			recoveryState.receivedReply[senderId] = true
+			recoveryState.receivedReply[senderPid] = true
 			recoveryState.replyMessagesStat[value]++
 
 			if !accepted && recoveryState.replyMessagesStat[value] >= p.readyMessagesThreshold {
 				p.deliver(msgData)
 			}
 		case messages.RecoveryMessage_ECHO:
-			if recoveryState.receivedEcho[senderId] {
+			if recoveryState.receivedEcho[senderPid] {
 				return
 			}
 
-			recoveryState.receivedEcho[senderId] = true
+			recoveryState.receivedEcho[senderPid] = true
 			recoveryState.echoMessagesStat[value]++
 
 			if recoveryState.stage < SentReady &&
@@ -483,11 +486,11 @@ func (p *Process) Receive(context actor.Context) {
 				p.broadcastReady(context, reliableMessage)
 			}
 		case messages.RecoveryMessage_READY:
-			if recoveryState.receivedReady[senderId] {
+			if recoveryState.receivedReady[senderPid] {
 				return
 			}
 
-			recoveryState.receivedReady[senderId] = true
+			recoveryState.receivedReady[senderPid] = true
 			recoveryState.readyMessagesStat[value]++
 
 			if recoveryState.stage < SentReady &&
@@ -503,10 +506,8 @@ func (p *Process) Receive(context actor.Context) {
 }
 
 func (p *Process) Broadcast(context actor.SenderContext, value int64) {
-	id := utils.PidToString(p.currPid)
-
 	msgData := &messages.MessageData{
-		Author:    id,
+		Author:    p.pid,
 		SeqNumber: p.msgCounter,
 		Value:     value,
 	}

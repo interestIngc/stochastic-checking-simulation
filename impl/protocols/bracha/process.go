@@ -11,6 +11,7 @@ import (
 )
 
 type Stage int32
+
 const (
 	Init Stage = iota
 	SentEcho
@@ -36,19 +37,24 @@ func newMessageState() *messageState {
 }
 
 type Process struct {
-	currPid           *actor.PID
-	pids              map[string]*actor.PID
-	msgCounter        int64
-	acceptedMessages  map[string]map[int64]protocols.ValueType
-	messagesLog       map[string]map[int64]*messageState
+	actorPid   *actor.PID
+	pid        string
+	actorPids  map[string]*actor.PID
+	msgCounter int64
+
+	acceptedMessages map[string]map[int64]protocols.ValueType
+	messagesLog      map[string]map[int64]*messageState
+
 	messagesForEcho   int
 	messagesForReady  int
 	messagesForAccept int
 }
 
-func (p *Process) InitProcess(currPid *actor.PID, pids []*actor.PID) {
-	p.currPid = currPid
-	p.pids = make(map[string]*actor.PID)
+func (p *Process) InitProcess(actorPid *actor.PID, actorPids []*actor.PID) {
+	p.actorPid = actorPid
+	p.pid = utils.MakeCustomPid(actorPid)
+	p.actorPids = make(map[string]*actor.PID)
+
 	p.msgCounter = 0
 
 	p.messagesForEcho = int(math.Ceil(float64(config.ProcessCount+config.FaultyProcesses+1) / float64(2)))
@@ -57,11 +63,11 @@ func (p *Process) InitProcess(currPid *actor.PID, pids []*actor.PID) {
 
 	p.acceptedMessages = make(map[string]map[int64]protocols.ValueType)
 	p.messagesLog = make(map[string]map[int64]*messageState)
-	for _, pid := range pids {
-		id := utils.PidToString(pid)
-		p.pids[id] = pid
-		p.acceptedMessages[id] = make(map[int64]protocols.ValueType)
-		p.messagesLog[id] = make(map[int64]*messageState)
+	for _, currActorPid := range actorPids {
+		pid := utils.MakeCustomPid(currActorPid)
+		p.actorPids[pid] = currActorPid
+		p.acceptedMessages[pid] = make(map[int64]protocols.ValueType)
+		p.messagesLog[pid] = make(map[int64]*messageState)
 	}
 }
 
@@ -75,8 +81,8 @@ func (p *Process) initMessageState(msgData *messages.MessageData) *messageState 
 }
 
 func (p *Process) broadcast(context actor.SenderContext, message *messages.BrachaMessage) {
-	for _, pid := range p.pids {
-		context.RequestWithCustomSender(pid, message, p.currPid)
+	for _, pid := range p.actorPids {
+		context.RequestWithCustomSender(pid, message, p.actorPid)
 	}
 }
 
@@ -112,7 +118,7 @@ func (p *Process) deliver(msgData *messages.MessageData) {
 
 	fmt.Printf(
 		"%s: Accepted transaction with seq number %d and value %d from %s in bracha broadcast\n",
-		utils.PidToString(p.currPid), msgData.SeqNumber, msgData.Value, msgData.Author)
+		p.pid, msgData.SeqNumber, msgData.Value, msgData.Author)
 }
 
 func (p *Process) Receive(context actor.Context) {
@@ -124,13 +130,14 @@ func (p *Process) Receive(context actor.Context) {
 	case *messages.BrachaMessage:
 		msg := message.(*messages.BrachaMessage)
 		msgData := msg.GetMessageData()
-		sender := utils.PidToString(context.Sender())
 		value := protocols.ValueType(msgData.Value)
+
+		senderPid := utils.MakeCustomPid(context.Sender())
 
 		acceptedValue, accepted := p.acceptedMessages[msgData.Author][msgData.SeqNumber]
 		if accepted {
 			if acceptedValue != value {
-				fmt.Printf("%s: Detected a duplicated seq number attack\n", p.currPid.Id)
+				fmt.Printf("%s: Detected a duplicated seq number attack\n", p.pid)
 			}
 			return
 		}
@@ -143,10 +150,10 @@ func (p *Process) Receive(context actor.Context) {
 				p.broadcastEcho(context, msgData, msgState)
 			}
 		case messages.BrachaMessage_ECHO:
-			if msgState.stage == SentReady || msgState.receivedEcho[sender] {
+			if msgState.stage == SentReady || msgState.receivedEcho[senderPid] {
 				return
 			}
-			msgState.receivedEcho[sender] = true
+			msgState.receivedEcho[senderPid] = true
 			msgState.echoCount[value]++
 
 			if msgState.echoCount[value] >= p.messagesForEcho {
@@ -158,10 +165,10 @@ func (p *Process) Receive(context actor.Context) {
 				}
 			}
 		case messages.BrachaMessage_READY:
-			if msgState.receivedReady[sender] {
+			if msgState.receivedReady[senderPid] {
 				return
 			}
-			msgState.receivedReady[sender] = true
+			msgState.receivedReady[senderPid] = true
 			msgState.readyCount[value]++
 
 			if msgState.readyCount[value] >= p.messagesForReady {
@@ -180,12 +187,10 @@ func (p *Process) Receive(context actor.Context) {
 }
 
 func (p *Process) Broadcast(context actor.SenderContext, value int64) {
-	id := utils.PidToString(p.currPid)
-
 	message := &messages.BrachaMessage{
 		Stage: messages.BrachaMessage_INITIAL,
 		MessageData: &messages.MessageData{
-			Author:    id,
+			Author:    p.pid,
 			SeqNumber: p.msgCounter,
 			Value:     value,
 		},

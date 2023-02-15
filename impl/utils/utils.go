@@ -6,7 +6,7 @@ import (
 	"github.com/asynkron/protoactor-go/actor"
 )
 
-func PidToString(pid *actor.PID) string {
+func MakeCustomPid(pid *actor.PID) string {
 	return fmt.Sprintf("Address: %s Id: %s", pid.Address, pid.Id)
 }
 

@@ -27,19 +27,18 @@ var (
 	mainServerAddr = flag.String("mainserver", "", "address of the main server, e.g. 127.0.0.1:8080")
 	protocol       = flag.String("protocol", "reliable_accountability",
 		"A protocol to run, one of: reliable_accountability, consistent_accountability, bracha")
-	faultyProcesses = flag.Int("f", 0, "max number of faulty processes in the system")
-	ownWitnessSetSize = flag.Int("w", 0, "size of the own witness set W")
-	potWitnessSetSize = flag.Int("v", 0, "size of the pot witness set V")
-	witnessThreshold = flag.Int("u", 0, "witnesses threshold to accept a transaction")
-	nodeIdSize = flag.Int("node_id_size", 256, "node id size, default is 256")
-	numberOfBins = flag.Int("number_of_bins", 32, "number of bins in history hash, default is 32")
-	recoverySwitchTimeoutNs =
-		flag.Int(
-			"recovery_timeout",
-			1000000000,
-			"timeout to wait (ns) for the process after initialising a message " +
-				"before switching to the recovery protocol in case value " +
-				"was not delivered during the given amount of time")
+	faultyProcesses         = flag.Int("f", 0, "max number of faulty processes in the system")
+	ownWitnessSetSize       = flag.Int("w", 0, "size of the own witness set W")
+	potWitnessSetSize       = flag.Int("v", 0, "size of the pot witness set V")
+	witnessThreshold        = flag.Int("u", 0, "witnesses threshold to accept a transaction")
+	nodeIdSize              = flag.Int("node_id_size", 256, "node id size, default is 256")
+	numberOfBins            = flag.Int("number_of_bins", 32, "number of bins in history hash, default is 32")
+	recoverySwitchTimeoutNs = flag.Int(
+		"recovery_timeout",
+		1000000000,
+		"timeout to wait (ns) for the process after initialising a message "+
+			"before switching to the recovery protocol in case value "+
+			"was not delivered during the given amount of time")
 )
 
 func main() {
@@ -72,7 +71,7 @@ func main() {
 		pids[i] = actor.NewPID(nodes[i], "pid")
 	}
 
-	mainServer := actor.NewPID(*mainServerAddr,"mainserver")
+	mainServer := actor.NewPID(*mainServerAddr, "mainserver")
 
 	system := actor.NewActorSystem()
 	remoteConfig := remote.Configure(host, port)
@@ -102,7 +101,7 @@ func main() {
 		return
 	}
 	process.InitProcess(currPid, pids)
-	fmt.Printf("%s: started\n", utils.PidToString(currPid))
+	fmt.Printf("%s: started\n", utils.MakeCustomPid(currPid))
 	system.Root.RequestWithCustomSender(mainServer, &messages.Started{}, currPid)
 
 	_, _ = console.ReadLine()

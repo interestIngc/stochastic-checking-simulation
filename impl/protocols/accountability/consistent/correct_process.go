@@ -25,29 +25,36 @@ func newMessageState() *messageState {
 }
 
 type CorrectProcess struct {
-	currPid          *actor.PID
-	pids             map[string]*actor.PID
-	msgCounter       int64
+	actorPid  *actor.PID
+	pid       string
+	actorPids map[string]*actor.PID
+
+	msgCounter int64
+
 	acceptedMessages map[string]map[int64]protocols.ValueType
 	messagesLog      map[string]map[int64]*messageState
-	wSelector        *hashing.WitnessesSelector
-	historyHash      *hashing.HistoryHash
+
+	wSelector   *hashing.WitnessesSelector
+	historyHash *hashing.HistoryHash
 }
 
-func (p *CorrectProcess) InitProcess(currPid *actor.PID, pids []*actor.PID) {
-	p.currPid = currPid
+func (p *CorrectProcess) InitProcess(actorPid *actor.PID, actorPids []*actor.PID) {
+	p.actorPid = actorPid
+	p.pid = utils.MakeCustomPid(actorPid)
+	p.actorPids = make(map[string]*actor.PID)
+
 	p.msgCounter = 0
-	p.pids = make(map[string]*actor.PID)
+
 	p.acceptedMessages = make(map[string]map[int64]protocols.ValueType)
 	p.messagesLog = make(map[string]map[int64]*messageState)
 
-	ids := make([]string, len(pids))
-	for i, pid := range pids {
-		id := utils.PidToString(pid)
-		ids[i] = id
-		p.pids[id] = pid
-		p.acceptedMessages[id] = make(map[int64]protocols.ValueType)
-		p.messagesLog[id] = make(map[int64]*messageState)
+	pids := make([]string, len(actorPids))
+	for i, currActorPid := range actorPids {
+		pid := utils.MakeCustomPid(currActorPid)
+		pids[i] = pid
+		p.actorPids[pid] = currActorPid
+		p.acceptedMessages[pid] = make(map[int64]protocols.ValueType)
+		p.messagesLog[pid] = make(map[int64]*messageState)
 	}
 
 	var hasher hashing.Hasher
@@ -57,53 +64,64 @@ func (p *CorrectProcess) InitProcess(currPid *actor.PID, pids []*actor.PID) {
 		hasher = hashing.HashSHA512{}
 	}
 
-	p.wSelector = &hashing.WitnessesSelector{NodeIds: ids, Hasher: hasher}
+	p.wSelector = &hashing.WitnessesSelector{NodeIds: pids, Hasher: hasher}
 	binCapacity := uint(math.Pow(2, float64(config.NodeIdSize/config.NumberOfBins)))
 	p.historyHash = hashing.NewHistoryHash(uint(config.NumberOfBins), binCapacity, hasher)
 }
 
+func (p *CorrectProcess) initMessageState(msgData *messages.MessageData) *messageState {
+	msgState := newMessageState()
+	msgState.witnessSet, _ = p.wSelector.GetWitnessSet(msgData.Author, msgData.SeqNumber, p.historyHash)
+
+	p.messagesLog[msgData.Author][msgData.SeqNumber] = msgState
+
+	return msgState
+}
+
 func (p *CorrectProcess) broadcast(context actor.SenderContext, message *messages.ConsistentProtocolMessage) {
-	for _, pid := range p.pids {
-		context.RequestWithCustomSender(pid, message, p.currPid)
+	for _, pid := range p.actorPids {
+		context.RequestWithCustomSender(pid, message, p.actorPid)
 	}
 }
 
+func (p *CorrectProcess) deliver(msgData *messages.MessageData) {
+	p.acceptedMessages[msgData.Author][msgData.SeqNumber] = protocols.ValueType(msgData.Value)
+	p.historyHash.Insert(utils.TransactionToBytes(msgData.Author, msgData.SeqNumber))
+	delete(p.messagesLog[msgData.Author], msgData.SeqNumber)
+
+	fmt.Printf(
+		"%s: Accepted transaction with seq number %d and value %d from %s\n",
+		p.pid, msgData.SeqNumber, msgData.Value, msgData.Author)
+}
+
 func (p *CorrectProcess) verify(
-	context actor.SenderContext, sender string, msgData *messages.MessageData) bool {
+	context actor.SenderContext, senderPid string, msgData *messages.MessageData) bool {
 	value := protocols.ValueType(msgData.Value)
 	msgState := p.messagesLog[msgData.Author][msgData.SeqNumber]
 
 	acceptedValue, accepted := p.acceptedMessages[msgData.Author][msgData.SeqNumber]
 	if accepted {
 		if acceptedValue != value {
-			//fmt.Printf("%s: Detected a duplicated seq number attack\n", p.currPid.Address)
+			//fmt.Printf("%s: Detected a duplicated seq number attack\n", p.pid)
 			return false
 		}
 	} else if msgState != nil {
-		if msgState.witnessSet[sender] && !msgState.receivedEcho[sender] {
-			msgState.receivedEcho[sender] = true
+		if msgState.witnessSet[senderPid] && !msgState.receivedEcho[senderPid] {
+			msgState.receivedEcho[senderPid] = true
 			msgState.echoCount[value]++
 			if msgState.echoCount[value] >= config.WitnessThreshold {
-				p.acceptedMessages[msgData.Author][msgData.SeqNumber] = value
-				p.historyHash.Insert(utils.TransactionToBytes(msgData.Author, msgData.SeqNumber))
-				delete(p.messagesLog[msgData.Author], msgData.SeqNumber)
-
-				fmt.Printf(
-					"%s: Accepted transaction with seq number %d and value %d from %s\n",
-					utils.PidToString(p.currPid), msgData.SeqNumber, msgData.Value, msgData.Author)
+				p.deliver(msgData)
 			}
 		}
 	} else {
-		msgState := newMessageState()
-		msgState.witnessSet, _ = p.wSelector.GetWitnessSet(msgData.Author, msgData.SeqNumber, p.historyHash)
-		p.messagesLog[msgData.Author][msgData.SeqNumber] = msgState
+		msgState = p.initMessageState(msgData)
 
 		message := &messages.ConsistentProtocolMessage{
 			Stage:       messages.ConsistentProtocolMessage_VERIFY,
 			MessageData: msgData,
 		}
-		for id := range msgState.witnessSet {
-			context.RequestWithCustomSender(p.pids[id], message, p.currPid)
+		for pid := range msgState.witnessSet {
+			context.RequestWithCustomSender(p.actorPids[pid], message, p.actorPid)
 		}
 	}
 	return true
@@ -111,7 +129,6 @@ func (p *CorrectProcess) verify(
 
 func (p *CorrectProcess) Receive(context actor.Context) {
 	message := context.Message()
-
 	switch message.(type) {
 	case *messages.Broadcast:
 		msg := message.(*messages.Broadcast)
@@ -119,7 +136,7 @@ func (p *CorrectProcess) Receive(context actor.Context) {
 	case *messages.ConsistentProtocolMessage:
 		msg := message.(*messages.ConsistentProtocolMessage)
 		msgData := msg.GetMessageData()
-		senderId := utils.PidToString(context.Sender())
+		senderId := utils.MakeCustomPid(context.Sender())
 
 		doBroadcast := p.verify(context, senderId, msgData)
 
@@ -135,13 +152,11 @@ func (p *CorrectProcess) Receive(context actor.Context) {
 }
 
 func (p *CorrectProcess) Broadcast(context actor.SenderContext, value int64) {
-	id := utils.PidToString(p.currPid)
-
 	p.verify(
 		context,
-		id,
+		p.pid,
 		&messages.MessageData{
-			Author:    id,
+			Author:    p.pid,
 			SeqNumber: p.msgCounter,
 			Value:     value,
 		})
