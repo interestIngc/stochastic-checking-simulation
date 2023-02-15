@@ -7,6 +7,8 @@ require github.com/asynkron/protoactor-go v0.0.0-20221002142108-880b460fcd1f
 require (
 	github.com/asynkron/goconsole v0.0.0-20160504192649-bfa12eebf716
 	github.com/stretchr/testify v1.7.1
+	golang.org/x/exp v0.0.0-20220518171630-0b5c67f07fdf
+	gonum.org/v1/gonum v0.12.0
 	google.golang.org/protobuf v1.28.1
 )
 
@@ -40,7 +42,6 @@ require (
 	go.opentelemetry.io/otel/sdk/export/metric v0.28.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v0.30.0 // indirect
 	go.opentelemetry.io/otel/trace v1.7.0 // indirect
-	golang.org/x/exp v0.0.0-20220518171630-0b5c67f07fdf // indirect
 	golang.org/x/net v0.0.0-20220526153639-5463443f8c37 // indirect
 	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a // indirect
 	golang.org/x/text v0.3.7 // indirect

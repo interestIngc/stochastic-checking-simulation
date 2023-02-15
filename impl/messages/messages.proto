@@ -65,3 +65,17 @@ message RecoveryMessage {
   Stage recoveryStage = 1;
   ReliableProtocolMessage message = 2;
 }
+
+message ScalableProtocolMessage {
+  enum Stage {
+    GOSSIP = 0;
+    GOSSIP_SUBSCRIBE = 1;
+    ECHO = 2;
+    ECHO_SUBSCRIBE = 3;
+    READY = 4;
+    READY_SUBSCRIBE = 5;
+  }
+
+  Stage stage = 1;
+  MessageData messageData = 2;
+}

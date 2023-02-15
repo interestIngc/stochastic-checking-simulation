@@ -225,6 +225,64 @@ func (RecoveryMessage_Stage) EnumDescriptor() ([]byte, []int) {
 	return file_messages_proto_rawDescGZIP(), []int{7, 0}
 }
 
+type ScalableProtocolMessage_Stage int32
+
+const (
+	ScalableProtocolMessage_GOSSIP           ScalableProtocolMessage_Stage = 0
+	ScalableProtocolMessage_GOSSIP_SUBSCRIBE ScalableProtocolMessage_Stage = 1
+	ScalableProtocolMessage_ECHO             ScalableProtocolMessage_Stage = 2
+	ScalableProtocolMessage_ECHO_SUBSCRIBE   ScalableProtocolMessage_Stage = 3
+	ScalableProtocolMessage_READY            ScalableProtocolMessage_Stage = 4
+	ScalableProtocolMessage_READY_SUBSCRIBE  ScalableProtocolMessage_Stage = 5
+)
+
+// Enum value maps for ScalableProtocolMessage_Stage.
+var (
+	ScalableProtocolMessage_Stage_name = map[int32]string{
+		0: "GOSSIP",
+		1: "GOSSIP_SUBSCRIBE",
+		2: "ECHO",
+		3: "ECHO_SUBSCRIBE",
+		4: "READY",
+		5: "READY_SUBSCRIBE",
+	}
+	ScalableProtocolMessage_Stage_value = map[string]int32{
+		"GOSSIP":           0,
+		"GOSSIP_SUBSCRIBE": 1,
+		"ECHO":             2,
+		"ECHO_SUBSCRIBE":   3,
+		"READY":            4,
+		"READY_SUBSCRIBE":  5,
+	}
+)
+
+func (x ScalableProtocolMessage_Stage) Enum() *ScalableProtocolMessage_Stage {
+	p := new(ScalableProtocolMessage_Stage)
+	*p = x
+	return p
+}
+
+func (x ScalableProtocolMessage_Stage) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ScalableProtocolMessage_Stage) Descriptor() protoreflect.EnumDescriptor {
+	return file_messages_proto_enumTypes[4].Descriptor()
+}
+
+func (ScalableProtocolMessage_Stage) Type() protoreflect.EnumType {
+	return &file_messages_proto_enumTypes[4]
+}
+
+func (x ScalableProtocolMessage_Stage) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ScalableProtocolMessage_Stage.Descriptor instead.
+func (ScalableProtocolMessage_Stage) EnumDescriptor() ([]byte, []int) {
+	return file_messages_proto_rawDescGZIP(), []int{8, 0}
+}
+
 type Started struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -648,6 +706,61 @@ func (x *RecoveryMessage) GetMessage() *ReliableProtocolMessage {
 	return nil
 }
 
+type ScalableProtocolMessage struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Stage       ScalableProtocolMessage_Stage `protobuf:"varint,1,opt,name=stage,proto3,enum=messages.ScalableProtocolMessage_Stage" json:"stage,omitempty"`
+	MessageData *MessageData                  `protobuf:"bytes,2,opt,name=messageData,proto3" json:"messageData,omitempty"`
+}
+
+func (x *ScalableProtocolMessage) Reset() {
+	*x = ScalableProtocolMessage{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_messages_proto_msgTypes[8]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ScalableProtocolMessage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ScalableProtocolMessage) ProtoMessage() {}
+
+func (x *ScalableProtocolMessage) ProtoReflect() protoreflect.Message {
+	mi := &file_messages_proto_msgTypes[8]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ScalableProtocolMessage.ProtoReflect.Descriptor instead.
+func (*ScalableProtocolMessage) Descriptor() ([]byte, []int) {
+	return file_messages_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *ScalableProtocolMessage) GetStage() ScalableProtocolMessage_Stage {
+	if x != nil {
+		return x.Stage
+	}
+	return ScalableProtocolMessage_GOSSIP
+}
+
+func (x *ScalableProtocolMessage) GetMessageData() *MessageData {
+	if x != nil {
+		return x.MessageData
+	}
+	return nil
+}
+
 var File_messages_proto protoreflect.FileDescriptor
 
 var file_messages_proto_rawDesc = []byte{
@@ -717,11 +830,26 @@ var file_messages_proto_rawDesc = []byte{
 	0x73, 0x73, 0x61, 0x67, 0x65, 0x22, 0x34, 0x0a, 0x05, 0x53, 0x74, 0x61, 0x67, 0x65, 0x12, 0x0b,
 	0x0a, 0x07, 0x52, 0x45, 0x43, 0x4f, 0x56, 0x45, 0x52, 0x10, 0x00, 0x12, 0x09, 0x0a, 0x05, 0x52,
 	0x45, 0x50, 0x4c, 0x59, 0x10, 0x01, 0x12, 0x08, 0x0a, 0x04, 0x45, 0x43, 0x48, 0x4f, 0x10, 0x02,
-	0x12, 0x09, 0x0a, 0x05, 0x52, 0x45, 0x41, 0x44, 0x59, 0x10, 0x03, 0x42, 0x2e, 0x5a, 0x2c, 0x73,
-	0x74, 0x6f, 0x63, 0x68, 0x61, 0x73, 0x74, 0x69, 0x63, 0x2d, 0x63, 0x68, 0x65, 0x63, 0x6b, 0x69,
-	0x6e, 0x67, 0x2d, 0x73, 0x69, 0x6d, 0x75, 0x6c, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2f, 0x69, 0x6d,
-	0x70, 0x6c, 0x2f, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x73, 0x62, 0x06, 0x70, 0x72, 0x6f,
-	0x74, 0x6f, 0x33,
+	0x12, 0x09, 0x0a, 0x05, 0x52, 0x45, 0x41, 0x44, 0x59, 0x10, 0x03, 0x22, 0xfa, 0x01, 0x0a, 0x17,
+	0x53, 0x63, 0x61, 0x6c, 0x61, 0x62, 0x6c, 0x65, 0x50, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c,
+	0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x12, 0x3d, 0x0a, 0x05, 0x73, 0x74, 0x61, 0x67, 0x65,
+	0x18, 0x01, 0x20, 0x01, 0x28, 0x0e, 0x32, 0x27, 0x2e, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65,
+	0x73, 0x2e, 0x53, 0x63, 0x61, 0x6c, 0x61, 0x62, 0x6c, 0x65, 0x50, 0x72, 0x6f, 0x74, 0x6f, 0x63,
+	0x6f, 0x6c, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x2e, 0x53, 0x74, 0x61, 0x67, 0x65, 0x52,
+	0x05, 0x73, 0x74, 0x61, 0x67, 0x65, 0x12, 0x37, 0x0a, 0x0b, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67,
+	0x65, 0x44, 0x61, 0x74, 0x61, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x15, 0x2e, 0x6d, 0x65,
+	0x73, 0x73, 0x61, 0x67, 0x65, 0x73, 0x2e, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x44, 0x61,
+	0x74, 0x61, 0x52, 0x0b, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x44, 0x61, 0x74, 0x61, 0x22,
+	0x67, 0x0a, 0x05, 0x53, 0x74, 0x61, 0x67, 0x65, 0x12, 0x0a, 0x0a, 0x06, 0x47, 0x4f, 0x53, 0x53,
+	0x49, 0x50, 0x10, 0x00, 0x12, 0x14, 0x0a, 0x10, 0x47, 0x4f, 0x53, 0x53, 0x49, 0x50, 0x5f, 0x53,
+	0x55, 0x42, 0x53, 0x43, 0x52, 0x49, 0x42, 0x45, 0x10, 0x01, 0x12, 0x08, 0x0a, 0x04, 0x45, 0x43,
+	0x48, 0x4f, 0x10, 0x02, 0x12, 0x12, 0x0a, 0x0e, 0x45, 0x43, 0x48, 0x4f, 0x5f, 0x53, 0x55, 0x42,
+	0x53, 0x43, 0x52, 0x49, 0x42, 0x45, 0x10, 0x03, 0x12, 0x09, 0x0a, 0x05, 0x52, 0x45, 0x41, 0x44,
+	0x59, 0x10, 0x04, 0x12, 0x13, 0x0a, 0x0f, 0x52, 0x45, 0x41, 0x44, 0x59, 0x5f, 0x53, 0x55, 0x42,
+	0x53, 0x43, 0x52, 0x49, 0x42, 0x45, 0x10, 0x05, 0x42, 0x2e, 0x5a, 0x2c, 0x73, 0x74, 0x6f, 0x63,
+	0x68, 0x61, 0x73, 0x74, 0x69, 0x63, 0x2d, 0x63, 0x68, 0x65, 0x63, 0x6b, 0x69, 0x6e, 0x67, 0x2d,
+	0x73, 0x69, 0x6d, 0x75, 0x6c, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2f, 0x69, 0x6d, 0x70, 0x6c, 0x2f,
+	0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x73, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -736,36 +864,40 @@ func file_messages_proto_rawDescGZIP() []byte {
 	return file_messages_proto_rawDescData
 }
 
-var file_messages_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_messages_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_messages_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
+var file_messages_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_messages_proto_goTypes = []interface{}{
 	(BrachaMessage_Stage)(0),             // 0: messages.BrachaMessage.Stage
 	(ConsistentProtocolMessage_Stage)(0), // 1: messages.ConsistentProtocolMessage.Stage
 	(ReliableProtocolMessage_Stage)(0),   // 2: messages.ReliableProtocolMessage.Stage
 	(RecoveryMessage_Stage)(0),           // 3: messages.RecoveryMessage.Stage
-	(*Started)(nil),                      // 4: messages.Started
-	(*Broadcast)(nil),                    // 5: messages.Broadcast
-	(*FaultyBroadcast)(nil),              // 6: messages.FaultyBroadcast
-	(*MessageData)(nil),                  // 7: messages.MessageData
-	(*BrachaMessage)(nil),                // 8: messages.BrachaMessage
-	(*ConsistentProtocolMessage)(nil),    // 9: messages.ConsistentProtocolMessage
-	(*ReliableProtocolMessage)(nil),      // 10: messages.ReliableProtocolMessage
-	(*RecoveryMessage)(nil),              // 11: messages.RecoveryMessage
+	(ScalableProtocolMessage_Stage)(0),   // 4: messages.ScalableProtocolMessage.Stage
+	(*Started)(nil),                      // 5: messages.Started
+	(*Broadcast)(nil),                    // 6: messages.Broadcast
+	(*FaultyBroadcast)(nil),              // 7: messages.FaultyBroadcast
+	(*MessageData)(nil),                  // 8: messages.MessageData
+	(*BrachaMessage)(nil),                // 9: messages.BrachaMessage
+	(*ConsistentProtocolMessage)(nil),    // 10: messages.ConsistentProtocolMessage
+	(*ReliableProtocolMessage)(nil),      // 11: messages.ReliableProtocolMessage
+	(*RecoveryMessage)(nil),              // 12: messages.RecoveryMessage
+	(*ScalableProtocolMessage)(nil),      // 13: messages.ScalableProtocolMessage
 }
 var file_messages_proto_depIdxs = []int32{
 	0,  // 0: messages.BrachaMessage.stage:type_name -> messages.BrachaMessage.Stage
-	7,  // 1: messages.BrachaMessage.messageData:type_name -> messages.MessageData
+	8,  // 1: messages.BrachaMessage.messageData:type_name -> messages.MessageData
 	1,  // 2: messages.ConsistentProtocolMessage.stage:type_name -> messages.ConsistentProtocolMessage.Stage
-	7,  // 3: messages.ConsistentProtocolMessage.messageData:type_name -> messages.MessageData
+	8,  // 3: messages.ConsistentProtocolMessage.messageData:type_name -> messages.MessageData
 	2,  // 4: messages.ReliableProtocolMessage.stage:type_name -> messages.ReliableProtocolMessage.Stage
-	7,  // 5: messages.ReliableProtocolMessage.messageData:type_name -> messages.MessageData
+	8,  // 5: messages.ReliableProtocolMessage.messageData:type_name -> messages.MessageData
 	3,  // 6: messages.RecoveryMessage.recoveryStage:type_name -> messages.RecoveryMessage.Stage
-	10, // 7: messages.RecoveryMessage.message:type_name -> messages.ReliableProtocolMessage
-	8,  // [8:8] is the sub-list for method output_type
-	8,  // [8:8] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	11, // 7: messages.RecoveryMessage.message:type_name -> messages.ReliableProtocolMessage
+	4,  // 8: messages.ScalableProtocolMessage.stage:type_name -> messages.ScalableProtocolMessage.Stage
+	8,  // 9: messages.ScalableProtocolMessage.messageData:type_name -> messages.MessageData
+	10, // [10:10] is the sub-list for method output_type
+	10, // [10:10] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_messages_proto_init() }
@@ -870,14 +1002,26 @@ func file_messages_proto_init() {
 				return nil
 			}
 		}
+		file_messages_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ScalableProtocolMessage); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_messages_proto_rawDesc,
-			NumEnums:      4,
-			NumMessages:   8,
+			NumEnums:      5,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
