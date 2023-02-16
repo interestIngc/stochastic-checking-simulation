@@ -66,21 +66,22 @@ func (ws *WitnessesSelector) GetWitnessSet(
 	potWitnessSet := make(map[string]bool)
 	ownWitnessSet := make(map[string]bool)
 
-	for i := 0; i < config.PotWitnessSetSize; i++ {
-		id := ws.NodeIds[distances[i].ind]
-		potWitnessSet[id] = true
-		if i < config.OwnWitnessSetSize {
-			ownWitnessSet[id] = true
-		}
-	}
-
-	//for i := 0; i < len(ws.NodeIds) && distances[i].d < config.PotWitnessSetRadius; i++ {
+	//for i := 0; i < config.MinPotWitnessSetSize; i++ {
 	//	id := ws.NodeIds[distances[i].ind]
 	//	potWitnessSet[id] = true
-	//	if distances[i].d < config.OwnWitnessSetRadius {
+	//	if i < config.MinOwnWitnessSetSize {
 	//		ownWitnessSet[id] = true
 	//	}
 	//}
+
+	for i := 0; i < len(ws.NodeIds) &&
+		(i < config.MinPotWitnessSetSize || distances[i].d < config.PotWitnessSetRadius); i++ {
+		id := ws.NodeIds[distances[i].ind]
+		potWitnessSet[id] = true
+		if i < config.MinOwnWitnessSetSize || distances[i].d < config.OwnWitnessSetRadius {
+			ownWitnessSet[id] = true
+		}
+	}
 
 	return ownWitnessSet, potWitnessSet
 }

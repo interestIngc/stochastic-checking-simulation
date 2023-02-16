@@ -59,8 +59,8 @@ func main() {
 
 	config.ProcessCount = len(nodes)
 	config.FaultyProcesses = *faultyProcesses
-	config.OwnWitnessSetSize = *ownWitnessSetSize
-	config.PotWitnessSetSize = *potWitnessSetSize
+	config.MinOwnWitnessSetSize = *ownWitnessSetSize
+	config.MinPotWitnessSetSize = *potWitnessSetSize
 	config.WitnessThreshold = *witnessThreshold
 	config.NodeIdSize = *nodeIdSize
 	config.NumberOfBins = *numberOfBins

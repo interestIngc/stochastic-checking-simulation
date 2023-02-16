@@ -9,11 +9,11 @@ var FaultyProcesses = 20
 
 // Accountability
 
-var OwnWitnessSetSize = 16
-var PotWitnessSetSize = 20
+var MinOwnWitnessSetSize = 16
+var MinPotWitnessSetSize = 32
 
-var OwnWitnessSetRadius = 16.0
-var PotWitnessSetRadius = 20.0
+var OwnWitnessSetRadius = 1900.0
+var PotWitnessSetRadius = 1910.0
 
 var WitnessThreshold = 4
 var RecoverySwitchTimeoutNs time.Duration = 1
