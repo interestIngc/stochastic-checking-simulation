@@ -27,10 +27,12 @@ var (
 	mainServerAddr = flag.String("mainserver", "", "address of the main server, e.g. 127.0.0.1:8080")
 	protocol       = flag.String("protocol", "reliable_accountability",
 		"A protocol to run, one of: reliable_accountability, consistent_accountability, bracha")
-	faultyProcesses         = flag.Int("f", 0, "max number of faulty processes in the system")
-	ownWitnessSetSize       = flag.Int("w", 0, "size of the own witness set W")
-	potWitnessSetSize       = flag.Int("v", 0, "size of the pot witness set V")
-	witnessThreshold        = flag.Int("u", 0, "witnesses threshold to accept a transaction")
+	faultyProcesses         = flag.Int("f", 20, "max number of faulty processes in the system")
+	minOwnWitnessSetSize    = flag.Int("w", 16, "minimal size of the own witness set W")
+	minPotWitnessSetSize    = flag.Int("v", 32, "minimal size of the pot witness set V")
+	ownWitnessSetRadius     = flag.Float64("wr", 1900.0, "own witness set radius")
+	potWitnessSetRadius     = flag.Float64("vr", 1910.0, "pot witness set radius")
+	witnessThreshold        = flag.Int("u", 4, "witnesses threshold to accept a transaction")
 	nodeIdSize              = flag.Int("node_id_size", 256, "node id size, default is 256")
 	numberOfBins            = flag.Int("number_of_bins", 32, "number of bins in history hash, default is 32")
 	recoverySwitchTimeoutNs = flag.Int(
@@ -39,6 +41,13 @@ var (
 		"timeout to wait (ns) for the process after initialising a message "+
 			"before switching to the recovery protocol in case value "+
 			"was not delivered during the given amount of time")
+	gossipSampleSize   = flag.Int("g_size", 20, "gossip sample size")
+	echoSampleSize     = flag.Int("e_size", 16, "echo sample size")
+	echoThreshold      = flag.Int("e_threshold", 10, "echo threshold")
+	readySampleSize    = flag.Int("r_size", 20, "ready sample size")
+	readyThreshold     = flag.Int("r_threshold", 10, "ready threshold")
+	deliverySampleSize = flag.Int("d_size", 20, "delivery sample size")
+	deliveryThreshold  = flag.Int("d_threshold", 15, "delivery threshold")
 )
 
 func main() {
@@ -57,14 +66,24 @@ func main() {
 		return
 	}
 
-	config.ProcessCount = len(nodes)
-	config.FaultyProcesses = *faultyProcesses
-	config.MinOwnWitnessSetSize = *ownWitnessSetSize
-	config.MinPotWitnessSetSize = *potWitnessSetSize
-	config.WitnessThreshold = *witnessThreshold
-	config.NodeIdSize = *nodeIdSize
-	config.NumberOfBins = *numberOfBins
-	config.RecoverySwitchTimeoutNs = time.Duration(*recoverySwitchTimeoutNs)
+	parameters := &config.Parameters{
+		FaultyProcesses:         *faultyProcesses,
+		MinOwnWitnessSetSize:    *minOwnWitnessSetSize,
+		MinPotWitnessSetSize:    *minPotWitnessSetSize,
+		OwnWitnessSetRadius:     *ownWitnessSetRadius,
+		PotWitnessSetRadius:     *potWitnessSetRadius,
+		WitnessThreshold:        *witnessThreshold,
+		RecoverySwitchTimeoutNs: time.Duration(*recoverySwitchTimeoutNs),
+		NodeIdSize:              *nodeIdSize,
+		NumberOfBins:            *numberOfBins,
+		GossipSampleSize:        *gossipSampleSize,
+		EchoSampleSize:          *echoSampleSize,
+		EchoThreshold:           *echoThreshold,
+		ReadySampleSize:         *readySampleSize,
+		ReadyThreshold:          *readyThreshold,
+		DeliverySampleSize:      *deliverySampleSize,
+		DeliveryThreshold:       *deliveryThreshold,
+	}
 
 	pids := make([]*actor.PID, len(nodes))
 	for i := 0; i < len(nodes); i++ {
@@ -100,7 +119,8 @@ func main() {
 		fmt.Printf("Error while generating pid happened: %s\n", e)
 		return
 	}
-	process.InitProcess(currPid, pids)
+
+	process.InitProcess(currPid, pids, parameters)
 	fmt.Printf("%s: started\n", utils.MakeCustomPid(currPid))
 	system.Root.RequestWithCustomSender(mainServer, &messages.Started{}, currPid)
 

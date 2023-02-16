@@ -34,11 +34,13 @@ type CorrectProcess struct {
 	acceptedMessages map[string]map[int64]protocols.ValueType
 	messagesLog      map[string]map[int64]*messageState
 
+	witnessThreshold int
+
 	wSelector   *hashing.WitnessesSelector
 	historyHash *hashing.HistoryHash
 }
 
-func (p *CorrectProcess) InitProcess(actorPid *actor.PID, actorPids []*actor.PID) {
+func (p *CorrectProcess) InitProcess(actorPid *actor.PID, actorPids []*actor.PID, parameters *config.Parameters) {
 	p.actorPid = actorPid
 	p.pid = utils.MakeCustomPid(actorPid)
 	p.actorPids = make(map[string]*actor.PID)
@@ -47,6 +49,8 @@ func (p *CorrectProcess) InitProcess(actorPid *actor.PID, actorPids []*actor.PID
 
 	p.acceptedMessages = make(map[string]map[int64]protocols.ValueType)
 	p.messagesLog = make(map[string]map[int64]*messageState)
+
+	p.witnessThreshold = parameters.WitnessThreshold
 
 	pids := make([]string, len(actorPids))
 	for i, currActorPid := range actorPids {
@@ -58,15 +62,22 @@ func (p *CorrectProcess) InitProcess(actorPid *actor.PID, actorPids []*actor.PID
 	}
 
 	var hasher hashing.Hasher
-	if config.NodeIdSize == 256 {
+	if parameters.NodeIdSize == 256 {
 		hasher = hashing.HashSHA256{}
 	} else {
 		hasher = hashing.HashSHA512{}
 	}
 
-	p.wSelector = &hashing.WitnessesSelector{NodeIds: pids, Hasher: hasher}
-	binCapacity := uint(math.Pow(2, float64(config.NodeIdSize/config.NumberOfBins)))
-	p.historyHash = hashing.NewHistoryHash(uint(config.NumberOfBins), binCapacity, hasher)
+	p.wSelector = &hashing.WitnessesSelector{
+		NodeIds:              pids,
+		Hasher:               hasher,
+		MinPotWitnessSetSize: parameters.MinPotWitnessSetSize,
+		MinOwnWitnessSetSize: parameters.MinOwnWitnessSetSize,
+		PotWitnessSetRadius:  parameters.PotWitnessSetRadius,
+		OwnWitnessSetRadius:  parameters.OwnWitnessSetRadius,
+	}
+	binCapacity := uint(math.Pow(2, float64(parameters.NodeIdSize/parameters.NumberOfBins)))
+	p.historyHash = hashing.NewHistoryHash(uint(parameters.NumberOfBins), binCapacity, hasher)
 }
 
 func (p *CorrectProcess) initMessageState(msgData *messages.MessageData) *messageState {
@@ -102,14 +113,14 @@ func (p *CorrectProcess) verify(
 	acceptedValue, accepted := p.acceptedMessages[msgData.Author][msgData.SeqNumber]
 	if accepted {
 		if acceptedValue != value {
-			//fmt.Printf("%s: Detected a duplicated seq number attack\n", p.pid)
+			fmt.Printf("%s: Detected a duplicated seq number attack\n", p.pid)
 			return false
 		}
 	} else if msgState != nil {
 		if msgState.witnessSet[senderPid] && !msgState.receivedEcho[senderPid] {
 			msgState.receivedEcho[senderPid] = true
 			msgState.echoCount[value]++
-			if msgState.echoCount[value] >= config.WitnessThreshold {
+			if msgState.echoCount[value] >= p.witnessThreshold {
 				p.deliver(msgData)
 			}
 		}

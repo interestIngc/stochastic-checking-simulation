@@ -9,15 +9,20 @@ import (
 )
 
 func main() {
+	processCount := 256
+	parameters := &config.Parameters{
+		FaultyProcesses: 20,
+	}
+
 	system := actor.NewActorSystem()
 	remoteConfig := remote.Configure("127.0.0.1", 8080)
 	remoter := remote.NewRemote(system, remoteConfig)
 	remoter.Start()
 
-	pids := make([]*actor.PID, config.ProcessCount)
-	processes := make([]*bracha.Process, config.ProcessCount)
+	pids := make([]*actor.PID, processCount)
+	processes := make([]*bracha.Process, processCount)
 
-	for i := 0; i < config.ProcessCount; i++ {
+	for i := 0; i < processCount; i++ {
 		processes[i] = &bracha.Process{}
 		pids[i] =
 			system.Root.Spawn(
@@ -27,39 +32,11 @@ func main() {
 					}),
 			)
 	}
-	for i := 0; i < config.ProcessCount; i++ {
-		processes[i].InitProcess(pids[i], pids)
+	for i := 0; i < processCount; i++ {
+		processes[i].InitProcess(pids[i], pids, parameters)
 	}
 
 	processes[0].Broadcast(system.Root, 5)
 
-	//for seq := 0; seq < 4; seq++ {
-	//	for i := 0; i < config.ProcessCount; i++ {
-	//		processes[i].Broadcast(system.Root, int32(i))
-	//	}
-	//}
-
-	//for i := 1; i < 2; i++ {
-	//	system.Root.RequestWithCustomSender(
-	//		pids[i],
-	//		&messages.Message{
-	//			Stage:     messages.Message_INITIAL,
-	//			Author:    pids[0],
-	//			SeqNumber: 0,
-	//			Value:     1,
-	//		},
-	//		pids[0])
-	//}
-	//for i := 2; i < 6; i++ {
-	//	system.Root.RequestWithCustomSender(
-	//		pids[i],
-	//		&messages.Message{
-	//			Stage:     messages.Message_INITIAL,
-	//			Author:    pids[0],
-	//			SeqNumber: 0,
-	//			Value:     2,
-	//		},
-	//		pids[0])
-	//}
 	_, _ = console.ReadLine()
 }

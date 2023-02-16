@@ -4,13 +4,17 @@ import (
 	"fmt"
 	"math/rand"
 	"sort"
-	"stochastic-checking-simulation/config"
 	"stochastic-checking-simulation/impl/utils"
 )
 
 type WitnessesSelector struct {
 	NodeIds []string
 	Hasher  Hasher
+
+	MinPotWitnessSetSize int
+	MinOwnWitnessSetSize int
+	PotWitnessSetRadius  float64
+	OwnWitnessSetRadius  float64
 }
 
 type dist struct {
@@ -66,19 +70,11 @@ func (ws *WitnessesSelector) GetWitnessSet(
 	potWitnessSet := make(map[string]bool)
 	ownWitnessSet := make(map[string]bool)
 
-	//for i := 0; i < config.MinPotWitnessSetSize; i++ {
-	//	id := ws.NodeIds[distances[i].ind]
-	//	potWitnessSet[id] = true
-	//	if i < config.MinOwnWitnessSetSize {
-	//		ownWitnessSet[id] = true
-	//	}
-	//}
-
 	for i := 0; i < len(ws.NodeIds) &&
-		(i < config.MinPotWitnessSetSize || distances[i].d < config.PotWitnessSetRadius); i++ {
+		(i < ws.MinPotWitnessSetSize || distances[i].d < ws.PotWitnessSetRadius); i++ {
 		id := ws.NodeIds[distances[i].ind]
 		potWitnessSet[id] = true
-		if i < config.MinOwnWitnessSetSize || distances[i].d < config.OwnWitnessSetRadius {
+		if i < ws.MinOwnWitnessSetSize || distances[i].d < ws.OwnWitnessSetRadius {
 			ownWitnessSet[id] = true
 		}
 	}

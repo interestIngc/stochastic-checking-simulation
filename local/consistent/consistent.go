@@ -7,20 +7,35 @@ import (
 	"stochastic-checking-simulation/config"
 	"stochastic-checking-simulation/impl/protocols"
 	"stochastic-checking-simulation/impl/protocols/accountability/consistent"
+	"time"
 )
 
 func main() {
+	processCount := 256
+	faultyProcessesCount := 20
+	parameters := &config.Parameters{
+		FaultyProcesses:         faultyProcessesCount,
+		MinOwnWitnessSetSize:    16,
+		MinPotWitnessSetSize:    32,
+		OwnWitnessSetRadius:     1900.0,
+		PotWitnessSetRadius:     1910.0,
+		WitnessThreshold:        4,
+		RecoverySwitchTimeoutNs: time.Duration(1000000000),
+		NodeIdSize:              256,
+		NumberOfBins:            32,
+	}
+
 	system := actor.NewActorSystem()
 	remoteConfig := remote.Configure("127.0.0.1", 8080)
 	remoter := remote.NewRemote(system, remoteConfig)
 	remoter.Start()
 
-	pids := make([]*actor.PID, config.ProcessCount)
-	processes := make([]protocols.Process, config.ProcessCount)
-	correctProcesses := make([]*consistent.CorrectProcess, config.ProcessCount-config.FaultyProcesses)
-	faultyProcesses := make([]*consistent.FaultyProcess, config.FaultyProcesses)
+	pids := make([]*actor.PID, processCount)
+	processes := make([]protocols.Process, processCount)
+	correctProcesses := make([]*consistent.CorrectProcess, processCount-faultyProcessesCount)
+	faultyProcesses := make([]*consistent.FaultyProcess, faultyProcessesCount)
 
-	for i := 0; i < config.FaultyProcesses; i++ {
+	for i := 0; i < faultyProcessesCount; i++ {
 		process := &consistent.FaultyProcess{}
 		faultyProcesses[i] = process
 		processes[i] = process
@@ -33,11 +48,11 @@ func main() {
 			)
 	}
 
-	for i := 0; i < config.ProcessCount-config.FaultyProcesses; i++ {
+	for i := 0; i < processCount-faultyProcessesCount; i++ {
 		process := &consistent.CorrectProcess{}
 		correctProcesses[i] = process
-		processes[i+config.FaultyProcesses] = process
-		pids[i+config.FaultyProcesses] =
+		processes[i+faultyProcessesCount] = process
+		pids[i+faultyProcessesCount] =
 			system.Root.Spawn(
 				actor.PropsFromProducer(
 					func() actor.Actor {
@@ -45,11 +60,11 @@ func main() {
 					}),
 			)
 	}
-	for i := 0; i < config.FaultyProcesses; i++ {
-		faultyProcesses[i].InitProcess(pids[i], pids)
+	for i := 0; i < faultyProcessesCount; i++ {
+		faultyProcesses[i].InitProcess(pids[i], pids, parameters)
 	}
-	for i := 0; i < config.ProcessCount-config.FaultyProcesses; i++ {
-		correctProcesses[i].InitProcess(pids[i+config.FaultyProcesses], pids)
+	for i := 0; i < processCount-faultyProcessesCount; i++ {
+		correctProcesses[i].InitProcess(pids[i+faultyProcessesCount], pids, parameters)
 	}
 
 	faultyProcesses[0].FaultyBroadcast(system.Root, 0, 5)

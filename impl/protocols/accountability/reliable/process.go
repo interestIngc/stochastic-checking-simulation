@@ -10,6 +10,7 @@ import (
 	"stochastic-checking-simulation/impl/messages"
 	"stochastic-checking-simulation/impl/protocols"
 	"stochastic-checking-simulation/impl/utils"
+	"time"
 )
 
 type WitnessStage int32
@@ -116,21 +117,25 @@ type Process struct {
 	lastSentPMessages   map[string]map[int64]*messages.ReliableProtocolMessage
 	recoveryMessagesLog map[string]map[int64]*recoveryMessageState
 
-	quorumThreshold        int
-	readyMessagesThreshold int
+	quorumThreshold         int
+	readyMessagesThreshold  int
+	recoverySwitchTimeoutNs time.Duration
+	witnessThreshold        int
 
 	wSelector   *hashing.WitnessesSelector
 	historyHash *hashing.HistoryHash
 }
 
-func (p *Process) InitProcess(actorPid *actor.PID, actorPids []*actor.PID) {
+func (p *Process) InitProcess(actorPid *actor.PID, actorPids []*actor.PID, parameters *config.Parameters) {
 	p.actorPid = actorPid
 	p.pid = utils.MakeCustomPid(actorPid)
 	p.actorPids = make(map[string]*actor.PID)
 	p.msgCounter = 0
 
-	p.quorumThreshold = int(math.Ceil(float64(config.ProcessCount+config.FaultyProcesses+1) / float64(2)))
-	p.readyMessagesThreshold = config.FaultyProcesses + 1
+	p.quorumThreshold = int(math.Ceil(float64(len(actorPids)+parameters.FaultyProcesses+1) / float64(2)))
+	p.readyMessagesThreshold = parameters.FaultyProcesses + 1
+	p.recoverySwitchTimeoutNs = parameters.RecoverySwitchTimeoutNs
+	p.witnessThreshold = parameters.WitnessThreshold
 
 	p.acceptedMessages = make(map[string]map[int64]protocols.ValueType)
 	p.messagesLog = make(map[string]map[int64]*messageState)
@@ -149,15 +154,22 @@ func (p *Process) InitProcess(actorPid *actor.PID, actorPids []*actor.PID) {
 	}
 
 	var hasher hashing.Hasher
-	if config.NodeIdSize == 256 {
+	if parameters.NodeIdSize == 256 {
 		hasher = hashing.HashSHA256{}
 	} else {
 		hasher = hashing.HashSHA512{}
 	}
 
-	p.wSelector = &hashing.WitnessesSelector{NodeIds: pids, Hasher: hasher}
-	binCapacity := uint(math.Pow(2, float64(config.NodeIdSize/config.NumberOfBins)))
-	p.historyHash = hashing.NewHistoryHash(uint(config.NumberOfBins), binCapacity, hasher)
+	p.wSelector = &hashing.WitnessesSelector{
+		NodeIds:              pids,
+		Hasher:               hasher,
+		MinPotWitnessSetSize: parameters.MinPotWitnessSetSize,
+		MinOwnWitnessSetSize: parameters.MinOwnWitnessSetSize,
+		PotWitnessSetRadius:  parameters.PotWitnessSetRadius,
+		OwnWitnessSetRadius:  parameters.OwnWitnessSetRadius,
+	}
+	binCapacity := uint(math.Pow(2, float64(parameters.NodeIdSize/parameters.NumberOfBins)))
+	p.historyHash = hashing.NewHistoryHash(uint(parameters.NumberOfBins), binCapacity, hasher)
 }
 
 func (p *Process) initMessageState(context actor.SenderContext, msgData *messages.MessageData) *messageState {
@@ -181,7 +193,7 @@ func (p *Process) registerMessage(context actor.Context, msgData *messages.Messa
 	if msgState == nil {
 		msgState = p.initMessageState(context, msgData)
 		context.ReenterAfter(
-			actor.NewFuture(context.ActorSystem(), config.RecoverySwitchTimeoutNs),
+			actor.NewFuture(context.ActorSystem(), p.recoverySwitchTimeoutNs),
 			func(res interface{}, err error) {
 				if !p.accepted(msgData) {
 					p.broadcastRecover(context, msgData)
@@ -364,7 +376,7 @@ func (p *Process) Receive(context actor.Context) {
 			msgState.readyFromWitnesses[senderPid] = true
 			msgState.readyFromWitnessesStat[value]++
 
-			if msgState.readyFromWitnessesStat[value] >= config.WitnessThreshold {
+			if msgState.readyFromWitnessesStat[value] >= p.witnessThreshold {
 				p.broadcastToWitnesses(
 					context,
 					&messages.ReliableProtocolMessage{
@@ -406,7 +418,7 @@ func (p *Process) Receive(context actor.Context) {
 			msgState.validateFromWitnesses[senderPid] = true
 			msgState.validatesStat[value]++
 
-			if msgState.validatesStat[value] >= config.WitnessThreshold {
+			if msgState.validatesStat[value] >= p.witnessThreshold {
 				p.deliver(msgData)
 			}
 		}

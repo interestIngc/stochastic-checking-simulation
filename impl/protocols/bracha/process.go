@@ -50,16 +50,16 @@ type Process struct {
 	messagesForAccept int
 }
 
-func (p *Process) InitProcess(actorPid *actor.PID, actorPids []*actor.PID) {
+func (p *Process) InitProcess(actorPid *actor.PID, actorPids []*actor.PID, parameters *config.Parameters) {
 	p.actorPid = actorPid
 	p.pid = utils.MakeCustomPid(actorPid)
 	p.actorPids = make(map[string]*actor.PID)
 
 	p.msgCounter = 0
 
-	p.messagesForEcho = int(math.Ceil(float64(config.ProcessCount+config.FaultyProcesses+1) / float64(2)))
-	p.messagesForReady = config.FaultyProcesses + 1
-	p.messagesForAccept = 2*config.FaultyProcesses + 1
+	p.messagesForEcho = int(math.Ceil(float64(len(actorPids)+parameters.FaultyProcesses+1) / float64(2)))
+	p.messagesForReady = parameters.FaultyProcesses + 1
+	p.messagesForAccept = 2*parameters.FaultyProcesses + 1
 
 	p.acceptedMessages = make(map[string]map[int64]protocols.ValueType)
 	p.messagesLog = make(map[string]map[int64]*messageState)

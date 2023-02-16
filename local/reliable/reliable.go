@@ -6,18 +6,32 @@ import (
 	"github.com/asynkron/protoactor-go/remote"
 	"stochastic-checking-simulation/config"
 	"stochastic-checking-simulation/impl/protocols/accountability/reliable"
+	"time"
 )
 
 func main() {
+	processCount := 256
+	parameters := &config.Parameters{
+		FaultyProcesses:         20,
+		MinOwnWitnessSetSize:    16,
+		MinPotWitnessSetSize:    32,
+		OwnWitnessSetRadius:     1900.0,
+		PotWitnessSetRadius:     1910.0,
+		WitnessThreshold:        4,
+		RecoverySwitchTimeoutNs: time.Duration(1000000000),
+		NodeIdSize:              256,
+		NumberOfBins:            32,
+	}
+
 	system := actor.NewActorSystem()
 	remoteConfig := remote.Configure("127.0.0.1", 8080)
 	remoter := remote.NewRemote(system, remoteConfig)
 	remoter.Start()
 
-	pids := make([]*actor.PID, config.ProcessCount)
-	processes := make([]*reliable.Process, config.ProcessCount)
+	pids := make([]*actor.PID, processCount)
+	processes := make([]*reliable.Process, processCount)
 
-	for i := 0; i < config.ProcessCount; i++ {
+	for i := 0; i < processCount; i++ {
 		processes[i] = &reliable.Process{}
 		pids[i] =
 			system.Root.Spawn(
@@ -27,8 +41,8 @@ func main() {
 					}),
 			)
 	}
-	for i := 0; i < config.ProcessCount; i++ {
-		processes[i].InitProcess(pids[i], pids)
+	for i := 0; i < processCount; i++ {
+		processes[i].InitProcess(pids[i], pids, parameters)
 	}
 
 	processes[0].Broadcast(system.Root, 5)

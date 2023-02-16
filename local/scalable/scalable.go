@@ -9,15 +9,26 @@ import (
 )
 
 func main() {
+	processCount := 256
+	parameters := &config.Parameters{
+		GossipSampleSize:   20,
+		EchoSampleSize:     16,
+		EchoThreshold:      10,
+		ReadySampleSize:    20,
+		ReadyThreshold:     10,
+		DeliverySampleSize: 20,
+		DeliveryThreshold:  15,
+	}
+
 	system := actor.NewActorSystem()
 	remoteConfig := remote.Configure("127.0.0.1", 8080)
 	remoter := remote.NewRemote(system, remoteConfig)
 	remoter.Start()
 
-	pids := make([]*actor.PID, config.ProcessCount)
-	processes := make([]*scalable.Process, config.ProcessCount)
+	pids := make([]*actor.PID, processCount)
+	processes := make([]*scalable.Process, processCount)
 
-	for i := 0; i < config.ProcessCount; i++ {
+	for i := 0; i < processCount; i++ {
 		processes[i] = &scalable.Process{}
 		pids[i] =
 			system.Root.Spawn(
@@ -27,8 +38,8 @@ func main() {
 					}),
 			)
 	}
-	for i := 0; i < config.ProcessCount; i++ {
-		processes[i].InitProcess(pids[i], pids)
+	for i := 0; i < processCount; i++ {
+		processes[i].InitProcess(pids[i], pids, parameters)
 	}
 
 	processes[0].Broadcast(system.Root, 5)

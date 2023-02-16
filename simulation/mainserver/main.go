@@ -7,7 +7,6 @@ import (
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/remote"
 	"net"
-	"stochastic-checking-simulation/config"
 	"strconv"
 )
 
@@ -30,8 +29,6 @@ func main() {
 		return
 	}
 
-	config.ProcessCount = *processCount
-
 	system := actor.NewActorSystem()
 	remoteConfig := remote.Configure(host, port)
 	remoter := remote.NewRemote(system, remoteConfig)
@@ -50,7 +47,7 @@ func main() {
 		return
 	}
 
-	server.InitMainServer(pid)
+	server.InitMainServer(pid, *processCount)
 	fmt.Printf("Main server started at: %s\n", *mainServerAddr)
 
 	_, _ = console.ReadLine()

@@ -7,7 +7,7 @@ import (
 )
 
 func MakeCustomPid(pid *actor.PID) string {
-	return fmt.Sprintf("Address:%s;Id:%s", pid.Address, pid.Id)
+	return fmt.Sprintf("Address:%s Id:%s", pid.Address, pid.Id)
 }
 
 func ToUint64(bytes []byte) uint64 {

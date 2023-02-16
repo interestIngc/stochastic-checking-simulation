@@ -70,10 +70,18 @@ type Process struct {
 
 	deliveredMessages map[string]map[int64]protocols.ValueType
 	messagesLog       map[string]map[int64]*messageState
+
+	gossipSampleSize   int
+	echoSampleSize     int
+	echoThreshold      int
+	readySampleSize    int
+	readyThreshold     int
+	deliverySampleSize int
+	deliveryThreshold  int
 }
 
 func (p *Process) getRandomPid(random *rand.Rand) string {
-	return p.pids[random.Int()%config.ProcessCount]
+	return p.pids[random.Int()%len(p.pids)]
 }
 
 func (p *Process) generateGossipSample() map[string]bool {
@@ -82,13 +90,13 @@ func (p *Process) generateGossipSample() map[string]bool {
 	seed := time.Now().UnixNano()
 
 	poisson := distuv.Poisson{
-		Lambda: float64(config.GossipSampleSize),
+		Lambda: float64(p.gossipSampleSize),
 		Src:    xrand.NewSource(uint64(seed)),
 	}
 
 	gSize := int(poisson.Rand())
-	if gSize > config.ProcessCount {
-		gSize = config.ProcessCount
+	if gSize > len(p.pids) {
+		gSize = len(p.pids)
 	}
 
 	uniform := rand.New(rand.NewSource(seed))
@@ -124,7 +132,7 @@ func (p *Process) sample(
 	return sample
 }
 
-func (p *Process) InitProcess(actorPid *actor.PID, actorPids []*actor.PID) {
+func (p *Process) InitProcess(actorPid *actor.PID, actorPids []*actor.PID, parameters *config.Parameters) {
 	p.actorPid = actorPid
 	p.pid = utils.MakeCustomPid(actorPid)
 	p.pids = make([]string, len(actorPids))
@@ -142,6 +150,14 @@ func (p *Process) InitProcess(actorPid *actor.PID, actorPids []*actor.PID) {
 		p.deliveredMessages[pid] = make(map[int64]protocols.ValueType)
 		p.messagesLog[pid] = make(map[int64]*messageState)
 	}
+
+	p.gossipSampleSize = parameters.GossipSampleSize
+	p.echoSampleSize = parameters.EchoSampleSize
+	p.echoThreshold = parameters.EchoThreshold
+	p.readySampleSize = parameters.ReadySampleSize
+	p.readyThreshold = parameters.ReadyThreshold
+	p.deliverySampleSize = parameters.DeliverySampleSize
+	p.deliveryThreshold = parameters.DeliveryThreshold
 }
 
 func (p *Process) initMessageState(
@@ -171,19 +187,19 @@ func (p *Process) initMessageState(
 				context,
 				messages.ScalableProtocolMessage_ECHO_SUBSCRIBE,
 				msgData,
-				config.EchoSampleSize)
+				p.echoSampleSize)
 		msgState.readySample =
 			p.sample(
 				context,
 				messages.ScalableProtocolMessage_READY_SUBSCRIBE,
 				msgData,
-				config.ReadySampleSize)
+				p.readySampleSize)
 		msgState.deliverySample =
 			p.sample(
 				context,
 				messages.ScalableProtocolMessage_READY_SUBSCRIBE,
 				msgData,
-				config.DeliverySampleSize)
+				p.deliverySampleSize)
 
 		p.messagesLog[msgData.Author][msgData.SeqNumber] = msgState
 	}
@@ -249,7 +265,7 @@ func (p *Process) maybeSendReadyFromSieve(
 	if !msgState.sentReadyFromSieve &&
 		msgState.echoMessage != nil &&
 		value == protocols.ValueType(msgState.echoMessage.GetMessageData().Value) &&
-		msgState.echoMessagesStat[value] >= config.EchoThreshold {
+		msgState.echoMessagesStat[value] >= p.echoThreshold {
 		msgState.readyMessagesSent[value] = true
 		p.broadcastReady(context, msgState, msgData)
 
@@ -347,7 +363,7 @@ func (p *Process) Receive(context actor.Context) {
 			if msgState.readySample[senderPid] {
 				msgState.readySampleStat[value]++
 
-				if msgState.readySampleStat[value] >= config.ReadyThreshold {
+				if msgState.readySampleStat[value] >= p.readyThreshold {
 					msgState.readyMessagesSent[value] = true
 					p.broadcastReady(context, msgState, msgData)
 				}
@@ -357,7 +373,7 @@ func (p *Process) Receive(context actor.Context) {
 				msgState.deliverySampleStat[value]++
 
 				if !p.delivered(msgData) &&
-					msgState.deliverySampleStat[value] >= config.DeliveryThreshold {
+					msgState.deliverySampleStat[value] >= p.deliveryThreshold {
 					p.deliver(msgData)
 				}
 			}
