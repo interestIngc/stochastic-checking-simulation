@@ -1,18 +1,21 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	console "github.com/asynkron/goconsole"
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/remote"
 	"net"
+	"os"
 	"stochastic-checking-simulation/config"
 	"stochastic-checking-simulation/impl/messages"
 	"stochastic-checking-simulation/impl/protocols"
 	"stochastic-checking-simulation/impl/protocols/accountability/consistent"
 	"stochastic-checking-simulation/impl/protocols/accountability/reliable"
 	"stochastic-checking-simulation/impl/protocols/bracha"
+	"stochastic-checking-simulation/impl/protocols/scalable"
 	"stochastic-checking-simulation/impl/utils"
 	"strconv"
 	"strings"
@@ -20,92 +23,127 @@ import (
 )
 
 var (
-	nodesStr = flag.String(
-		"nodes", "",
-		"a string representing bindings host:port separated by comma, e.g. 127.0.0.1:8081,127.0.0.1:8082")
-	address        = flag.String("address", "", "current node's address, e.g. 127.0.0.1:8081")
-	mainServerAddr = flag.String("mainserver", "", "address of the main server, e.g. 127.0.0.1:8080")
-	protocol       = flag.String("protocol", "reliable_accountability",
-		"A protocol to run, one of: reliable_accountability, consistent_accountability, bracha")
-	faultyProcesses         = flag.Int("f", 20, "max number of faulty processes in the system")
-	minOwnWitnessSetSize    = flag.Int("w", 16, "minimal size of the own witness set W")
-	minPotWitnessSetSize    = flag.Int("v", 32, "minimal size of the pot witness set V")
-	ownWitnessSetRadius     = flag.Float64("wr", 1900.0, "own witness set radius")
-	potWitnessSetRadius     = flag.Float64("vr", 1910.0, "pot witness set radius")
-	witnessThreshold        = flag.Int("u", 4, "witnesses threshold to accept a transaction")
-	nodeIdSize              = flag.Int("node_id_size", 256, "node id size, default is 256")
-	numberOfBins            = flag.Int("number_of_bins", 32, "number of bins in history hash, default is 32")
-	recoverySwitchTimeoutNs = flag.Int(
-		"recovery_timeout",
-		1000000000,
-		"timeout to wait (ns) for the process after initialising a message "+
-			"before switching to the recovery protocol in case value "+
-			"was not delivered during the given amount of time")
-	gossipSampleSize   = flag.Int("g_size", 20, "gossip sample size")
-	echoSampleSize     = flag.Int("e_size", 16, "echo sample size")
-	echoThreshold      = flag.Int("e_threshold", 10, "echo threshold")
-	readySampleSize    = flag.Int("r_size", 20, "ready sample size")
-	readyThreshold     = flag.Int("r_threshold", 10, "ready threshold")
-	deliverySampleSize = flag.Int("d_size", 20, "delivery sample size")
-	deliveryThreshold  = flag.Int("d_threshold", 15, "delivery threshold")
+	filePath = flag.String("file", "", "absolute path to the input file")
 )
+
+func exit(message string) {
+	fmt.Println(message)
+	os.Exit(1)
+}
+
+func getMandatoryParameter(parameters map[string]string, parameter string) string {
+	value, found := parameters[parameter]
+	if !found {
+		exit(fmt.Sprintf("parameter %s is mandatory\n", parameter))
+	}
+	return value
+}
+
+func parseInt(valueStr string) int {
+	if valueStr == "" {
+		return 0
+	}
+	value, e := strconv.Atoi(valueStr)
+	if e != nil {
+		return 0
+	}
+	return value
+}
+
+func parseFloat(valueStr string) float64 {
+	if valueStr == "" {
+		return 0
+	}
+	value, e := strconv.ParseFloat(valueStr, 64)
+	if e != nil {
+		return 0
+	}
+	return value
+}
+
+func getParameters(parameters map[string]string) *config.Parameters {
+	return &config.Parameters{
+		FaultyProcesses:         parseInt(parameters["f"]),
+		MinOwnWitnessSetSize:    parseInt(parameters["w"]),
+		MinPotWitnessSetSize:    parseInt(parameters["v"]),
+		OwnWitnessSetRadius:     parseFloat(parameters["wr"]),
+		PotWitnessSetRadius:     parseFloat(parameters["vr"]),
+		WitnessThreshold:        parseInt(parameters["u"]),
+		RecoverySwitchTimeoutNs: time.Duration(parseInt(parameters["recovery_timeout"])),
+		NodeIdSize:              parseInt(parameters["node_id_size"]),
+		NumberOfBins:            parseInt(parameters["number_of_bins"]),
+		GossipSampleSize:        parseInt(parameters["g_size"]),
+		EchoSampleSize:          parseInt(parameters["e_size"]),
+		EchoThreshold:           parseInt(parameters["e_threshold"]),
+		ReadySampleSize:         parseInt(parameters["r_size"]),
+		ReadyThreshold:          parseInt(parameters["r_threshold"]),
+		DeliverySampleSize:      parseInt(parameters["d_size"]),
+		DeliveryThreshold:       parseInt(parameters["d_threshold"]),
+	}
+}
 
 func main() {
 	flag.Parse()
 
-	nodes := strings.Split(*nodesStr, ",")
-	host, portStr, e := net.SplitHostPort(*address)
+	file, e := os.Open(*filePath)
 	if e != nil {
-		fmt.Printf("Could not split %s into host and port\n", *address)
-		return
+		fmt.Printf("Can't read from file %s", *filePath)
+		os.Exit(1)
+	}
+
+	scanner := bufio.NewScanner(file)
+
+	parametersMap := make(map[string]string)
+	for scanner.Scan() {
+		line := scanner.Text()
+		param := strings.Split(line, " ")
+		if len(param) != 2 {
+			exit(fmt.Sprintf("Unexpected \"%s\", expected \"parameter_name parameter_value\"\n", line))
+		}
+		parametersMap[param[0]] = param[1]
+	}
+
+	nodes := strings.Split(getMandatoryParameter(parametersMap, "nodes"), ",")
+	address := getMandatoryParameter(parametersMap, "current_node")
+	host, portStr, e := net.SplitHostPort(address)
+	if e != nil {
+		exit(fmt.Sprintf("Could not split %s into host and port\n", address))
 	}
 
 	port, e := strconv.Atoi(portStr)
 	if e != nil {
-		fmt.Printf("Could not convert port string representation into int: %s\n", e)
-		return
+		exit(fmt.Sprintf("Could not convert port string representation into int: %s\n", e))
 	}
 
-	parameters := &config.Parameters{
-		FaultyProcesses:         *faultyProcesses,
-		MinOwnWitnessSetSize:    *minOwnWitnessSetSize,
-		MinPotWitnessSetSize:    *minPotWitnessSetSize,
-		OwnWitnessSetRadius:     *ownWitnessSetRadius,
-		PotWitnessSetRadius:     *potWitnessSetRadius,
-		WitnessThreshold:        *witnessThreshold,
-		RecoverySwitchTimeoutNs: time.Duration(*recoverySwitchTimeoutNs),
-		NodeIdSize:              *nodeIdSize,
-		NumberOfBins:            *numberOfBins,
-		GossipSampleSize:        *gossipSampleSize,
-		EchoSampleSize:          *echoSampleSize,
-		EchoThreshold:           *echoThreshold,
-		ReadySampleSize:         *readySampleSize,
-		ReadyThreshold:          *readyThreshold,
-		DeliverySampleSize:      *deliverySampleSize,
-		DeliveryThreshold:       *deliveryThreshold,
-	}
+	parameters := getParameters(parametersMap)
 
 	pids := make([]*actor.PID, len(nodes))
 	for i := 0; i < len(nodes); i++ {
 		pids[i] = actor.NewPID(nodes[i], "pid")
 	}
 
-	mainServer := actor.NewPID(*mainServerAddr, "mainserver")
+	mainServer := actor.NewPID(getMandatoryParameter(parametersMap, "main_server"), "mainserver")
+
+	var process protocols.Process
+
+	protocol := getMandatoryParameter(parametersMap, "protocol")
+	switch protocol {
+	case "reliable_accountability":
+		process = &reliable.Process{}
+	case "consistent_accountability":
+		process = &consistent.CorrectProcess{}
+	case "bracha":
+		process = &bracha.Process{}
+	case "scalable":
+		process = &scalable.Process{}
+	default:
+		exit(fmt.Sprintf("Invalid protocol: %s\n", protocol))
+	}
 
 	system := actor.NewActorSystem()
 	remoteConfig := remote.Configure(host, port)
 	remoter := remote.NewRemote(system, remoteConfig)
 	remoter.Start()
-
-	var process protocols.Process
-
-	if *protocol == "reliable_accountability" {
-		process = &reliable.Process{}
-	} else if *protocol == "consistent_accountability" {
-		process = &consistent.CorrectProcess{}
-	} else {
-		process = &bracha.Process{}
-	}
 
 	currPid, e :=
 		system.Root.SpawnNamed(
@@ -116,12 +154,12 @@ func main() {
 			"pid",
 		)
 	if e != nil {
-		fmt.Printf("Error while generating pid happened: %s\n", e)
-		return
+		exit(fmt.Sprintf("Error while spawning the process happened: %s\n", e))
 	}
 
 	process.InitProcess(currPid, pids, parameters)
 	fmt.Printf("%s: started\n", utils.MakeCustomPid(currPid))
+
 	system.Root.RequestWithCustomSender(mainServer, &messages.Started{}, currPid)
 
 	_, _ = console.ReadLine()
