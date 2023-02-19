@@ -247,6 +247,9 @@ func (p *Process) broadcastGossip(
 
 func (p *Process) broadcastReady(
 	context actor.SenderContext, msgState *messageState, msgData *messages.MessageData) {
+	value := protocols.ValueType(msgData.Value)
+	msgState.readyMessagesSent[value] = true
+
 	p.broadcastToSet(
 		context,
 		msgState.readySubscriptionSet,
@@ -266,7 +269,6 @@ func (p *Process) maybeSendReadyFromSieve(
 		msgState.echoMessage != nil &&
 		value == protocols.ValueType(msgState.echoMessage.GetMessageData().Value) &&
 		msgState.echoMessagesStat[value] >= p.echoThreshold {
-		msgState.readyMessagesSent[value] = true
 		p.broadcastReady(context, msgState, msgData)
 
 		msgState.sentReadyFromSieve = true
@@ -302,7 +304,8 @@ func (p *Process) Receive(context actor.Context) {
 		case messages.ScalableProtocolMessage_GOSSIP:
 			if msgState.gossipMessage == nil {
 				p.broadcastGossip(context, msgState, msgData)
-
+			}
+			if msgState.echoMessage == nil {
 				msgState.echoMessage =
 					&messages.ScalableProtocolMessage{
 						Stage:       messages.ScalableProtocolMessage_ECHO,
@@ -312,7 +315,6 @@ func (p *Process) Receive(context actor.Context) {
 					context,
 					msgState.echoSubscriptionSet,
 					msgState.echoMessage)
-
 				p.maybeSendReadyFromSieve(context, msgState, msgData)
 			}
 		case messages.ScalableProtocolMessage_ECHO_SUBSCRIBE:
@@ -363,8 +365,8 @@ func (p *Process) Receive(context actor.Context) {
 			if msgState.readySample[senderPid] {
 				msgState.readySampleStat[value]++
 
-				if msgState.readySampleStat[value] >= p.readyThreshold {
-					msgState.readyMessagesSent[value] = true
+				if !msgState.readyMessagesSent[value] &&
+					msgState.readySampleStat[value] >= p.readyThreshold {
 					p.broadcastReady(context, msgState, msgData)
 				}
 			}
