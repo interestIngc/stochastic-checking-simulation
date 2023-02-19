@@ -13,6 +13,7 @@ import (
 var (
 	mainServerAddr = flag.String("mainserver", "", "address of the main server, e.g. 127.0.0.1:8080")
 	processCount   = flag.Int("n", 0, "number of processes in the system (excluding the main server)")
+	times          = flag.Int("times", 5, "number of transactions for each process to broadcast")
 )
 
 func main() {
@@ -47,7 +48,7 @@ func main() {
 		return
 	}
 
-	server.InitMainServer(pid, *processCount)
+	server.InitMainServer(pid, *processCount, *times)
 	fmt.Printf("Main server started at: %s\n", *mainServerAddr)
 
 	_, _ = console.ReadLine()

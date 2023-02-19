@@ -3,17 +3,18 @@
 ## Command to start the main server (must be called before starting nodes)
 
 ```
-go run simulation/mainserver/server.go simulation/mainserver/main.go --mainserver @{MainServerAddress} --n @{N}
+go run simulation/mainserver/server.go simulation/mainserver/main.go --mainserver @{MainServerAddress} --n @{N} --times @{Times}
 ```
 
 ### Where
 @{MainServerAddress} - address of the main server, e.g. 127.0.0.1:8080  
-@{N} - the number of processes in the system (excluding the main server)  
+@{N} - number of processes in the system (excluding the main server)  
+@{Times} - number of transactions for each process to broadcast, defaults to 5
 
 ### Example command
 
 ```
-go run simulation/mainserver/server.go simulation/mainserver/main.go --mainserver 127.0.0.1:8080 --n 2
+go run simulation/mainserver/server.go simulation/mainserver/main.go --mainserver 127.0.0.1:8080 --n 2 --times 3
 ```
 
 ## Command to start a node:
