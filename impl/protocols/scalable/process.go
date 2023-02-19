@@ -36,6 +36,8 @@ type messageState struct {
 	echoMessage   *messages.ScalableProtocolMessage
 
 	sentReadyFromSieve bool
+
+	receivedMessagesCnt int
 }
 
 func newMessageState() *messageState {
@@ -57,6 +59,8 @@ func newMessageState() *messageState {
 
 	ms.echoSubscriptionSet = make(map[string]bool)
 	ms.readySubscriptionSet = make(map[string]bool)
+
+	ms.receivedMessagesCnt = 0
 
 	return ms
 }
@@ -226,10 +230,11 @@ func (p *Process) delivered(msgData *messages.MessageData) bool {
 
 func (p *Process) deliver(msgData *messages.MessageData) {
 	p.deliveredMessages[msgData.Author][msgData.SeqNumber] = protocols.ValueType(msgData.Value)
+	messagesReceived := p.messagesLog[msgData.Author][msgData.SeqNumber].receivedMessagesCnt
 
 	fmt.Printf(
-		"%s: Accepted transaction with seq number %d and value %d from %s\n",
-		p.pid, msgData.SeqNumber, msgData.Value, msgData.Author)
+		"%s: Accepted transaction with seq number %d and value %d from %s, messages received: %d\n",
+		p.pid, msgData.SeqNumber, msgData.Value, msgData.Author, messagesReceived)
 }
 
 func (p *Process) broadcastGossip(
@@ -290,6 +295,7 @@ func (p *Process) Receive(context actor.Context) {
 		senderPid := utils.MakeCustomPid(sender)
 
 		msgState := p.initMessageState(context, msgData)
+		msgState.receivedMessagesCnt++
 
 		switch msg.Stage {
 		case messages.ScalableProtocolMessage_GOSSIP_SUBSCRIBE:

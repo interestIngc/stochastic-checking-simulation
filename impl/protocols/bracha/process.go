@@ -21,9 +21,13 @@ const (
 type messageState struct {
 	receivedEcho  map[string]bool
 	receivedReady map[string]bool
-	echoCount     map[protocols.ValueType]int
-	readyCount    map[protocols.ValueType]int
-	stage         Stage
+
+	echoCount  map[protocols.ValueType]int
+	readyCount map[protocols.ValueType]int
+
+	stage Stage
+
+	receivedMessagesCnt int
 }
 
 func newMessageState() *messageState {
@@ -32,7 +36,11 @@ func newMessageState() *messageState {
 	ms.receivedReady = make(map[string]bool)
 	ms.echoCount = make(map[protocols.ValueType]int)
 	ms.readyCount = make(map[protocols.ValueType]int)
+
 	ms.stage = Init
+
+	ms.receivedMessagesCnt = 0
+
 	return ms
 }
 
@@ -114,11 +122,12 @@ func (p *Process) broadcastReady(
 
 func (p *Process) deliver(msgData *messages.MessageData) {
 	p.acceptedMessages[msgData.Author][msgData.SeqNumber] = protocols.ValueType(msgData.Value)
+	messagesReceived := p.messagesLog[msgData.Author][msgData.SeqNumber].receivedMessagesCnt
 	delete(p.messagesLog[msgData.Author], msgData.SeqNumber)
 
 	fmt.Printf(
-		"%s: Accepted transaction with seq number %d and value %d from %s in bracha broadcast\n",
-		p.pid, msgData.SeqNumber, msgData.Value, msgData.Author)
+		"%s: Accepted transaction with seq number %d and value %d from %s, messages received: %d\n",
+		p.pid, msgData.SeqNumber, msgData.Value, msgData.Author, messagesReceived)
 }
 
 func (p *Process) Receive(context actor.Context) {
@@ -143,6 +152,7 @@ func (p *Process) Receive(context actor.Context) {
 		}
 
 		msgState := p.initMessageState(msgData)
+		msgState.receivedMessagesCnt++
 
 		switch msg.Stage {
 		case messages.BrachaMessage_INITIAL:

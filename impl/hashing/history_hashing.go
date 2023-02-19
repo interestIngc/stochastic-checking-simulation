@@ -1,6 +1,7 @@
 package hashing
 
 import (
+	"fmt"
 	"stochastic-checking-simulation/impl/utils"
 )
 
@@ -28,4 +29,8 @@ func (hh *HistoryHash) Insert(bytes []byte) {
 		direction = -1
 	}
 	hh.bins.add(binIndex, direction)
+}
+
+func (hh *HistoryHash) Print(message string) {
+	fmt.Printf("%s, history hash is\n%v\n", message, hh.bins.vector)
 }

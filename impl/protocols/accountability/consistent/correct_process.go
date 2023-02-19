@@ -15,12 +15,18 @@ type messageState struct {
 	receivedEcho map[string]bool
 	echoCount    map[protocols.ValueType]int
 	witnessSet   map[string]bool
+
+	processedMessagesCnt int
 }
 
 func newMessageState() *messageState {
 	ms := new(messageState)
+
 	ms.receivedEcho = make(map[string]bool)
 	ms.echoCount = make(map[protocols.ValueType]int)
+
+	ms.processedMessagesCnt = 0
+
 	return ms
 }
 
@@ -97,12 +103,15 @@ func (p *CorrectProcess) broadcast(context actor.SenderContext, message *message
 
 func (p *CorrectProcess) deliver(msgData *messages.MessageData) {
 	p.acceptedMessages[msgData.Author][msgData.SeqNumber] = protocols.ValueType(msgData.Value)
-	p.historyHash.Insert(utils.TransactionToBytes(msgData.Author, msgData.SeqNumber))
+	p.historyHash.Insert(
+		utils.TransactionToBytes(msgData.Author, msgData.SeqNumber))
+	processedMessages := p.messagesLog[msgData.Author][msgData.SeqNumber].processedMessagesCnt
 	delete(p.messagesLog[msgData.Author], msgData.SeqNumber)
 
-	fmt.Printf(
-		"%s: Accepted transaction with seq number %d and value %d from %s\n",
-		p.pid, msgData.SeqNumber, msgData.Value, msgData.Author)
+	p.historyHash.Print(
+		fmt.Sprintf(
+			"%s: Accepted transaction with seq number %d and value %d from %s, messages processed: %d",
+			p.pid, msgData.SeqNumber, msgData.Value, msgData.Author, processedMessages))
 }
 
 func (p *CorrectProcess) verify(
@@ -117,6 +126,7 @@ func (p *CorrectProcess) verify(
 			return false
 		}
 	} else if msgState != nil {
+		msgState.processedMessagesCnt++
 		if msgState.witnessSet[senderPid] && !msgState.receivedEcho[senderPid] {
 			msgState.receivedEcho[senderPid] = true
 			msgState.echoCount[value]++
@@ -126,6 +136,7 @@ func (p *CorrectProcess) verify(
 		}
 	} else {
 		msgState = p.initMessageState(msgData)
+		msgState.processedMessagesCnt++
 
 		message := &messages.ConsistentProtocolMessage{
 			Stage:       messages.ConsistentProtocolMessage_VERIFY,
