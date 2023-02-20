@@ -30,11 +30,11 @@ Content of the input file should be as follows:
 
 1. Each line of the file must represent one parameter, i.e.
 ```
-parameter @{ParameterValue}
+@{ParameterName} @{ParameterValue}
 ```
-2. Parameters might appear in any order, some of them, which are marked as optional, 
-might be missing in case they are not required for the selected protocol to run.
-3. Description of the parameters  
+2. Parameters might appear in any order, optional parameters might be missing 
+in case they are not required for the selected protocol to run.
+3. Description of the parameters
     * Mandatory:
         * nodes - string representing bindings host:port separated by comma, e.g. 127.0.0.1:8081,127.0.0.1:8082
         * current_node - current node's address, e.g. 127.0.0.1:8081
@@ -46,8 +46,8 @@ might be missing in case they are not required for the selected protocol to run.
             * scalable - scalable byzantine reliable broadcast protocol
     * Optional:
         * f - max number of faulty processes in the system
-        * w - size of the own witness set W within accountability protocols
-        * v - size of the pot witness set V within accountability protocols
+        * w - minimal size of the own witness set W within accountability protocols
+        * v - minimal size of the pot witness set V within accountability protocols
         * wr - own witness set radius within accountability protocols
         * vr - pot witness set radius within accountability protocols
         * u - witnesses threshold to accept a transaction within accountability protocols
