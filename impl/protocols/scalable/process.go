@@ -22,7 +22,7 @@ type messageState struct {
 	readySampleStat    map[protocols.ValueType]int
 	deliverySampleStat map[protocols.ValueType]int
 
-	readyMessagesSent map[protocols.ValueType]bool
+	sentReadyMessages map[protocols.ValueType]bool
 
 	gossipSample   map[string]bool
 	echoSample     map[string]bool
@@ -50,7 +50,7 @@ func newMessageState() *messageState {
 	ms.readySampleStat = make(map[protocols.ValueType]int)
 	ms.deliverySampleStat = make(map[protocols.ValueType]int)
 
-	ms.readyMessagesSent = make(map[protocols.ValueType]bool)
+	ms.sentReadyMessages = make(map[protocols.ValueType]bool)
 
 	ms.gossipSample = make(map[string]bool)
 	ms.echoSample = make(map[string]bool)
@@ -253,7 +253,7 @@ func (p *Process) broadcastGossip(
 func (p *Process) broadcastReady(
 	context actor.SenderContext, msgState *messageState, msgData *messages.MessageData) {
 	value := protocols.ValueType(msgData.Value)
-	msgState.readyMessagesSent[value] = true
+	msgState.sentReadyMessages[value] = true
 
 	p.broadcastToSet(
 		context,
@@ -348,7 +348,7 @@ func (p *Process) Receive(context actor.Context) {
 
 			msgState.readySubscriptionSet[senderPid] = true
 
-			for val := range msgState.readyMessagesSent {
+			for val := range msgState.sentReadyMessages {
 				context.RequestWithCustomSender(
 					sender,
 					&messages.ScalableProtocolMessage{
@@ -371,7 +371,7 @@ func (p *Process) Receive(context actor.Context) {
 			if msgState.readySample[senderPid] {
 				msgState.readySampleStat[value]++
 
-				if !msgState.readyMessagesSent[value] &&
+				if !msgState.sentReadyMessages[value] &&
 					msgState.readySampleStat[value] >= p.readyThreshold {
 					p.broadcastReady(context, msgState, msgData)
 				}

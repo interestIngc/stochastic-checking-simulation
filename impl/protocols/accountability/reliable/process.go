@@ -56,7 +56,7 @@ type messageState struct {
 	ownWitnessSet map[string]bool
 	potWitnessSet map[string]bool
 
-	processedMessagesCnt int
+	receivedMessagesCnt int
 }
 
 func newMessageState() *messageState {
@@ -75,7 +75,7 @@ func newMessageState() *messageState {
 	ms.stage = InitialStage
 	ms.witnessStage = InitialWitnessStage
 
-	ms.processedMessagesCnt = 0
+	ms.receivedMessagesCnt = 0
 
 	return ms
 }
@@ -94,7 +94,7 @@ type recoveryMessageState struct {
 
 	stage RecoveryStage
 
-	processedMessagesCnt int
+	receivedMessagesCnt int
 }
 
 func newRecoveryMessageState() *recoveryMessageState {
@@ -108,7 +108,7 @@ func newRecoveryMessageState() *recoveryMessageState {
 
 	ms.stage = InitialRecoveryStage
 
-	ms.processedMessagesCnt = 0
+	ms.receivedMessagesCnt = 0
 
 	return ms
 }
@@ -312,23 +312,23 @@ func (p *Process) deliver(msgData *messages.MessageData) {
 	p.acceptedMessages[msgData.Author][msgData.SeqNumber] = protocols.ValueType(msgData.Value)
 	p.historyHash.Insert(
 		utils.TransactionToBytes(msgData.Author, msgData.SeqNumber))
-	processedMessages := 0
+	messagesReceived := 0
 	msgState := p.messagesLog[msgData.Author][msgData.SeqNumber]
 	recoveryMsgState := p.recoveryMessagesLog[msgData.Author][msgData.SeqNumber]
 
 	if msgState != nil {
-		processedMessages += msgState.processedMessagesCnt
+		messagesReceived += msgState.receivedMessagesCnt
 		delete(p.messagesLog[msgData.Author], msgData.SeqNumber)
 	}
 	if recoveryMsgState != nil {
-		processedMessages += recoveryMsgState.processedMessagesCnt
+		messagesReceived += recoveryMsgState.receivedMessagesCnt
 		delete(p.recoveryMessagesLog[msgData.Author], msgData.SeqNumber)
 	}
 
 	p.historyHash.Print(
 		fmt.Sprintf(
-			"%s: Accepted transaction with seq number %d and value %d from %s, messages processed: %d",
-			p.pid, msgData.SeqNumber, msgData.Value, msgData.Author, processedMessages))
+			"%s: Accepted transaction with seq number %d and value %d from %s, messages received: %d",
+			p.pid, msgData.SeqNumber, msgData.Value, msgData.Author, messagesReceived))
 }
 
 func (p *Process) Receive(context actor.Context) {
@@ -348,7 +348,7 @@ func (p *Process) Receive(context actor.Context) {
 		}
 
 		msgState := p.registerMessage(context, msgData)
-		msgState.processedMessagesCnt++
+		msgState.receivedMessagesCnt++
 
 		switch msg.Stage {
 		case messages.ReliableProtocolMessage_NOTIFY:
@@ -454,7 +454,7 @@ func (p *Process) Receive(context actor.Context) {
 
 		accepted := p.accepted(msgData)
 		recoveryState := p.initRecoveryMessageState(msgData)
-		recoveryState.processedMessagesCnt++
+		recoveryState.receivedMessagesCnt++
 
 		switch msg.RecoveryStage {
 		case messages.RecoveryMessage_RECOVER:
