@@ -4,6 +4,7 @@ import "time"
 
 type Parameters struct {
 	// Broadcast
+	ProcessCount    int
 	FaultyProcesses int
 
 	// Accountability

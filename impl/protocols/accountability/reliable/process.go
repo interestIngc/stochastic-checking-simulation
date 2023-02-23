@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/asynkron/protoactor-go/actor"
 	"google.golang.org/protobuf/proto"
+	"log"
 	"math"
 	"stochastic-checking-simulation/config"
 	"stochastic-checking-simulation/impl/hashing"
@@ -256,7 +257,7 @@ func (p *Process) broadcastRecover(
 	context actor.SenderContext, msgData *messages.MessageData) {
 	lastProcessMessage := p.lastSentPMessages[msgData.Author][msgData.SeqNumber]
 	if lastProcessMessage == nil {
-		fmt.Printf(
+		log.Printf(
 			"%s: Error, no process message for transaction with author: %s and seq number %d was sent\n",
 			p.pid,
 			msgData.Author,
@@ -296,7 +297,7 @@ func (p *Process) accepted(msgData *messages.MessageData) bool {
 	acceptedValue, accepted := p.acceptedMessages[msgData.Author][msgData.SeqNumber]
 	if accepted {
 		if acceptedValue != protocols.ValueType(msgData.Value) {
-			fmt.Printf("%s: Detected a duplicated seq number attack\n", p.pid)
+			log.Printf("%s: Detected a duplicated seq number attack\n", p.pid)
 		}
 	}
 	return accepted

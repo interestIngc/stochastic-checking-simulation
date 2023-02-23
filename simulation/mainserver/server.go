@@ -1,22 +1,22 @@
 package main
 
 import (
-	"fmt"
 	"github.com/asynkron/protoactor-go/actor"
+	"log"
 	"math/rand"
 	"stochastic-checking-simulation/impl/messages"
 )
 
 type MainServer struct {
-	currPid              *actor.PID
-	expectedProcessCount int
-	times                int
-	startedProcesses     *actor.PIDSet
+	currPid          *actor.PID
+	processCount     int
+	times            int
+	startedProcesses *actor.PIDSet
 }
 
 func (ms *MainServer) InitMainServer(currPid *actor.PID, processCount int, times int) {
 	ms.currPid = currPid
-	ms.expectedProcessCount = processCount
+	ms.processCount = processCount
 	ms.times = times
 	ms.startedProcesses = actor.NewPIDSet()
 }
@@ -36,8 +36,8 @@ func (ms *MainServer) Receive(context actor.Context) {
 	switch context.Message().(type) {
 	case *messages.Started:
 		ms.startedProcesses.Add(context.Sender())
-		if ms.startedProcesses.Len() == ms.expectedProcessCount {
-			fmt.Println("Main server: starting broadcast")
+		if ms.startedProcesses.Len() == ms.processCount {
+			log.Println("Main server: starting broadcast")
 			ms.simulate(context)
 		}
 	}

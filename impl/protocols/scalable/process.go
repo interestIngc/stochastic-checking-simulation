@@ -1,11 +1,11 @@
 package scalable
 
 import (
-	"fmt"
 	"github.com/asynkron/protoactor-go/actor"
 	xrand "golang.org/x/exp/rand"
 	"gonum.org/v1/gonum/stat/distuv"
 	"google.golang.org/protobuf/proto"
+	"log"
 	"math/rand"
 	"stochastic-checking-simulation/config"
 	"stochastic-checking-simulation/impl/messages"
@@ -222,7 +222,7 @@ func (p *Process) delivered(msgData *messages.MessageData) bool {
 	deliveredValue, delivered := p.deliveredMessages[msgData.Author][msgData.SeqNumber]
 	if delivered {
 		if deliveredValue != protocols.ValueType(msgData.Value) {
-			fmt.Printf("%s: Detected a duplicated seq number attack\n", p.pid)
+			log.Printf("%s: Detected a duplicated seq number attack\n", p.pid)
 		}
 	}
 	return delivered
@@ -232,7 +232,7 @@ func (p *Process) deliver(msgData *messages.MessageData) {
 	p.deliveredMessages[msgData.Author][msgData.SeqNumber] = protocols.ValueType(msgData.Value)
 	messagesReceived := p.messagesLog[msgData.Author][msgData.SeqNumber].receivedMessagesCnt
 
-	fmt.Printf(
+	log.Printf(
 		"%s: Accepted transaction with seq number %d and value %d from %s, messages received: %d\n",
 		p.pid, msgData.SeqNumber, msgData.Value, msgData.Author, messagesReceived)
 }

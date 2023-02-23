@@ -2,36 +2,23 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	console "github.com/asynkron/goconsole"
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/remote"
-	"net"
-	"strconv"
+	"log"
+	"stochastic-checking-simulation/config"
 )
 
 var (
-	mainServerAddr = flag.String("mainserver", "", "address of the main server, e.g. 127.0.0.1:8080")
-	processCount   = flag.Int("n", 0, "number of processes in the system (excluding the main server)")
-	times          = flag.Int("times", 5, "number of transactions for each process to broadcast")
+	processCount = flag.Int("n", 0, "number of processes in the system (excluding the main server)")
+	times        = flag.Int("times", 5, "number of transactions for each process to broadcast")
 )
 
 func main() {
 	flag.Parse()
 
-	host, portStr, e := net.SplitHostPort(*mainServerAddr)
-	if e != nil {
-		fmt.Printf("Could not split %s into host and port\n", *mainServerAddr)
-		return
-	}
-	port, e := strconv.Atoi(portStr)
-	if e != nil {
-		fmt.Printf("Could not convert port string representation into int: %s\n", e)
-		return
-	}
-
 	system := actor.NewActorSystem()
-	remoteConfig := remote.Configure(host, port)
+	remoteConfig := remote.Configure(config.BaseIpAddress, config.Port)
 	remoter := remote.NewRemote(system, remoteConfig)
 	remoter.Start()
 
@@ -44,12 +31,12 @@ func main() {
 		"mainserver",
 	)
 	if e != nil {
-		fmt.Printf("Could not start a main server: %s\n", e)
+		log.Printf("Could not start the main server: %s\n", e)
 		return
 	}
 
 	server.InitMainServer(pid, *processCount, *times)
-	fmt.Printf("Main server started at: %s\n", *mainServerAddr)
+	log.Printf("Main server started at: %s:%d\n", config.BaseIpAddress, config.Port)
 
 	_, _ = console.ReadLine()
 }

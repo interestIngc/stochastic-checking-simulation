@@ -1,8 +1,8 @@
 package bracha
 
 import (
-	"fmt"
 	"github.com/asynkron/protoactor-go/actor"
+	"log"
 	"math"
 	"stochastic-checking-simulation/config"
 	"stochastic-checking-simulation/impl/messages"
@@ -125,7 +125,7 @@ func (p *Process) deliver(msgData *messages.MessageData) {
 	messagesReceived := p.messagesLog[msgData.Author][msgData.SeqNumber].receivedMessagesCnt
 	delete(p.messagesLog[msgData.Author], msgData.SeqNumber)
 
-	fmt.Printf(
+	log.Printf(
 		"%s: Accepted transaction with seq number %d and value %d from %s, messages received: %d\n",
 		p.pid, msgData.SeqNumber, msgData.Value, msgData.Author, messagesReceived)
 }
@@ -146,7 +146,7 @@ func (p *Process) Receive(context actor.Context) {
 		acceptedValue, accepted := p.acceptedMessages[msgData.Author][msgData.SeqNumber]
 		if accepted {
 			if acceptedValue != value {
-				fmt.Printf("%s: Detected a duplicated seq number attack\n", p.pid)
+				log.Printf("%s: Detected a duplicated seq number attack\n", p.pid)
 			}
 			return
 		}

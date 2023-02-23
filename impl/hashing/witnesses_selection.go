@@ -1,7 +1,7 @@
 package hashing
 
 import (
-	"fmt"
+	"log"
 	"math/rand"
 	"sort"
 	"stochastic-checking-simulation/impl/utils"
@@ -58,7 +58,7 @@ func (ws *WitnessesSelector) GetWitnessSet(
 		d, e := multiRingDistance(historyHashRingCopy, transactionRing, 1.0)
 
 		if e != nil {
-			fmt.Printf("Error while generating a witness set happened: %s\n", e)
+			log.Printf("Error while generating a witness set happened: %s\n", e)
 			return nil, nil
 		}
 

@@ -3,6 +3,7 @@ package consistent
 import (
 	"fmt"
 	"github.com/asynkron/protoactor-go/actor"
+	"log"
 	"math"
 	"stochastic-checking-simulation/config"
 	"stochastic-checking-simulation/impl/hashing"
@@ -122,7 +123,7 @@ func (p *CorrectProcess) verify(
 	acceptedValue, accepted := p.acceptedMessages[msgData.Author][msgData.SeqNumber]
 	if accepted {
 		if acceptedValue != value {
-			fmt.Printf("%s: Detected a duplicated seq number attack\n", p.pid)
+			log.Printf("%s: Detected a duplicated seq number attack\n", p.pid)
 			return false
 		}
 	} else if msgState != nil {

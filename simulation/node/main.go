@@ -7,7 +7,7 @@ import (
 	console "github.com/asynkron/goconsole"
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/remote"
-	"net"
+	"log"
 	"os"
 	"stochastic-checking-simulation/config"
 	"stochastic-checking-simulation/impl/messages"
@@ -23,11 +23,14 @@ import (
 )
 
 var (
-	filePath = flag.String("file", "", "absolute path to the input file")
+	filePath     = flag.String("file", "", "absolute path to the input file")
+	processIndex = flag.Int("i", 0, "index of the current process in the system")
 )
 
+const Bytes = 4
+
 func exit(message string) {
-	fmt.Println(message)
+	log.Println(message)
 	os.Exit(1)
 }
 
@@ -63,6 +66,7 @@ func parseFloat(valueStr string) float64 {
 
 func getParameters(parameters map[string]string) *config.Parameters {
 	return &config.Parameters{
+		ProcessCount:            parseInt(parameters["n"]),
 		FaultyProcesses:         parseInt(parameters["f"]),
 		MinOwnWitnessSetSize:    parseInt(parameters["w"]),
 		MinPotWitnessSetSize:    parseInt(parameters["v"]),
@@ -82,12 +86,16 @@ func getParameters(parameters map[string]string) *config.Parameters {
 	}
 }
 
+func joinWithPort(ip string, port int) string {
+	return fmt.Sprintf("%s:%d", ip, port)
+}
+
 func main() {
 	flag.Parse()
 
 	file, e := os.Open(*filePath)
 	if e != nil {
-		fmt.Printf("Can't read from file %s", *filePath)
+		log.Printf("Can't read from file %s", *filePath)
 		os.Exit(1)
 	}
 
@@ -103,26 +111,55 @@ func main() {
 		parametersMap[param[0]] = param[1]
 	}
 
-	nodes := strings.Split(getMandatoryParameter(parametersMap, "nodes"), ",")
-	address := getMandatoryParameter(parametersMap, "current_node")
-	host, portStr, e := net.SplitHostPort(address)
-	if e != nil {
-		exit(fmt.Sprintf("Could not split %s into host and port\n", address))
-	}
-
-	port, e := strconv.Atoi(portStr)
-	if e != nil {
-		exit(fmt.Sprintf("Could not convert port string representation into int: %s\n", e))
-	}
-
 	parameters := getParameters(parametersMap)
 
-	pids := make([]*actor.PID, len(nodes))
-	for i := 0; i < len(nodes); i++ {
-		pids[i] = actor.NewPID(nodes[i], "pid")
+	ipBytes := make([]int, Bytes)
+
+	for i, currByte := range strings.Split(config.BaseIpAddress, ".") {
+		ipBytes[i], e = strconv.Atoi(currByte)
+		if e != nil {
+			exit(fmt.Sprintf("Byte %d in base ip address is invalid", i))
+		}
+		if i >= Bytes {
+			exit("base ip address is not in ipv4")
+		}
 	}
 
-	mainServer := actor.NewPID(getMandatoryParameter(parametersMap, "main_server"), "mainserver")
+	//var processIp string
+	var processPort int
+	pids := make([]*actor.PID, parameters.ProcessCount)
+
+	port := config.Port
+
+	for i := 0; i < parameters.ProcessCount; i++ {
+		port++
+		leftByteInd := Bytes - 1
+		for ; leftByteInd >= 0 && ipBytes[leftByteInd] == 255; leftByteInd-- {
+		}
+		if leftByteInd == -1 {
+			exit(
+				"cannot assign ip addresses, number of processes in the system is too high")
+		}
+		ipBytes[leftByteInd]++
+		for ind := leftByteInd + 1; ind < Bytes; ind++ {
+			ipBytes[ind] = 0
+		}
+
+		ipAsStr := make([]string, Bytes)
+		for ind := 0; ind < Bytes; ind++ {
+			ipAsStr[ind] = strconv.Itoa(ipBytes[ind])
+		}
+
+		//currIp := strings.Join(ipAsStr, ".")
+		if i == *processIndex {
+			//processIp = currIp
+			processPort = port
+		}
+		//pids[i] = actor.NewPID(joinWithPort(currIp, config.Port), "pid")
+		pids[i] = actor.NewPID(joinWithPort(config.BaseIpAddress, port), "pid")
+	}
+
+	mainServer := actor.NewPID(joinWithPort(config.BaseIpAddress, config.Port), "mainserver")
 
 	var process protocols.Process
 
@@ -141,7 +178,8 @@ func main() {
 	}
 
 	system := actor.NewActorSystem()
-	remoteConfig := remote.Configure(host, port)
+	//remoteConfig := remote.Configure(processIp, config.Port)
+	remoteConfig := remote.Configure(config.BaseIpAddress, processPort)
 	remoter := remote.NewRemote(system, remoteConfig)
 	remoter.Start()
 
@@ -158,7 +196,7 @@ func main() {
 	}
 
 	process.InitProcess(currPid, pids, parameters)
-	fmt.Printf("%s: started\n", utils.MakeCustomPid(currPid))
+	log.Printf("%s: started\n", utils.MakeCustomPid(currPid))
 
 	system.Root.RequestWithCustomSender(mainServer, &messages.Started{}, currPid)
 
