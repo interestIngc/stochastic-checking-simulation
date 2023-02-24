@@ -135,9 +135,14 @@ type Process struct {
 	historyHash *hashing.HistoryHash
 
 	transactionManager *impl.TransactionManager
+	logger             *log.Logger
 }
 
-func (p *Process) InitProcess(actorPid *actor.PID, actorPids []*actor.PID, parameters *config.Parameters) {
+func (p *Process) InitProcess(
+	actorPid *actor.PID,
+	actorPids []*actor.PID,
+	parameters *config.Parameters,
+	logger *log.Logger) {
 	p.actorPid = actorPid
 	p.pid = utils.MakeCustomPid(actorPid)
 	p.actorPids = make(map[string]*actor.PID)
@@ -181,6 +186,8 @@ func (p *Process) InitProcess(actorPid *actor.PID, actorPids []*actor.PID, param
 	}
 	binCapacity := uint(math.Pow(2, float64(parameters.NodeIdSize/parameters.NumberOfBins)))
 	p.historyHash = hashing.NewHistoryHash(uint(parameters.NumberOfBins), binCapacity, hasher)
+
+	p.logger = logger
 }
 
 func (p *Process) initMessageState(context actor.SenderContext, msgData *messages.MessageData) *messageState {
@@ -259,7 +266,7 @@ func (p *Process) broadcastRecover(
 	context actor.SenderContext, msgData *messages.MessageData) {
 	lastProcessMessage := p.lastSentPMessages[msgData.Author][msgData.SeqNumber]
 	if lastProcessMessage == nil {
-		log.Printf(
+		p.logger.Printf(
 			"%s: Error, no process message for transaction with author: %s and seq number %d was sent\n",
 			p.pid,
 			msgData.Author,
@@ -299,7 +306,7 @@ func (p *Process) accepted(msgData *messages.MessageData) bool {
 	acceptedValue, accepted := p.acceptedMessages[msgData.Author][msgData.SeqNumber]
 	if accepted {
 		if acceptedValue != protocols.ValueType(msgData.Value) {
-			log.Printf("%s: Detected a duplicated seq number attack\n", p.pid)
+			p.logger.Printf("%s: Detected a duplicated seq number attack\n", p.pid)
 		}
 	}
 	return accepted
@@ -328,7 +335,7 @@ func (p *Process) deliver(msgData *messages.MessageData) {
 		delete(p.recoveryMessagesLog[msgData.Author], msgData.SeqNumber)
 	}
 
-	log.Printf(
+	p.logger.Printf(
 		"%s: Accepted transaction with seq number %d and value %d from %s, messages received: %d, history hash is %s\n",
 		p.pid, msgData.SeqNumber, msgData.Value, msgData.Author, messagesReceived, p.historyHash.ToString())
 }

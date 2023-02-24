@@ -2,6 +2,7 @@ package consistent
 
 import (
 	"github.com/asynkron/protoactor-go/actor"
+	"log"
 	"stochastic-checking-simulation/config"
 	"stochastic-checking-simulation/impl/messages"
 	"stochastic-checking-simulation/impl/utils"
@@ -11,9 +12,13 @@ type FaultyProcess struct {
 	process *CorrectProcess
 }
 
-func (p *FaultyProcess) InitProcess(currPid *actor.PID, pids []*actor.PID, parameters *config.Parameters) {
+func (p *FaultyProcess) InitProcess(
+	currPid *actor.PID,
+	pids []*actor.PID,
+	parameters *config.Parameters,
+	logger *log.Logger) {
 	p.process = &CorrectProcess{}
-	p.process.InitProcess(currPid, pids, parameters)
+	p.process.InitProcess(currPid, pids, parameters, logger)
 }
 
 func (p *FaultyProcess) Receive(context actor.Context) {

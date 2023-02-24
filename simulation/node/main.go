@@ -23,24 +23,13 @@ import (
 )
 
 var (
-	filePath     = flag.String("file", "", "absolute path to the input file")
+	inputFile = flag.String("input_file", "", "path to the input file")
+	logFile   = flag.String("log_file", "",
+		"path to the file where to save logs produced by the process")
 	processIndex = flag.Int("i", 0, "index of the current process in the system")
 )
 
 const Bytes = 4
-
-func exit(message string) {
-	log.Println(message)
-	os.Exit(1)
-}
-
-func getMandatoryParameter(parameters map[string]string, parameter string) string {
-	value, found := parameters[parameter]
-	if !found {
-		exit(fmt.Sprintf("parameter %s is mandatory\n", parameter))
-	}
-	return value
-}
 
 func parseInt(valueStr string) int {
 	if valueStr == "" {
@@ -93,10 +82,12 @@ func joinWithPort(ip string, port int) string {
 func main() {
 	flag.Parse()
 
-	file, e := os.Open(*filePath)
+	f := utils.OpenLogFile(*logFile)
+	logger := log.New(f, "", log.LstdFlags)
+
+	file, e := os.Open(*inputFile)
 	if e != nil {
-		log.Printf("Can't read from file %s", *filePath)
-		os.Exit(1)
+		utils.ExitWithError(logger, fmt.Sprintf("Can't read from file %s", *inputFile))
 	}
 
 	scanner := bufio.NewScanner(file)
@@ -106,11 +97,17 @@ func main() {
 		line := scanner.Text()
 		param := strings.Split(line, " ")
 		if len(param) != 2 {
-			exit(fmt.Sprintf("Unexpected \"%s\", expected \"parameter_name parameter_value\"\n", line))
+			utils.ExitWithError(
+				logger,
+				fmt.Sprintf("Unexpected \"%s\", expected \"parameter_name parameter_value\"", line))
 		}
 		parametersMap[param[0]] = param[1]
 	}
 
+	protocol, protocolDefined := parametersMap["protocol"]
+	if !protocolDefined {
+		utils.ExitWithError(logger, "parameter protocol is mandatory")
+	}
 	parameters := getParameters(parametersMap)
 
 	ipBytes := make([]int, Bytes)
@@ -118,10 +115,10 @@ func main() {
 	for i, currByte := range strings.Split(config.BaseIpAddress, ".") {
 		ipBytes[i], e = strconv.Atoi(currByte)
 		if e != nil {
-			exit(fmt.Sprintf("Byte %d in base ip address is invalid", i))
+			utils.ExitWithError(logger, fmt.Sprintf("Byte %d in base ip address is invalid", i))
 		}
 		if i >= Bytes {
-			exit("base ip address is not in ipv4")
+			utils.ExitWithError(logger, "base ip address must be ipv4")
 		}
 	}
 
@@ -137,7 +134,8 @@ func main() {
 		for ; leftByteInd >= 0 && ipBytes[leftByteInd] == 255; leftByteInd-- {
 		}
 		if leftByteInd == -1 {
-			exit(
+			utils.ExitWithError(
+				logger,
 				"cannot assign ip addresses, number of processes in the system is too high")
 		}
 		ipBytes[leftByteInd]++
@@ -163,7 +161,6 @@ func main() {
 
 	var process protocols.Process
 
-	protocol := getMandatoryParameter(parametersMap, "protocol")
 	switch protocol {
 	case "reliable_accountability":
 		process = &reliable.Process{}
@@ -174,7 +171,7 @@ func main() {
 	case "scalable":
 		process = &scalable.Process{}
 	default:
-		exit(fmt.Sprintf("Invalid protocol: %s\n", protocol))
+		utils.ExitWithError(logger, fmt.Sprintf("Invalid protocol: %s", protocol))
 	}
 
 	system := actor.NewActorSystem()
@@ -192,11 +189,11 @@ func main() {
 			"pid",
 		)
 	if e != nil {
-		exit(fmt.Sprintf("Error while spawning the process happened: %s\n", e))
+		utils.ExitWithError(logger, fmt.Sprintf("Error while spawning the process happened: %s", e))
 	}
 
-	process.InitProcess(currPid, pids, parameters)
-	log.Printf("%s: started\n", utils.MakeCustomPid(currPid))
+	process.InitProcess(currPid, pids, parameters, logger)
+	logger.Printf("%s: started\n", utils.MakeCustomPid(currPid))
 
 	system.Root.RequestWithCustomSender(mainServer, &messages.Started{}, currPid)
 

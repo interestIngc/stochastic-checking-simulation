@@ -85,6 +85,7 @@ type Process struct {
 	deliveryThreshold  int
 
 	transactionManager *impl.TransactionManager
+	logger             *log.Logger
 }
 
 func (p *Process) getRandomPid(random *rand.Rand) string {
@@ -139,7 +140,11 @@ func (p *Process) sample(
 	return sample
 }
 
-func (p *Process) InitProcess(actorPid *actor.PID, actorPids []*actor.PID, parameters *config.Parameters) {
+func (p *Process) InitProcess(
+	actorPid *actor.PID,
+	actorPids []*actor.PID,
+	parameters *config.Parameters,
+	logger *log.Logger) {
 	p.actorPid = actorPid
 	p.pid = utils.MakeCustomPid(actorPid)
 	p.pids = make([]string, len(actorPids))
@@ -165,6 +170,8 @@ func (p *Process) InitProcess(actorPid *actor.PID, actorPids []*actor.PID, param
 	p.readyThreshold = parameters.ReadyThreshold
 	p.deliverySampleSize = parameters.DeliverySampleSize
 	p.deliveryThreshold = parameters.DeliveryThreshold
+
+	p.logger = logger
 }
 
 func (p *Process) initMessageState(
@@ -225,7 +232,7 @@ func (p *Process) delivered(msgData *messages.MessageData) bool {
 	deliveredValue, delivered := p.deliveredMessages[msgData.Author][msgData.SeqNumber]
 	if delivered {
 		if deliveredValue != protocols.ValueType(msgData.Value) {
-			log.Printf("%s: Detected a duplicated seq number attack\n", p.pid)
+			p.logger.Printf("%s: Detected a duplicated seq number attack\n", p.pid)
 		}
 	}
 	return delivered
@@ -235,7 +242,7 @@ func (p *Process) deliver(msgData *messages.MessageData) {
 	p.deliveredMessages[msgData.Author][msgData.SeqNumber] = protocols.ValueType(msgData.Value)
 	messagesReceived := p.messagesLog[msgData.Author][msgData.SeqNumber].receivedMessagesCnt
 
-	log.Printf(
+	p.logger.Printf(
 		"%s: Accepted transaction with seq number %d and value %d from %s, messages received: %d\n",
 		p.pid, msgData.SeqNumber, msgData.Value, msgData.Author, messagesReceived)
 }

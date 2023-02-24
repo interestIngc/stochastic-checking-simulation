@@ -11,13 +11,16 @@ type MainServer struct {
 	processCount     int
 	times            int
 	startedProcesses *actor.PIDSet
+
+	logger *log.Logger
 }
 
-func (ms *MainServer) InitMainServer(currPid *actor.PID, processCount int, times int) {
+func (ms *MainServer) InitMainServer(currPid *actor.PID, processCount int, times int, logger *log.Logger) {
 	ms.currPid = currPid
 	ms.processCount = processCount
 	ms.times = times
 	ms.startedProcesses = actor.NewPIDSet()
+	ms.logger = logger
 }
 
 func (ms *MainServer) simulate(context actor.SenderContext) {
@@ -36,7 +39,7 @@ func (ms *MainServer) Receive(context actor.Context) {
 	case *messages.Started:
 		ms.startedProcesses.Add(context.Sender())
 		if ms.startedProcesses.Len() == ms.processCount {
-			log.Println("Main server: starting broadcast")
+			ms.logger.Println("Main server: starting broadcast")
 			ms.simulate(context)
 		}
 	}

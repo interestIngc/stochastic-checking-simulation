@@ -4,6 +4,7 @@ import (
 	console "github.com/asynkron/goconsole"
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/remote"
+	"log"
 	"stochastic-checking-simulation/config"
 	"stochastic-checking-simulation/impl/protocols"
 	"stochastic-checking-simulation/impl/protocols/accountability/consistent"
@@ -60,11 +61,13 @@ func main() {
 					}),
 			)
 	}
+
+	logger := log.Default()
 	for i := 0; i < faultyProcessesCount; i++ {
-		faultyProcesses[i].InitProcess(pids[i], pids, parameters)
+		faultyProcesses[i].InitProcess(pids[i], pids, parameters, logger)
 	}
 	for i := 0; i < processCount-faultyProcessesCount; i++ {
-		correctProcesses[i].InitProcess(pids[i+faultyProcessesCount], pids, parameters)
+		correctProcesses[i].InitProcess(pids[i+faultyProcessesCount], pids, parameters, logger)
 	}
 
 	faultyProcesses[0].FaultyBroadcast(system.Root, 0, 5)

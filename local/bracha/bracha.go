@@ -4,6 +4,7 @@ import (
 	console "github.com/asynkron/goconsole"
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/remote"
+	"log"
 	"stochastic-checking-simulation/config"
 	"stochastic-checking-simulation/impl/protocols/bracha"
 )
@@ -32,8 +33,10 @@ func main() {
 					}),
 			)
 	}
+
+	logger := log.Default()
 	for i := 0; i < processCount; i++ {
-		processes[i].InitProcess(pids[i], pids, parameters)
+		processes[i].InitProcess(pids[i], pids, parameters, logger)
 	}
 
 	processes[0].Broadcast(system.Root, 5)

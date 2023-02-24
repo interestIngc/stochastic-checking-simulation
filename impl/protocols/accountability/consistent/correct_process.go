@@ -47,9 +47,14 @@ type CorrectProcess struct {
 	historyHash *hashing.HistoryHash
 
 	transactionManager *impl.TransactionManager
+	logger             *log.Logger
 }
 
-func (p *CorrectProcess) InitProcess(actorPid *actor.PID, actorPids []*actor.PID, parameters *config.Parameters) {
+func (p *CorrectProcess) InitProcess(
+	actorPid *actor.PID,
+	actorPids []*actor.PID,
+	parameters *config.Parameters,
+	logger *log.Logger) {
 	p.actorPid = actorPid
 	p.pid = utils.MakeCustomPid(actorPid)
 	p.actorPids = make(map[string]*actor.PID)
@@ -87,6 +92,8 @@ func (p *CorrectProcess) InitProcess(actorPid *actor.PID, actorPids []*actor.PID
 	}
 	binCapacity := uint(math.Pow(2, float64(parameters.NodeIdSize/parameters.NumberOfBins)))
 	p.historyHash = hashing.NewHistoryHash(uint(parameters.NumberOfBins), binCapacity, hasher)
+
+	p.logger = logger
 }
 
 func (p *CorrectProcess) initMessageState(msgData *messages.MessageData) *messageState {
@@ -111,7 +118,7 @@ func (p *CorrectProcess) deliver(msgData *messages.MessageData) {
 	messagesReceived := p.messagesLog[msgData.Author][msgData.SeqNumber].receivedMessagesCnt
 	delete(p.messagesLog[msgData.Author], msgData.SeqNumber)
 
-	log.Printf(
+	p.logger.Printf(
 		"%s: Accepted transaction with seq number %d and value %d from %s, messages received: %d, history hash is %s\n",
 		p.pid, msgData.SeqNumber, msgData.Value, msgData.Author, messagesReceived, p.historyHash.ToString())
 }
@@ -124,7 +131,7 @@ func (p *CorrectProcess) verify(
 	acceptedValue, accepted := p.acceptedMessages[msgData.Author][msgData.SeqNumber]
 	if accepted {
 		if acceptedValue != value {
-			log.Printf("%s: Detected a duplicated seq number attack\n", p.pid)
+			p.logger.Printf("%s: Detected a duplicated seq number attack\n", p.pid)
 			return false
 		}
 	} else if msgState != nil {

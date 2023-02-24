@@ -59,9 +59,14 @@ type Process struct {
 	messagesForAccept int
 
 	transactionManager *impl.TransactionManager
+	logger             *log.Logger
 }
 
-func (p *Process) InitProcess(actorPid *actor.PID, actorPids []*actor.PID, parameters *config.Parameters) {
+func (p *Process) InitProcess(
+	actorPid *actor.PID,
+	actorPids []*actor.PID,
+	parameters *config.Parameters,
+	logger *log.Logger) {
 	p.actorPid = actorPid
 	p.pid = utils.MakeCustomPid(actorPid)
 	p.actorPids = make(map[string]*actor.PID)
@@ -80,6 +85,8 @@ func (p *Process) InitProcess(actorPid *actor.PID, actorPids []*actor.PID, param
 		p.acceptedMessages[pid] = make(map[int64]protocols.ValueType)
 		p.messagesLog[pid] = make(map[int64]*messageState)
 	}
+
+	p.logger = logger
 }
 
 func (p *Process) initMessageState(msgData *messages.MessageData) *messageState {
@@ -128,7 +135,7 @@ func (p *Process) deliver(msgData *messages.MessageData) {
 	messagesReceived := p.messagesLog[msgData.Author][msgData.SeqNumber].receivedMessagesCnt
 	delete(p.messagesLog[msgData.Author], msgData.SeqNumber)
 
-	log.Printf(
+	p.logger.Printf(
 		"%s: Accepted transaction with seq number %d and value %d from %s, messages received: %d\n",
 		p.pid, msgData.SeqNumber, msgData.Value, msgData.Author, messagesReceived)
 }
@@ -153,7 +160,7 @@ func (p *Process) Receive(context actor.Context) {
 		acceptedValue, accepted := p.acceptedMessages[msgData.Author][msgData.SeqNumber]
 		if accepted {
 			if acceptedValue != value {
-				log.Printf("%s: Detected a duplicated seq number attack\n", p.pid)
+				p.logger.Printf("%s: Detected a duplicated seq number attack\n", p.pid)
 			}
 			return
 		}
