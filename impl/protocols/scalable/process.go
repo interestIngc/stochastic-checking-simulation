@@ -8,6 +8,7 @@ import (
 	"log"
 	"math/rand"
 	"stochastic-checking-simulation/config"
+	"stochastic-checking-simulation/impl"
 	"stochastic-checking-simulation/impl/messages"
 	"stochastic-checking-simulation/impl/protocols"
 	"stochastic-checking-simulation/impl/utils"
@@ -82,6 +83,8 @@ type Process struct {
 	readyThreshold     int
 	deliverySampleSize int
 	deliveryThreshold  int
+
+	transactionManager *impl.TransactionManager
 }
 
 func (p *Process) getRandomPid(random *rand.Rand) string {
@@ -283,9 +286,13 @@ func (p *Process) maybeSendReadyFromSieve(
 func (p *Process) Receive(context actor.Context) {
 	message := context.Message()
 	switch message.(type) {
-	case *messages.Broadcast:
-		msg := message.(*messages.Broadcast)
-		p.Broadcast(context, msg.Value)
+	case *messages.Simulate:
+		msg := message.(*messages.Simulate)
+
+		p.transactionManager = &impl.TransactionManager{
+			TransactionsToSendOut: msg.Transactions,
+		}
+		p.transactionManager.SendOutTransaction(context, p)
 	case *messages.ScalableProtocolMessage:
 		msg := message.(*messages.ScalableProtocolMessage)
 		msgData := msg.GetMessageData()

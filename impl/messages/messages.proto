@@ -4,8 +4,8 @@ option go_package = "stochastic-checking-simulation/impl/messages";
 
 message Started {}
 
-message Broadcast {
-  int64 value = 1;
+message Simulate {
+  int64 transactions = 1;
 }
 
 message FaultyBroadcast {

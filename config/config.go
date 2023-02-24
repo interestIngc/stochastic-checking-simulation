@@ -5,3 +5,5 @@ package config
 
 const Port = 8080
 const BaseIpAddress = "127.0.0.1"
+
+const TimeoutToSendOutNewTransactionNs = 10000000
