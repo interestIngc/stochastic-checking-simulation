@@ -1,7 +1,7 @@
 package hashing
 
 import (
-	"log"
+	"fmt"
 	"stochastic-checking-simulation/impl/utils"
 )
 
@@ -31,6 +31,6 @@ func (hh *HistoryHash) Insert(bytes []byte) {
 	hh.bins.add(binIndex, direction)
 }
 
-func (hh *HistoryHash) Print(message string) {
-	log.Printf("%s, history hash is\n%v\n", message, hh.bins.vector)
+func (hh *HistoryHash) ToString() string {
+	return fmt.Sprintf("%v", hh.bins.vector)
 }

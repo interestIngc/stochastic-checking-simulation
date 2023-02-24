@@ -1,7 +1,6 @@
 package consistent
 
 import (
-	"fmt"
 	"github.com/asynkron/protoactor-go/actor"
 	"log"
 	"math"
@@ -112,10 +111,9 @@ func (p *CorrectProcess) deliver(msgData *messages.MessageData) {
 	messagesReceived := p.messagesLog[msgData.Author][msgData.SeqNumber].receivedMessagesCnt
 	delete(p.messagesLog[msgData.Author], msgData.SeqNumber)
 
-	p.historyHash.Print(
-		fmt.Sprintf(
-			"%s: Accepted transaction with seq number %d and value %d from %s, messages received: %d",
-			p.pid, msgData.SeqNumber, msgData.Value, msgData.Author, messagesReceived))
+	log.Printf(
+		"%s: Accepted transaction with seq number %d and value %d from %s, messages received: %d, history hash is %s\n",
+		p.pid, msgData.SeqNumber, msgData.Value, msgData.Author, messagesReceived, p.historyHash.ToString())
 }
 
 func (p *CorrectProcess) verify(

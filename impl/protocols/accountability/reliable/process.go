@@ -1,7 +1,6 @@
 package reliable
 
 import (
-	"fmt"
 	"github.com/asynkron/protoactor-go/actor"
 	"google.golang.org/protobuf/proto"
 	"log"
@@ -329,10 +328,9 @@ func (p *Process) deliver(msgData *messages.MessageData) {
 		delete(p.recoveryMessagesLog[msgData.Author], msgData.SeqNumber)
 	}
 
-	p.historyHash.Print(
-		fmt.Sprintf(
-			"%s: Accepted transaction with seq number %d and value %d from %s, messages received: %d",
-			p.pid, msgData.SeqNumber, msgData.Value, msgData.Author, messagesReceived))
+	log.Printf(
+		"%s: Accepted transaction with seq number %d and value %d from %s, messages received: %d, history hash is %s\n",
+		p.pid, msgData.SeqNumber, msgData.Value, msgData.Author, messagesReceived, p.historyHash.ToString())
 }
 
 func (p *Process) Receive(context actor.Context) {
