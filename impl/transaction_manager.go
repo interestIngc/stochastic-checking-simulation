@@ -11,15 +11,15 @@ type TransactionManager struct {
 	TransactionsToSendOut int64
 }
 
-func (s *TransactionManager) SendOutTransaction(context actor.Context, p protocols.Process) {
-	if s.TransactionsToSendOut > 0 {
+func (tm *TransactionManager) SendOutTransaction(context actor.Context, p protocols.Process) {
+	if tm.TransactionsToSendOut > 0 {
 		p.Broadcast(context, int64(rand.Int()))
-		s.TransactionsToSendOut--
+		tm.TransactionsToSendOut--
 
 		context.ReenterAfter(
 			actor.NewFuture(context.ActorSystem(), config.TimeoutToSendOutNewTransactionNs),
 			func(res interface{}, err error) {
-				s.SendOutTransaction(context, p)
+				tm.SendOutTransaction(context, p)
 			})
 	}
 }
