@@ -1,33 +1,31 @@
 package config
 
-import "time"
-
 type Parameters struct {
 	// Broadcast
-	ProcessCount    int
-	FaultyProcesses int
+	ProcessCount    int `json:"n"`
+	FaultyProcesses int `json:"f"`
 
 	// Accountability
-	MinOwnWitnessSetSize int
-	MinPotWitnessSetSize int
+	MinOwnWitnessSetSize int `json:"w"`
+	MinPotWitnessSetSize int `json:"v"`
 
-	OwnWitnessSetRadius float64
-	PotWitnessSetRadius float64
+	OwnWitnessSetRadius float64 `json:"wr"`
+	PotWitnessSetRadius float64 `json:"vr"`
 
-	WitnessThreshold        int
-	RecoverySwitchTimeoutNs time.Duration
-	NodeIdSize              int
-	NumberOfBins            int
+	WitnessThreshold        int `json:"u"`
+	RecoverySwitchTimeoutNs int `json:"recovery_timeout"`
+	NodeIdSize              int `json:"node_id_size"`
+	NumberOfBins            int `json:"number_of_bins"`
 
 	// Scalable reliable broadcast
-	GossipSampleSize int
+	GossipSampleSize int `json:"g_size"`
 
-	EchoSampleSize int
-	EchoThreshold  int
+	EchoSampleSize int `json:"e_size"`
+	EchoThreshold  int `json:"e_threshold"`
 
-	ReadySampleSize int
-	ReadyThreshold  int
+	ReadySampleSize int `json:"r_size"`
+	ReadyThreshold  int `json:"r_threshold"`
 
-	DeliverySampleSize int
-	DeliveryThreshold  int
+	DeliverySampleSize int `json:"d_size"`
+	DeliveryThreshold  int `json:"d_threshold"`
 }

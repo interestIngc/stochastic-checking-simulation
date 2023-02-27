@@ -16,7 +16,7 @@ var (
 	times        = flag.Int("times", 5, "number of transactions for each process to broadcast")
 	logFile      = flag.String(
 		"log_file",
-		"mainserver.log",
+		"",
 		"path to the file where to save logs produced by the main server")
 )
 

@@ -1,12 +1,13 @@
 package main
 
 import (
-	"bufio"
+	"encoding/json"
 	"flag"
 	"fmt"
 	console "github.com/asynkron/goconsole"
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/remote"
+	"io"
 	"log"
 	"os"
 	"stochastic-checking-simulation/config"
@@ -19,11 +20,10 @@ import (
 	"stochastic-checking-simulation/impl/utils"
 	"strconv"
 	"strings"
-	"time"
 )
 
 var (
-	inputFile = flag.String("input_file", "", "path to the input file")
+	inputFile = flag.String("input_file", "", "path to the input file in json format")
 	logFile   = flag.String("log_file", "",
 		"path to the file where to save logs produced by the process")
 	processIndex = flag.Int("i", 0, "index of the current process in the system")
@@ -31,48 +31,9 @@ var (
 
 const Bytes = 4
 
-func parseInt(valueStr string) int {
-	if valueStr == "" {
-		return 0
-	}
-	value, e := strconv.Atoi(valueStr)
-	if e != nil {
-		return 0
-	}
-	return value
-}
-
-func parseFloat(valueStr string) float64 {
-	if valueStr == "" {
-		return 0
-	}
-	value, e := strconv.ParseFloat(valueStr, 64)
-	if e != nil {
-		return 0
-	}
-	return value
-}
-
-func getParameters(parameters map[string]string) *config.Parameters {
-	return &config.Parameters{
-		ProcessCount:            parseInt(parameters["n"]),
-		FaultyProcesses:         parseInt(parameters["f"]),
-		MinOwnWitnessSetSize:    parseInt(parameters["w"]),
-		MinPotWitnessSetSize:    parseInt(parameters["v"]),
-		OwnWitnessSetRadius:     parseFloat(parameters["wr"]),
-		PotWitnessSetRadius:     parseFloat(parameters["vr"]),
-		WitnessThreshold:        parseInt(parameters["u"]),
-		RecoverySwitchTimeoutNs: time.Duration(parseInt(parameters["recovery_timeout"])),
-		NodeIdSize:              parseInt(parameters["node_id_size"]),
-		NumberOfBins:            parseInt(parameters["number_of_bins"]),
-		GossipSampleSize:        parseInt(parameters["g_size"]),
-		EchoSampleSize:          parseInt(parameters["e_size"]),
-		EchoThreshold:           parseInt(parameters["e_threshold"]),
-		ReadySampleSize:         parseInt(parameters["r_size"]),
-		ReadyThreshold:          parseInt(parameters["r_threshold"]),
-		DeliverySampleSize:      parseInt(parameters["d_size"]),
-		DeliveryThreshold:       parseInt(parameters["d_threshold"]),
-	}
+type Input struct {
+	Protocol   string            `json:"protocol"`
+	Parameters config.Parameters `json:"parameters"`
 }
 
 func joinWithPort(ip string, port int) string {
@@ -82,33 +43,30 @@ func joinWithPort(ip string, port int) string {
 func main() {
 	flag.Parse()
 
-	f := utils.OpenLogFile(*logFile)
-	logger := log.New(f, "", log.LstdFlags)
+	lFile := utils.OpenLogFile(*logFile)
+	logger := log.New(lFile, "", log.LstdFlags)
 
-	file, e := os.Open(*inputFile)
+	iFile, e := os.Open(*inputFile)
 	if e != nil {
 		utils.ExitWithError(logger, fmt.Sprintf("Can't read from file %s", *inputFile))
 	}
 
-	scanner := bufio.NewScanner(file)
-
-	parametersMap := make(map[string]string)
-	for scanner.Scan() {
-		line := scanner.Text()
-		param := strings.Split(line, " ")
-		if len(param) != 2 {
-			utils.ExitWithError(
-				logger,
-				fmt.Sprintf("Unexpected \"%s\", expected \"parameter_name parameter_value\"", line))
-		}
-		parametersMap[param[0]] = param[1]
+	byteArray, e := io.ReadAll(iFile)
+	if e != nil {
+		utils.ExitWithError(logger, fmt.Sprintf("Could not read bytes from the input file\n%e", e))
 	}
 
-	protocol, protocolDefined := parametersMap["protocol"]
-	if !protocolDefined {
+	var input Input
+	e = json.Unmarshal(byteArray, &input)
+	if e != nil {
+		utils.ExitWithError(logger, fmt.Sprintf("Could not parse json from the input file\n%e", e))
+	}
+
+	if input.Protocol == "" {
 		utils.ExitWithError(logger, "parameter protocol is mandatory")
 	}
-	parameters := getParameters(parametersMap)
+
+	processCount := input.Parameters.ProcessCount
 
 	ipBytes := make([]int, Bytes)
 
@@ -124,11 +82,11 @@ func main() {
 
 	//var processIp string
 	var processPort int
-	pids := make([]*actor.PID, parameters.ProcessCount)
+	pids := make([]*actor.PID, processCount)
 
 	port := config.Port
 
-	for i := 0; i < parameters.ProcessCount; i++ {
+	for i := 0; i < processCount; i++ {
 		port++
 		leftByteInd := Bytes - 1
 		for ; leftByteInd >= 0 && ipBytes[leftByteInd] == 255; leftByteInd-- {
@@ -161,7 +119,7 @@ func main() {
 
 	var process protocols.Process
 
-	switch protocol {
+	switch input.Protocol {
 	case "reliable_accountability":
 		process = &reliable.Process{}
 	case "consistent_accountability":
@@ -171,7 +129,7 @@ func main() {
 	case "scalable":
 		process = &scalable.Process{}
 	default:
-		utils.ExitWithError(logger, fmt.Sprintf("Invalid protocol: %s", protocol))
+		utils.ExitWithError(logger, fmt.Sprintf("Invalid protocol: %s", input.Protocol))
 	}
 
 	system := actor.NewActorSystem()
@@ -192,7 +150,7 @@ func main() {
 		utils.ExitWithError(logger, fmt.Sprintf("Error while spawning the process happened: %s", e))
 	}
 
-	process.InitProcess(currPid, pids, parameters, logger)
+	process.InitProcess(currPid, pids, &input.Parameters, logger)
 	logger.Printf("%s: started\n", utils.MakeCustomPid(currPid))
 
 	system.Root.RequestWithCustomSender(mainServer, &messages.Started{}, currPid)

@@ -150,7 +150,7 @@ func (p *Process) InitProcess(
 
 	p.quorumThreshold = int(math.Ceil(float64(len(actorPids)+parameters.FaultyProcesses+1) / float64(2)))
 	p.readyMessagesThreshold = parameters.FaultyProcesses + 1
-	p.recoverySwitchTimeoutNs = parameters.RecoverySwitchTimeoutNs
+	p.recoverySwitchTimeoutNs = time.Duration(parameters.RecoverySwitchTimeoutNs)
 	p.witnessThreshold = parameters.WitnessThreshold
 
 	p.acceptedMessages = make(map[string]map[int64]protocols.ValueType)
