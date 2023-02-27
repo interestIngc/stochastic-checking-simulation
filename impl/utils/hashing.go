@@ -2,13 +2,7 @@ package utils
 
 import (
 	"encoding/binary"
-	"fmt"
-	"github.com/asynkron/protoactor-go/actor"
 )
-
-func MakeCustomPid(pid *actor.PID) string {
-	return fmt.Sprintf("Address:%s,Id:%s", pid.Address, pid.Id)
-}
 
 func ToUint64(bytes []byte) uint64 {
 	return binary.LittleEndian.Uint64(bytes)
