@@ -7,7 +7,6 @@ import (
 	"log"
 	"stochastic-checking-simulation/config"
 	"stochastic-checking-simulation/impl/protocols/accountability/reliable"
-	"time"
 )
 
 func main() {
@@ -19,7 +18,7 @@ func main() {
 		OwnWitnessSetRadius:     1900.0,
 		PotWitnessSetRadius:     1910.0,
 		WitnessThreshold:        4,
-		RecoverySwitchTimeoutNs: time.Duration(1000000000),
+		RecoverySwitchTimeoutNs: 1000000000,
 		NodeIdSize:              256,
 		NumberOfBins:            32,
 	}
