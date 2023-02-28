@@ -6,6 +6,7 @@ import (
 	"math"
 	"stochastic-checking-simulation/config"
 	"stochastic-checking-simulation/impl"
+	"stochastic-checking-simulation/impl/eventlogger"
 	"stochastic-checking-simulation/impl/hashing"
 	"stochastic-checking-simulation/impl/messages"
 	"stochastic-checking-simulation/impl/protocols"
@@ -47,7 +48,7 @@ type CorrectProcess struct {
 	historyHash *hashing.HistoryHash
 
 	transactionManager *impl.TransactionManager
-	logger             *log.Logger
+	logger             *eventlogger.EventLogger
 }
 
 func (p *CorrectProcess) InitProcess(
@@ -93,7 +94,7 @@ func (p *CorrectProcess) InitProcess(
 	binCapacity := uint(math.Pow(2, float64(parameters.NodeIdSize/parameters.NumberOfBins)))
 	p.historyHash = hashing.NewHistoryHash(uint(parameters.NumberOfBins), binCapacity, hasher)
 
-	p.logger = logger
+	p.logger = eventlogger.InitEventLogger(p.pid, logger)
 }
 
 func (p *CorrectProcess) initMessageState(msgData *messages.MessageData) *messageState {
@@ -105,9 +106,17 @@ func (p *CorrectProcess) initMessageState(msgData *messages.MessageData) *messag
 	return msgState
 }
 
+func (p *CorrectProcess) sendMessage(
+	context actor.SenderContext,
+	to *actor.PID,
+	message *messages.ConsistentProtocolMessage) {
+	message.Timestamp = utils.GetNow()
+	context.RequestWithCustomSender(to, message, p.actorPid)
+}
+
 func (p *CorrectProcess) broadcast(context actor.SenderContext, message *messages.ConsistentProtocolMessage) {
 	for _, pid := range p.actorPids {
-		context.RequestWithCustomSender(pid, message, p.actorPid)
+		p.sendMessage(context, pid, message)
 	}
 }
 
@@ -118,9 +127,8 @@ func (p *CorrectProcess) deliver(msgData *messages.MessageData) {
 	messagesReceived := p.messagesLog[msgData.Author][msgData.SeqNumber].receivedMessagesCnt
 	delete(p.messagesLog[msgData.Author], msgData.SeqNumber)
 
-	p.logger.Printf(
-		"%s: Accepted transaction with seq number %d and value %d from %s, messages received: %d, history hash is %s\n",
-		p.pid, msgData.SeqNumber, msgData.Value, msgData.Author, messagesReceived, p.historyHash.ToString())
+	p.logger.LogAccept(msgData, messagesReceived)
+	p.logger.LogHistoryHash(p.historyHash)
 }
 
 func (p *CorrectProcess) verify(
@@ -131,7 +139,7 @@ func (p *CorrectProcess) verify(
 	acceptedValue, accepted := p.acceptedMessages[msgData.Author][msgData.SeqNumber]
 	if accepted {
 		if acceptedValue != value {
-			p.logger.Printf("%s: Detected a duplicated seq number attack\n", p.pid)
+			p.logger.LogAttack()
 			return false
 		}
 	} else if msgState != nil {
@@ -152,7 +160,7 @@ func (p *CorrectProcess) verify(
 			MessageData: msgData,
 		}
 		for pid := range msgState.witnessSet {
-			context.RequestWithCustomSender(p.actorPids[pid], message, p.actorPid)
+			p.sendMessage(context, p.actorPids[pid], message)
 		}
 	}
 	return true
@@ -164,6 +172,8 @@ func (p *CorrectProcess) Receive(context actor.Context) {
 	case *messages.Simulate:
 		msg := message.(*messages.Simulate)
 
+		p.logger.LogMessageLatency(utils.MakeCustomPid(context.Sender()), msg.Timestamp)
+
 		p.transactionManager = &impl.TransactionManager{
 			TransactionsToSendOut: msg.Transactions,
 		}
@@ -171,9 +181,11 @@ func (p *CorrectProcess) Receive(context actor.Context) {
 	case *messages.ConsistentProtocolMessage:
 		msg := message.(*messages.ConsistentProtocolMessage)
 		msgData := msg.GetMessageData()
-		senderId := utils.MakeCustomPid(context.Sender())
+		senderPid := utils.MakeCustomPid(context.Sender())
 
-		doBroadcast := p.verify(context, senderId, msgData)
+		p.logger.LogMessageLatency(senderPid, msg.Timestamp)
+
+		doBroadcast := p.verify(context, senderPid, msgData)
 
 		if msg.Stage == messages.ConsistentProtocolMessage_VERIFY && doBroadcast {
 			p.broadcast(

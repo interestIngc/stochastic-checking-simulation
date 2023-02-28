@@ -31,20 +31,24 @@ func (p *FaultyProcess) Receive(context actor.Context) {
 		msg := message.(*messages.ConsistentProtocolMessage)
 		msgData := msg.GetMessageData()
 		sender := context.Sender()
+		senderPid := utils.MakeCustomPid(sender)
+
+		p.process.logger.LogMessageLatency(senderPid, msg.Timestamp)
 
 		switch msg.Stage {
 		case messages.ConsistentProtocolMessage_ECHO:
-			p.process.verify(context, utils.MakeCustomPid(sender), msgData)
+			p.process.verify(context, senderPid, msgData)
 		case messages.ConsistentProtocolMessage_VERIFY:
 			if msgData.Author == p.process.pid {
-				context.RequestWithCustomSender(
+				p.process.sendMessage(
+					context,
 					sender,
-					messages.ConsistentProtocolMessage{
+					&messages.ConsistentProtocolMessage{
 						Stage:       messages.ConsistentProtocolMessage_ECHO,
 						MessageData: msgData,
 					},
-					p.process.actorPid)
-			} else if p.process.verify(context, utils.MakeCustomPid(sender), msgData) {
+				)
+			} else if p.process.verify(context, senderPid, msgData) {
 				p.process.broadcast(
 					context,
 					&messages.ConsistentProtocolMessage{
@@ -74,8 +78,8 @@ func (p *FaultyProcess) FaultyBroadcast(context actor.SenderContext, value1 int6
 		if i >= len(msgState.witnessSet)/2 {
 			currValue = value2
 		}
-
-		context.RequestWithCustomSender(
+		p.process.sendMessage(
+			context,
 			p.process.actorPids[witness],
 			&messages.ConsistentProtocolMessage{
 				Stage: messages.ConsistentProtocolMessage_VERIFY,
@@ -85,8 +89,7 @@ func (p *FaultyProcess) FaultyBroadcast(context actor.SenderContext, value1 int6
 					Value:     currValue,
 				},
 			},
-			p.process.actorPid)
-
+		)
 		i++
 	}
 

@@ -5,6 +5,7 @@ import (
 	"github.com/asynkron/protoactor-go/actor"
 	"log"
 	"os"
+	"time"
 )
 
 func MakeCustomPid(pid *actor.PID) string {
@@ -22,4 +23,8 @@ func OpenLogFile(logFile string) *os.File {
 		log.Printf("Could not open file %s to write logs into", logFile)
 	}
 	return f
+}
+
+func GetNow() int64 {
+	return time.Now().UnixNano()
 }

@@ -6,6 +6,7 @@ import (
 	"math"
 	"stochastic-checking-simulation/config"
 	"stochastic-checking-simulation/impl"
+	"stochastic-checking-simulation/impl/eventlogger"
 	"stochastic-checking-simulation/impl/messages"
 	"stochastic-checking-simulation/impl/protocols"
 	"stochastic-checking-simulation/impl/utils"
@@ -59,7 +60,7 @@ type Process struct {
 	messagesForAccept int
 
 	transactionManager *impl.TransactionManager
-	logger             *log.Logger
+	logger             *eventlogger.EventLogger
 }
 
 func (p *Process) InitProcess(
@@ -86,7 +87,7 @@ func (p *Process) InitProcess(
 		p.messagesLog[pid] = make(map[int64]*messageState)
 	}
 
-	p.logger = logger
+	p.logger = eventlogger.InitEventLogger(p.pid, logger)
 }
 
 func (p *Process) initMessageState(msgData *messages.MessageData) *messageState {
@@ -98,9 +99,17 @@ func (p *Process) initMessageState(msgData *messages.MessageData) *messageState 
 	return msgState
 }
 
+func (p *Process) sendMessage(
+	context actor.SenderContext,
+	to *actor.PID,
+	message *messages.BrachaMessage) {
+	message.Timestamp = utils.GetNow()
+	context.RequestWithCustomSender(to, message, p.actorPid)
+}
+
 func (p *Process) broadcast(context actor.SenderContext, message *messages.BrachaMessage) {
 	for _, pid := range p.actorPids {
-		context.RequestWithCustomSender(pid, message, p.actorPid)
+		p.sendMessage(context, pid, message)
 	}
 }
 
@@ -135,9 +144,7 @@ func (p *Process) deliver(msgData *messages.MessageData) {
 	messagesReceived := p.messagesLog[msgData.Author][msgData.SeqNumber].receivedMessagesCnt
 	delete(p.messagesLog[msgData.Author], msgData.SeqNumber)
 
-	p.logger.Printf(
-		"%s: Accepted transaction with seq number %d and value %d from %s, messages received: %d\n",
-		p.pid, msgData.SeqNumber, msgData.Value, msgData.Author, messagesReceived)
+	p.logger.LogAccept(msgData, messagesReceived)
 }
 
 func (p *Process) Receive(context actor.Context) {
@@ -145,6 +152,8 @@ func (p *Process) Receive(context actor.Context) {
 	switch message.(type) {
 	case *messages.Simulate:
 		msg := message.(*messages.Simulate)
+
+		p.logger.LogMessageLatency(utils.MakeCustomPid(context.Sender()), msg.Timestamp)
 
 		p.transactionManager = &impl.TransactionManager{
 			TransactionsToSendOut: msg.Transactions,
@@ -156,11 +165,12 @@ func (p *Process) Receive(context actor.Context) {
 		value := protocols.ValueType(msgData.Value)
 
 		senderPid := utils.MakeCustomPid(context.Sender())
+		p.logger.LogMessageLatency(senderPid, msg.Timestamp)
 
 		acceptedValue, accepted := p.acceptedMessages[msgData.Author][msgData.SeqNumber]
 		if accepted {
 			if acceptedValue != value {
-				p.logger.Printf("%s: Detected a duplicated seq number attack\n", p.pid)
+				p.logger.LogAttack()
 			}
 			return
 		}

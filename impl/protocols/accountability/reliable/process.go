@@ -7,6 +7,7 @@ import (
 	"math"
 	"stochastic-checking-simulation/config"
 	"stochastic-checking-simulation/impl"
+	"stochastic-checking-simulation/impl/eventlogger"
 	"stochastic-checking-simulation/impl/hashing"
 	"stochastic-checking-simulation/impl/messages"
 	"stochastic-checking-simulation/impl/protocols"
@@ -135,7 +136,7 @@ type Process struct {
 	historyHash *hashing.HistoryHash
 
 	transactionManager *impl.TransactionManager
-	logger             *log.Logger
+	logger             *eventlogger.EventLogger
 }
 
 func (p *Process) InitProcess(
@@ -187,7 +188,7 @@ func (p *Process) InitProcess(
 	binCapacity := uint(math.Pow(2, float64(parameters.NodeIdSize/parameters.NumberOfBins)))
 	p.historyHash = hashing.NewHistoryHash(uint(parameters.NumberOfBins), binCapacity, hasher)
 
-	p.logger = logger
+	p.logger = eventlogger.InitEventLogger(p.pid, logger)
 }
 
 func (p *Process) initMessageState(context actor.SenderContext, msgData *messages.MessageData) *messageState {
@@ -231,9 +232,23 @@ func (p *Process) initRecoveryMessageState(msgData *messages.MessageData) *recov
 	return recoveryState
 }
 
+func (p *Process) sendMessage(context actor.SenderContext, to *actor.PID, message proto.Message) {
+	timestamp := utils.GetNow()
+	reliableMessage, isReliable := message.(*messages.ReliableProtocolMessage)
+	if isReliable {
+		reliableMessage.Timestamp = timestamp
+	}
+	recoveryMessage, isRecovery := message.(*messages.RecoveryMessage)
+	if isRecovery {
+		recoveryMessage.Timestamp = timestamp
+	}
+
+	context.RequestWithCustomSender(to, message, p.actorPid)
+}
+
 func (p *Process) broadcast(context actor.SenderContext, message proto.Message) {
 	for _, pid := range p.actorPids {
-		context.RequestWithCustomSender(pid, message, p.actorPid)
+		p.sendMessage(context, pid, message)
 	}
 }
 
@@ -242,7 +257,7 @@ func (p *Process) broadcastToWitnesses(
 	message *messages.ReliableProtocolMessage,
 	msgState *messageState) {
 	for pid := range msgState.potWitnessSet {
-		context.RequestWithCustomSender(p.actorPids[pid], message, p.actorPid)
+		p.sendMessage(context, p.actorPids[pid], message)
 	}
 
 	msgData := message.GetMessageData()
@@ -267,7 +282,7 @@ func (p *Process) broadcastRecover(
 	lastProcessMessage := p.lastSentPMessages[msgData.Author][msgData.SeqNumber]
 	if lastProcessMessage == nil {
 		p.logger.Printf(
-			"%s: Error, no process message for transaction with author: %s and seq number %d was sent\n",
+			"%s: Error, no process message for transaction with author %s and seq number %d was sent\n",
 			p.pid,
 			msgData.Author,
 			msgData.SeqNumber)
@@ -306,7 +321,7 @@ func (p *Process) accepted(msgData *messages.MessageData) bool {
 	acceptedValue, accepted := p.acceptedMessages[msgData.Author][msgData.SeqNumber]
 	if accepted {
 		if acceptedValue != protocols.ValueType(msgData.Value) {
-			p.logger.Printf("%s: Detected a duplicated seq number attack\n", p.pid)
+			p.logger.LogAttack()
 		}
 	}
 	return accepted
@@ -335,9 +350,8 @@ func (p *Process) deliver(msgData *messages.MessageData) {
 		delete(p.recoveryMessagesLog[msgData.Author], msgData.SeqNumber)
 	}
 
-	p.logger.Printf(
-		"%s: Accepted transaction with seq number %d and value %d from %s, messages received: %d, history hash is %s\n",
-		p.pid, msgData.SeqNumber, msgData.Value, msgData.Author, messagesReceived, p.historyHash.ToString())
+	p.logger.LogAccept(msgData, messagesReceived)
+	p.logger.LogHistoryHash(p.historyHash)
 }
 
 func (p *Process) Receive(context actor.Context) {
@@ -345,6 +359,8 @@ func (p *Process) Receive(context actor.Context) {
 	switch message.(type) {
 	case *messages.Simulate:
 		msg := message.(*messages.Simulate)
+
+		p.logger.LogMessageLatency(utils.MakeCustomPid(context.Sender()), msg.Timestamp)
 
 		p.transactionManager = &impl.TransactionManager{
 			TransactionsToSendOut: msg.Transactions,
@@ -355,6 +371,8 @@ func (p *Process) Receive(context actor.Context) {
 		msgData := msg.GetMessageData()
 		senderPid := utils.MakeCustomPid(context.Sender())
 		value := protocols.ValueType(msgData.Value)
+
+		p.logger.LogMessageLatency(senderPid, msg.Timestamp)
 
 		if p.accepted(msgData) {
 			return
@@ -465,6 +483,8 @@ func (p *Process) Receive(context actor.Context) {
 		sender := context.Sender()
 		senderPid := utils.MakeCustomPid(sender)
 
+		p.logger.LogMessageLatency(senderPid, msg.Timestamp)
+
 		accepted := p.accepted(msgData)
 		recoveryState := p.initRecoveryMessageState(msgData)
 		recoveryState.receivedMessagesCnt++
@@ -482,13 +502,14 @@ func (p *Process) Receive(context actor.Context) {
 			}
 
 			if accepted {
-				context.RequestWithCustomSender(
+				p.sendMessage(
+					context,
 					sender,
-					messages.RecoveryMessage{
+					&messages.RecoveryMessage{
 						RecoveryStage: messages.RecoveryMessage_REPLY,
 						Message:       reliableMessage,
 					},
-					p.actorPid)
+				)
 			}
 			recoverMessagesCnt := len(recoveryState.receivedRecover)
 

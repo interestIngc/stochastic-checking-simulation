@@ -4,11 +4,11 @@ import (
 	"github.com/asynkron/protoactor-go/actor"
 	xrand "golang.org/x/exp/rand"
 	"gonum.org/v1/gonum/stat/distuv"
-	"google.golang.org/protobuf/proto"
 	"log"
 	"math/rand"
 	"stochastic-checking-simulation/config"
 	"stochastic-checking-simulation/impl"
+	"stochastic-checking-simulation/impl/eventlogger"
 	"stochastic-checking-simulation/impl/messages"
 	"stochastic-checking-simulation/impl/protocols"
 	"stochastic-checking-simulation/impl/utils"
@@ -85,7 +85,7 @@ type Process struct {
 	deliveryThreshold  int
 
 	transactionManager *impl.TransactionManager
-	logger             *log.Logger
+	logger             *eventlogger.EventLogger
 }
 
 func (p *Process) getRandomPid(random *rand.Rand) string {
@@ -171,7 +171,7 @@ func (p *Process) InitProcess(
 	p.deliverySampleSize = parameters.DeliverySampleSize
 	p.deliveryThreshold = parameters.DeliveryThreshold
 
-	p.logger = logger
+	p.logger = eventlogger.InitEventLogger(p.pid, logger)
 }
 
 func (p *Process) initMessageState(
@@ -221,10 +221,18 @@ func (p *Process) initMessageState(
 	return msgState
 }
 
+func (p *Process) sendMessage(
+	context actor.SenderContext,
+	to *actor.PID,
+	message *messages.ScalableProtocolMessage) {
+	message.Timestamp = utils.GetNow()
+	context.RequestWithCustomSender(to, message, p.actorPid)
+}
+
 func (p *Process) broadcastToSet(
-	context actor.SenderContext, set map[string]bool, msg proto.Message) {
+	context actor.SenderContext, set map[string]bool, msg *messages.ScalableProtocolMessage) {
 	for pid := range set {
-		context.RequestWithCustomSender(p.actorPids[pid], msg, p.actorPid)
+		p.sendMessage(context, p.actorPids[pid], msg)
 	}
 }
 
@@ -232,7 +240,7 @@ func (p *Process) delivered(msgData *messages.MessageData) bool {
 	deliveredValue, delivered := p.deliveredMessages[msgData.Author][msgData.SeqNumber]
 	if delivered {
 		if deliveredValue != protocols.ValueType(msgData.Value) {
-			p.logger.Printf("%s: Detected a duplicated seq number attack\n", p.pid)
+			p.logger.LogAttack()
 		}
 	}
 	return delivered
@@ -242,9 +250,7 @@ func (p *Process) deliver(msgData *messages.MessageData) {
 	p.deliveredMessages[msgData.Author][msgData.SeqNumber] = protocols.ValueType(msgData.Value)
 	messagesReceived := p.messagesLog[msgData.Author][msgData.SeqNumber].receivedMessagesCnt
 
-	p.logger.Printf(
-		"%s: Accepted transaction with seq number %d and value %d from %s, messages received: %d\n",
-		p.pid, msgData.SeqNumber, msgData.Value, msgData.Author, messagesReceived)
+	p.logger.LogAccept(msgData, messagesReceived)
 }
 
 func (p *Process) broadcastGossip(
@@ -296,6 +302,8 @@ func (p *Process) Receive(context actor.Context) {
 	case *messages.Simulate:
 		msg := message.(*messages.Simulate)
 
+		p.logger.LogMessageLatency(utils.MakeCustomPid(context.Sender()), msg.Timestamp)
+
 		p.transactionManager = &impl.TransactionManager{
 			TransactionsToSendOut: msg.Transactions,
 		}
@@ -308,6 +316,8 @@ func (p *Process) Receive(context actor.Context) {
 		sender := context.Sender()
 		senderPid := utils.MakeCustomPid(sender)
 
+		p.logger.LogMessageLatency(senderPid, msg.Timestamp)
+
 		msgState := p.initMessageState(context, msgData)
 		msgState.receivedMessagesCnt++
 
@@ -319,7 +329,7 @@ func (p *Process) Receive(context actor.Context) {
 
 			msgState.gossipSample[senderPid] = true
 			if msgState.gossipMessage != nil {
-				context.RequestWithCustomSender(sender, msgState.gossipMessage, p.actorPid)
+				p.sendMessage(context, sender, msgState.gossipMessage)
 			}
 		case messages.ScalableProtocolMessage_GOSSIP:
 			if msgState.gossipMessage == nil {
@@ -344,7 +354,7 @@ func (p *Process) Receive(context actor.Context) {
 
 			msgState.echoSubscriptionSet[senderPid] = true
 			if msgState.echoMessage != nil {
-				context.RequestWithCustomSender(sender, msgState.echoMessage, p.actorPid)
+				p.sendMessage(context, sender, msgState.echoMessage)
 			}
 		case messages.ScalableProtocolMessage_ECHO:
 			if !msgState.echoSample[senderPid] || msgState.receivedEcho[senderPid] {
@@ -363,7 +373,8 @@ func (p *Process) Receive(context actor.Context) {
 			msgState.readySubscriptionSet[senderPid] = true
 
 			for val := range msgState.sentReadyMessages {
-				context.RequestWithCustomSender(
+				p.sendMessage(
+					context,
 					sender,
 					&messages.ScalableProtocolMessage{
 						Stage: messages.ScalableProtocolMessage_READY,
@@ -373,7 +384,7 @@ func (p *Process) Receive(context actor.Context) {
 							Value:     int64(val),
 						},
 					},
-					p.actorPid)
+				)
 			}
 		case messages.ScalableProtocolMessage_READY:
 			if msgState.receivedReady[senderPid][value] {
