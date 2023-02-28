@@ -1,4 +1,4 @@
-package impl
+package manager
 
 import (
 	"github.com/asynkron/protoactor-go/actor"

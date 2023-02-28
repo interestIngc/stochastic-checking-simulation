@@ -5,11 +5,11 @@ import (
 	"google.golang.org/protobuf/proto"
 	"log"
 	"math"
-	"stochastic-checking-simulation/config"
-	"stochastic-checking-simulation/impl"
 	"stochastic-checking-simulation/impl/eventlogger"
 	"stochastic-checking-simulation/impl/hashing"
+	"stochastic-checking-simulation/impl/manager"
 	"stochastic-checking-simulation/impl/messages"
+	"stochastic-checking-simulation/impl/parameters"
 	"stochastic-checking-simulation/impl/protocols"
 	"stochastic-checking-simulation/impl/utils"
 	"time"
@@ -135,14 +135,14 @@ type Process struct {
 	wSelector   *hashing.WitnessesSelector
 	historyHash *hashing.HistoryHash
 
-	transactionManager *impl.TransactionManager
+	transactionManager *manager.TransactionManager
 	logger             *eventlogger.EventLogger
 }
 
 func (p *Process) InitProcess(
 	actorPid *actor.PID,
 	actorPids []*actor.PID,
-	parameters *config.Parameters,
+	parameters *parameters.Parameters,
 	logger *log.Logger) {
 	p.actorPid = actorPid
 	p.pid = utils.MakeCustomPid(actorPid)
@@ -362,7 +362,7 @@ func (p *Process) Receive(context actor.Context) {
 
 		p.logger.LogMessageLatency(utils.MakeCustomPid(context.Sender()), msg.Timestamp)
 
-		p.transactionManager = &impl.TransactionManager{
+		p.transactionManager = &manager.TransactionManager{
 			TransactionsToSendOut: msg.Transactions,
 		}
 		p.transactionManager.SendOutTransaction(context, p)

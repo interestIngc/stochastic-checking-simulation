@@ -1,4 +1,4 @@
-package config
+package parameters
 
 type Parameters struct {
 	// Broadcast

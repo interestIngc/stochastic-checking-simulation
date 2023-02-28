@@ -5,7 +5,7 @@ import (
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/remote"
 	"log"
-	"stochastic-checking-simulation/config"
+	"stochastic-checking-simulation/impl/parameters"
 	"stochastic-checking-simulation/impl/protocols"
 	"stochastic-checking-simulation/impl/protocols/accountability/consistent"
 )
@@ -13,7 +13,7 @@ import (
 func main() {
 	processCount := 256
 	faultyProcessesCount := 20
-	parameters := &config.Parameters{
+	parameters := &parameters.Parameters{
 		FaultyProcesses:         faultyProcessesCount,
 		MinOwnWitnessSetSize:    16,
 		MinPotWitnessSetSize:    32,

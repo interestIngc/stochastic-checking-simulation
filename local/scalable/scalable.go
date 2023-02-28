@@ -5,13 +5,13 @@ import (
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/remote"
 	"log"
-	"stochastic-checking-simulation/config"
+	"stochastic-checking-simulation/impl/parameters"
 	"stochastic-checking-simulation/impl/protocols/scalable"
 )
 
 func main() {
 	processCount := 256
-	parameters := &config.Parameters{
+	parameters := &parameters.Parameters{
 		GossipSampleSize:   20,
 		EchoSampleSize:     16,
 		EchoThreshold:      10,

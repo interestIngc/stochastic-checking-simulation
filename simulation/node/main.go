@@ -12,6 +12,7 @@ import (
 	"os"
 	"stochastic-checking-simulation/config"
 	"stochastic-checking-simulation/impl/messages"
+	"stochastic-checking-simulation/impl/parameters"
 	"stochastic-checking-simulation/impl/protocols"
 	"stochastic-checking-simulation/impl/protocols/accountability/consistent"
 	"stochastic-checking-simulation/impl/protocols/accountability/reliable"
@@ -32,8 +33,8 @@ var (
 const Bytes = 4
 
 type Input struct {
-	Protocol   string            `json:"protocol"`
-	Parameters config.Parameters `json:"parameters"`
+	Protocol   string                `json:"protocol"`
+	Parameters parameters.Parameters `json:"parameters"`
 }
 
 func joinWithPort(ip string, port int) string {
