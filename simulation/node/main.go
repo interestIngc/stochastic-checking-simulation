@@ -81,14 +81,14 @@ func main() {
 		}
 	}
 
-	//var processIp string
-	var processPort int
+	var processIp string
+	//var processPort int
 	pids := make([]*actor.PID, processCount)
 
-	port := config.Port
+	//port := config.Port
 
 	for i := 0; i < processCount; i++ {
-		port++
+		//port++
 		leftByteInd := Bytes - 1
 		for ; leftByteInd >= 0 && ipBytes[leftByteInd] == 255; leftByteInd-- {
 		}
@@ -102,18 +102,19 @@ func main() {
 			ipBytes[ind] = 0
 		}
 
-		ipAsStr := make([]string, Bytes)
+		ipBytesAsStr := make([]string, Bytes)
 		for ind := 0; ind < Bytes; ind++ {
-			ipAsStr[ind] = strconv.Itoa(ipBytes[ind])
+			ipBytesAsStr[ind] = strconv.Itoa(ipBytes[ind])
 		}
 
-		//currIp := strings.Join(ipAsStr, ".")
+		currIp := strings.Join(ipBytesAsStr, ".")
 		if i == *processIndex {
-			//processIp = currIp
-			processPort = port
+			processIp = currIp
+			fmt.Println(processIp)
+			//processPort = port
 		}
-		//pids[i] = actor.NewPID(joinWithPort(currIp, config.Port), "pid")
-		pids[i] = actor.NewPID(joinWithPort(config.BaseIpAddress, port), "pid")
+		pids[i] = actor.NewPID(joinWithPort(currIp, config.Port), "pid")
+		//pids[i] = actor.NewPID(joinWithPort(config.BaseIpAddress, port), "pid")
 	}
 
 	mainServer := actor.NewPID(joinWithPort(config.BaseIpAddress, config.Port), "mainserver")
@@ -134,8 +135,8 @@ func main() {
 	}
 
 	system := actor.NewActorSystem()
-	//remoteConfig := remote.Configure(processIp, config.Port)
-	remoteConfig := remote.Configure(config.BaseIpAddress, processPort)
+	remoteConfig := remote.Configure(processIp, config.Port)
+	//remoteConfig := remote.Configure(config.BaseIpAddress, processPort)
 	remoter := remote.NewRemote(system, remoteConfig)
 	remoter.Start()
 
