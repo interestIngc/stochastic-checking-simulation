@@ -70,8 +70,10 @@ type Process struct {
 	actorPid   *actor.PID
 	pid        string
 	actorPids  map[string]*actor.PID
-	pids       []string
-	msgCounter int64
+	pids               []string
+
+	transactionCounter int64
+	messageCounter int64
 
 	deliveredMessages map[string]map[int64]protocols.ValueType
 	messagesLog       map[string]map[int64]*messageState
@@ -150,7 +152,8 @@ func (p *Process) InitProcess(
 	p.pids = make([]string, len(actorPids))
 	p.actorPids = make(map[string]*actor.PID)
 
-	p.msgCounter = 0
+	p.transactionCounter = 0
+	p.messageCounter = 0
 
 	p.deliveredMessages = make(map[string]map[int64]protocols.ValueType)
 	p.messagesLog = make(map[string]map[int64]*messageState)
@@ -225,8 +228,12 @@ func (p *Process) sendMessage(
 	context actor.SenderContext,
 	to *actor.PID,
 	message *messages.ScalableProtocolMessage) {
-	message.Timestamp = utils.GetNow()
+	message.Stamp = p.messageCounter
+
 	context.RequestWithCustomSender(to, message, p.actorPid)
+
+	p.logger.OnMessageSent(p.messageCounter)
+	p.messageCounter++
 }
 
 func (p *Process) broadcastToSet(
@@ -240,7 +247,7 @@ func (p *Process) delivered(msgData *messages.MessageData) bool {
 	deliveredValue, delivered := p.deliveredMessages[msgData.Author][msgData.SeqNumber]
 	if delivered {
 		if deliveredValue != protocols.ValueType(msgData.Value) {
-			p.logger.LogAttack()
+			p.logger.OnAttack(msgData, int64(deliveredValue))
 		}
 	}
 	return delivered
@@ -250,7 +257,7 @@ func (p *Process) deliver(msgData *messages.MessageData) {
 	p.deliveredMessages[msgData.Author][msgData.SeqNumber] = protocols.ValueType(msgData.Value)
 	messagesReceived := p.messagesLog[msgData.Author][msgData.SeqNumber].receivedMessagesCnt
 
-	p.logger.LogAccept(msgData, messagesReceived)
+	p.logger.OnAccept(msgData, messagesReceived)
 }
 
 func (p *Process) broadcastGossip(
@@ -302,8 +309,6 @@ func (p *Process) Receive(context actor.Context) {
 	case *messages.Simulate:
 		msg := message.(*messages.Simulate)
 
-		p.logger.LogMessageLatency(utils.MakeCustomPid(context.Sender()), msg.Timestamp)
-
 		p.transactionManager = &manager.TransactionManager{
 			TransactionsToSendOut: msg.Transactions,
 		}
@@ -316,7 +321,7 @@ func (p *Process) Receive(context actor.Context) {
 		sender := context.Sender()
 		senderPid := utils.MakeCustomPid(sender)
 
-		p.logger.LogMessageLatency(senderPid, msg.Timestamp)
+		p.logger.OnMessageReceived(senderPid, msg.Stamp)
 
 		msgState := p.initMessageState(context, msgData)
 		msgState.receivedMessagesCnt++
@@ -417,12 +422,14 @@ func (p *Process) Receive(context actor.Context) {
 func (p *Process) Broadcast(context actor.SenderContext, value int64) {
 	msgData := &messages.MessageData{
 		Author:    p.pid,
-		SeqNumber: p.msgCounter,
+		SeqNumber: p.transactionCounter,
 		Value:     value,
 	}
 
 	msgState := p.initMessageState(context, msgData)
 	p.broadcastGossip(context, msgState, msgData)
 
-	p.msgCounter++
+	p.logger.OnTransactionInit(p.transactionCounter)
+
+	p.transactionCounter++
 }

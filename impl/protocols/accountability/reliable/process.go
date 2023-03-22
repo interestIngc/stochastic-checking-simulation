@@ -120,7 +120,8 @@ type Process struct {
 	pid       string
 	actorPids map[string]*actor.PID
 
-	msgCounter int64
+	transactionCounter int64
+	messageCounter int64
 
 	acceptedMessages    map[string]map[int64]protocols.ValueType
 	messagesLog         map[string]map[int64]*messageState
@@ -147,7 +148,8 @@ func (p *Process) InitProcess(
 	p.actorPid = actorPid
 	p.pid = utils.MakeCustomPid(actorPid)
 	p.actorPids = make(map[string]*actor.PID)
-	p.msgCounter = 0
+	p.transactionCounter = 0
+	p.messageCounter = 0
 
 	p.quorumThreshold = int(math.Ceil(float64(len(actorPids)+parameters.FaultyProcesses+1) / float64(2)))
 	p.readyMessagesThreshold = parameters.FaultyProcesses + 1
@@ -233,17 +235,19 @@ func (p *Process) initRecoveryMessageState(msgData *messages.MessageData) *recov
 }
 
 func (p *Process) sendMessage(context actor.SenderContext, to *actor.PID, message proto.Message) {
-	timestamp := utils.GetNow()
 	reliableMessage, isReliable := message.(*messages.ReliableProtocolMessage)
 	if isReliable {
-		reliableMessage.Timestamp = timestamp
+		reliableMessage.Stamp = p.messageCounter
 	}
 	recoveryMessage, isRecovery := message.(*messages.RecoveryMessage)
 	if isRecovery {
-		recoveryMessage.Timestamp = timestamp
+		recoveryMessage.Stamp = p.messageCounter
 	}
 
 	context.RequestWithCustomSender(to, message, p.actorPid)
+	p.logger.OnMessageSent(p.messageCounter)
+
+	p.messageCounter++
 }
 
 func (p *Process) broadcast(context actor.SenderContext, message proto.Message) {
@@ -280,13 +284,6 @@ func (p *Process) broadcastReadyFromWitness(
 func (p *Process) broadcastRecover(
 	context actor.SenderContext, msgData *messages.MessageData) {
 	lastProcessMessage := p.lastSentPMessages[msgData.Author][msgData.SeqNumber]
-	if lastProcessMessage == nil {
-		p.logger.Printf(
-			"%s: Error, no process message for transaction with author %s and seq number %d was sent\n",
-			p.pid,
-			msgData.Author,
-			msgData.SeqNumber)
-	}
 
 	p.broadcast(
 		context,
@@ -321,7 +318,7 @@ func (p *Process) accepted(msgData *messages.MessageData) bool {
 	acceptedValue, accepted := p.acceptedMessages[msgData.Author][msgData.SeqNumber]
 	if accepted {
 		if acceptedValue != protocols.ValueType(msgData.Value) {
-			p.logger.LogAttack()
+			p.logger.OnAttack(msgData, int64(acceptedValue))
 		}
 	}
 	return accepted
@@ -350,8 +347,8 @@ func (p *Process) deliver(msgData *messages.MessageData) {
 		delete(p.recoveryMessagesLog[msgData.Author], msgData.SeqNumber)
 	}
 
-	p.logger.LogAccept(msgData, messagesReceived)
-	p.logger.LogHistoryHash(p.historyHash)
+	p.logger.OnAccept(msgData, messagesReceived)
+	p.logger.OnHistoryHashUpdate(msgData, p.historyHash)
 }
 
 func (p *Process) Receive(context actor.Context) {
@@ -359,8 +356,6 @@ func (p *Process) Receive(context actor.Context) {
 	switch message.(type) {
 	case *messages.Simulate:
 		msg := message.(*messages.Simulate)
-
-		p.logger.LogMessageLatency(utils.MakeCustomPid(context.Sender()), msg.Timestamp)
 
 		p.transactionManager = &manager.TransactionManager{
 			TransactionsToSendOut: msg.Transactions,
@@ -372,7 +367,7 @@ func (p *Process) Receive(context actor.Context) {
 		senderPid := utils.MakeCustomPid(context.Sender())
 		value := protocols.ValueType(msgData.Value)
 
-		p.logger.LogMessageLatency(senderPid, msg.Timestamp)
+		p.logger.OnMessageReceived(senderPid, msg.Stamp)
 
 		if p.accepted(msgData) {
 			return
@@ -483,7 +478,7 @@ func (p *Process) Receive(context actor.Context) {
 		sender := context.Sender()
 		senderPid := utils.MakeCustomPid(sender)
 
-		p.logger.LogMessageLatency(senderPid, msg.Timestamp)
+		p.logger.OnMessageReceived(senderPid, msg.Stamp)
 
 		accepted := p.accepted(msgData)
 		recoveryState := p.initRecoveryMessageState(msgData)
@@ -576,11 +571,13 @@ func (p *Process) Receive(context actor.Context) {
 func (p *Process) Broadcast(context actor.SenderContext, value int64) {
 	msgData := &messages.MessageData{
 		Author:    p.pid,
-		SeqNumber: p.msgCounter,
+		SeqNumber: p.transactionCounter,
 		Value:     value,
 	}
 
 	p.initMessageState(context, msgData)
 
-	p.msgCounter++
+	p.logger.OnTransactionInit(p.transactionCounter)
+
+	p.transactionCounter++
 }

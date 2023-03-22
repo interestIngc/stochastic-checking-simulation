@@ -6,7 +6,6 @@ message Started {}
 
 message Simulate {
   int64 transactions = 1;
-  int64 timestamp = 3;
 }
 
 message FaultyBroadcast {
@@ -29,7 +28,7 @@ message BrachaMessage {
 
   Stage stage = 1;
   MessageData messageData = 2;
-  int64 timestamp = 3;
+  int64 stamp = 3;
 }
 
 message ConsistentProtocolMessage {
@@ -40,7 +39,7 @@ message ConsistentProtocolMessage {
 
   Stage stage = 1;
   MessageData messageData = 2;
-  int64 timestamp = 3;
+  int64 stamp = 3;
 }
 
 message ReliableProtocolMessage {
@@ -55,7 +54,7 @@ message ReliableProtocolMessage {
 
   Stage stage = 1;
   MessageData messageData = 2;
-  int64 timestamp = 3;
+  int64 stamp = 3;
 }
 
 message RecoveryMessage {
@@ -68,7 +67,7 @@ message RecoveryMessage {
 
   Stage recoveryStage = 1;
   ReliableProtocolMessage message = 2;
-  int64 timestamp = 3;
+  int64 stamp = 3;
 }
 
 message ScalableProtocolMessage {
@@ -83,5 +82,5 @@ message ScalableProtocolMessage {
 
   Stage stage = 1;
   MessageData messageData = 2;
-  int64 timestamp = 3;
+  int64 stamp = 3;
 }

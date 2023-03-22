@@ -49,8 +49,9 @@ func newMessageState() *messageState {
 type Process struct {
 	actorPid   *actor.PID
 	pid        string
-	actorPids  map[string]*actor.PID
-	msgCounter int64
+	actorPids          map[string]*actor.PID
+	transactionCounter int64
+	messageCounter int64
 
 	acceptedMessages map[string]map[int64]protocols.ValueType
 	messagesLog      map[string]map[int64]*messageState
@@ -72,7 +73,8 @@ func (p *Process) InitProcess(
 	p.pid = utils.MakeCustomPid(actorPid)
 	p.actorPids = make(map[string]*actor.PID)
 
-	p.msgCounter = 0
+	p.transactionCounter = 0
+	p.messageCounter = 0
 
 	p.messagesForEcho = int(math.Ceil(float64(len(actorPids)+parameters.FaultyProcesses+1) / float64(2)))
 	p.messagesForReady = parameters.FaultyProcesses + 1
@@ -103,8 +105,12 @@ func (p *Process) sendMessage(
 	context actor.SenderContext,
 	to *actor.PID,
 	message *messages.BrachaMessage) {
-	message.Timestamp = utils.GetNow()
+	message.Stamp = p.messageCounter
+
 	context.RequestWithCustomSender(to, message, p.actorPid)
+	p.logger.OnMessageSent(p.messageCounter)
+
+	p.messageCounter++
 }
 
 func (p *Process) broadcast(context actor.SenderContext, message *messages.BrachaMessage) {
@@ -144,7 +150,7 @@ func (p *Process) deliver(msgData *messages.MessageData) {
 	messagesReceived := p.messagesLog[msgData.Author][msgData.SeqNumber].receivedMessagesCnt
 	delete(p.messagesLog[msgData.Author], msgData.SeqNumber)
 
-	p.logger.LogAccept(msgData, messagesReceived)
+	p.logger.OnAccept(msgData, messagesReceived)
 }
 
 func (p *Process) Receive(context actor.Context) {
@@ -152,8 +158,6 @@ func (p *Process) Receive(context actor.Context) {
 	switch message.(type) {
 	case *messages.Simulate:
 		msg := message.(*messages.Simulate)
-
-		p.logger.LogMessageLatency(utils.MakeCustomPid(context.Sender()), msg.Timestamp)
 
 		p.transactionManager = &manager.TransactionManager{
 			TransactionsToSendOut: msg.Transactions,
@@ -165,12 +169,12 @@ func (p *Process) Receive(context actor.Context) {
 		value := protocols.ValueType(msgData.Value)
 
 		senderPid := utils.MakeCustomPid(context.Sender())
-		p.logger.LogMessageLatency(senderPid, msg.Timestamp)
+		p.logger.OnMessageReceived(senderPid, msg.Stamp)
 
 		acceptedValue, accepted := p.acceptedMessages[msgData.Author][msgData.SeqNumber]
 		if accepted {
 			if acceptedValue != value {
-				p.logger.LogAttack()
+				p.logger.OnAttack(msgData, int64(acceptedValue))
 			}
 			return
 		}
@@ -225,11 +229,13 @@ func (p *Process) Broadcast(context actor.SenderContext, value int64) {
 		Stage: messages.BrachaMessage_INITIAL,
 		MessageData: &messages.MessageData{
 			Author:    p.pid,
-			SeqNumber: p.msgCounter,
+			SeqNumber: p.transactionCounter,
 			Value:     value,
 		},
 	}
 	p.broadcast(context, message)
 
-	p.msgCounter++
+	p.logger.OnTransactionInit(p.transactionCounter)
+
+	p.transactionCounter++
 }

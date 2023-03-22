@@ -37,7 +37,8 @@ type CorrectProcess struct {
 	pid       string
 	actorPids map[string]*actor.PID
 
-	msgCounter int64
+	transactionCounter int64
+	messageCounter int64
 
 	acceptedMessages map[string]map[int64]protocols.ValueType
 	messagesLog      map[string]map[int64]*messageState
@@ -60,7 +61,8 @@ func (p *CorrectProcess) InitProcess(
 	p.pid = utils.MakeCustomPid(actorPid)
 	p.actorPids = make(map[string]*actor.PID)
 
-	p.msgCounter = 0
+	p.transactionCounter = 0
+	p.messageCounter = 0
 
 	p.acceptedMessages = make(map[string]map[int64]protocols.ValueType)
 	p.messagesLog = make(map[string]map[int64]*messageState)
@@ -110,8 +112,12 @@ func (p *CorrectProcess) sendMessage(
 	context actor.SenderContext,
 	to *actor.PID,
 	message *messages.ConsistentProtocolMessage) {
-	message.Timestamp = utils.GetNow()
+	message.Stamp = p.messageCounter
+
 	context.RequestWithCustomSender(to, message, p.actorPid)
+
+	p.logger.OnMessageSent(p.messageCounter)
+	p.messageCounter++
 }
 
 func (p *CorrectProcess) broadcast(context actor.SenderContext, message *messages.ConsistentProtocolMessage) {
@@ -127,8 +133,8 @@ func (p *CorrectProcess) deliver(msgData *messages.MessageData) {
 	messagesReceived := p.messagesLog[msgData.Author][msgData.SeqNumber].receivedMessagesCnt
 	delete(p.messagesLog[msgData.Author], msgData.SeqNumber)
 
-	p.logger.LogAccept(msgData, messagesReceived)
-	p.logger.LogHistoryHash(p.historyHash)
+	p.logger.OnAccept(msgData, messagesReceived)
+	p.logger.OnHistoryHashUpdate(msgData, p.historyHash)
 }
 
 func (p *CorrectProcess) verify(
@@ -139,7 +145,7 @@ func (p *CorrectProcess) verify(
 	acceptedValue, accepted := p.acceptedMessages[msgData.Author][msgData.SeqNumber]
 	if accepted {
 		if acceptedValue != value {
-			p.logger.LogAttack()
+			p.logger.OnAttack(msgData, int64(acceptedValue))
 			return false
 		}
 	} else if msgState != nil {
@@ -172,8 +178,6 @@ func (p *CorrectProcess) Receive(context actor.Context) {
 	case *messages.Simulate:
 		msg := message.(*messages.Simulate)
 
-		p.logger.LogMessageLatency(utils.MakeCustomPid(context.Sender()), msg.Timestamp)
-
 		p.transactionManager = &manager.TransactionManager{
 			TransactionsToSendOut: msg.Transactions,
 		}
@@ -183,7 +187,7 @@ func (p *CorrectProcess) Receive(context actor.Context) {
 		msgData := msg.GetMessageData()
 		senderPid := utils.MakeCustomPid(context.Sender())
 
-		p.logger.LogMessageLatency(senderPid, msg.Timestamp)
+		p.logger.OnMessageReceived(senderPid, msg.Stamp)
 
 		doBroadcast := p.verify(context, senderPid, msgData)
 
@@ -204,9 +208,11 @@ func (p *CorrectProcess) Broadcast(context actor.SenderContext, value int64) {
 		p.pid,
 		&messages.MessageData{
 			Author:    p.pid,
-			SeqNumber: p.msgCounter,
+			SeqNumber: p.transactionCounter,
 			Value:     value,
 		})
 
-	p.msgCounter++
+	p.logger.OnTransactionInit(p.transactionCounter)
+
+	p.transactionCounter++
 }

@@ -33,7 +33,7 @@ func (p *FaultyProcess) Receive(context actor.Context) {
 		sender := context.Sender()
 		senderPid := utils.MakeCustomPid(sender)
 
-		p.process.logger.LogMessageLatency(senderPid, msg.Timestamp)
+		p.process.logger.OnMessageReceived(senderPid, msg.Stamp)
 
 		switch msg.Stage {
 		case messages.ConsistentProtocolMessage_ECHO:
@@ -68,7 +68,7 @@ func (p *FaultyProcess) FaultyBroadcast(context actor.SenderContext, value1 int6
 	msgState := p.process.initMessageState(
 		&messages.MessageData{
 			Author:    p.process.pid,
-			SeqNumber: p.process.msgCounter,
+			SeqNumber: p.process.transactionCounter,
 			Value:     value1,
 		})
 
@@ -85,7 +85,7 @@ func (p *FaultyProcess) FaultyBroadcast(context actor.SenderContext, value1 int6
 				Stage: messages.ConsistentProtocolMessage_VERIFY,
 				MessageData: &messages.MessageData{
 					Author:    p.process.pid,
-					SeqNumber: p.process.msgCounter,
+					SeqNumber: p.process.transactionCounter,
 					Value:     currValue,
 				},
 			},
@@ -93,5 +93,5 @@ func (p *FaultyProcess) FaultyBroadcast(context actor.SenderContext, value1 int6
 		i++
 	}
 
-	p.process.msgCounter++
+	p.process.transactionCounter++
 }

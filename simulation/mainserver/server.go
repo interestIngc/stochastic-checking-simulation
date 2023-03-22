@@ -4,6 +4,7 @@ import (
 	"github.com/asynkron/protoactor-go/actor"
 	"log"
 	"stochastic-checking-simulation/impl/messages"
+	"stochastic-checking-simulation/impl/utils"
 )
 
 type MainServer struct {
@@ -39,7 +40,7 @@ func (ms *MainServer) Receive(context actor.Context) {
 	case *messages.Started:
 		ms.startedProcesses.Add(context.Sender())
 		if ms.startedProcesses.Len() == ms.processCount {
-			ms.logger.Println("Main server: starting broadcast")
+			ms.logger.Printf("Starting broadcast, timestamp: %d\n", utils.GetNow())
 			ms.simulate(context)
 		}
 	}
