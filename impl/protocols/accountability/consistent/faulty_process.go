@@ -29,7 +29,7 @@ func (p *FaultyProcess) Receive(context actor.Context) {
 		p.FaultyBroadcast(context, msg.Value1, msg.Value2)
 	case *messages.ConsistentProtocolMessage:
 		msg := message.(*messages.ConsistentProtocolMessage)
-		msgData := msg.GetMessageData()
+		sourceMessage := msg.SourceMessage
 		sender := context.Sender()
 		senderPid := utils.MakeCustomPid(sender)
 
@@ -37,23 +37,23 @@ func (p *FaultyProcess) Receive(context actor.Context) {
 
 		switch msg.Stage {
 		case messages.ConsistentProtocolMessage_ECHO:
-			p.process.verify(context, senderPid, msgData)
+			p.process.verify(context, senderPid, sourceMessage)
 		case messages.ConsistentProtocolMessage_VERIFY:
-			if msgData.Author == p.process.pid {
+			if sourceMessage.Author == p.process.pid {
 				p.process.sendMessage(
 					context,
 					sender,
 					&messages.ConsistentProtocolMessage{
-						Stage:       messages.ConsistentProtocolMessage_ECHO,
-						MessageData: msgData,
+						Stage:         messages.ConsistentProtocolMessage_ECHO,
+						SourceMessage: sourceMessage,
 					},
 				)
-			} else if p.process.verify(context, senderPid, msgData) {
+			} else if p.process.verify(context, senderPid, sourceMessage) {
 				p.process.broadcast(
 					context,
 					&messages.ConsistentProtocolMessage{
-						Stage:       messages.ConsistentProtocolMessage_ECHO,
-						MessageData: msgData,
+						Stage:         messages.ConsistentProtocolMessage_ECHO,
+						SourceMessage: sourceMessage,
 					})
 			}
 		}
@@ -66,7 +66,7 @@ func (p *FaultyProcess) Broadcast(context actor.SenderContext, value int64) {
 
 func (p *FaultyProcess) FaultyBroadcast(context actor.SenderContext, value1 int64, value2 int64) {
 	msgState := p.process.initMessageState(
-		&messages.MessageData{
+		&messages.SourceMessage{
 			Author:    p.process.pid,
 			SeqNumber: p.process.transactionCounter,
 			Value:     value1,
@@ -83,7 +83,7 @@ func (p *FaultyProcess) FaultyBroadcast(context actor.SenderContext, value1 int6
 			p.process.actorPids[witness],
 			&messages.ConsistentProtocolMessage{
 				Stage: messages.ConsistentProtocolMessage_VERIFY,
-				MessageData: &messages.MessageData{
+				SourceMessage: &messages.SourceMessage{
 					Author:    p.process.pid,
 					SeqNumber: p.process.transactionCounter,
 					Value:     currValue,

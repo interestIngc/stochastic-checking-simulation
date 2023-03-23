@@ -24,24 +24,26 @@ func (el *EventLogger) OnTransactionInit(seqNumber int64) {
 		el.pid, seqNumber, utils.GetNow())
 }
 
-func (el *EventLogger) OnAccept(msgData *messages.MessageData, messagesReceived int) {
+func (el *EventLogger) OnAccept(
+	sourceMessage *messages.SourceMessage, messagesReceived int) {
 	el.logger.Printf(
 		"Accepted transaction {%s;%d}. Value: %d, messages received: %d, timestamp: %d\n",
-		msgData.Author, msgData.SeqNumber, msgData.Value, messagesReceived, utils.GetNow())
+		sourceMessage.Author, sourceMessage.SeqNumber, sourceMessage.Value, messagesReceived, utils.GetNow())
 }
 
 func (el *EventLogger) OnHistoryHashUpdate(
-	msgData *messages.MessageData, historyHash *hashing.HistoryHash) {
+	sourceMessage *messages.SourceMessage, historyHash *hashing.HistoryHash) {
 	el.logger.Printf(
 		"History hash after accepting transaction {%s;%d} is %s\n",
-		msgData.Author, msgData.SeqNumber, historyHash.ToString())
+		sourceMessage.Author, sourceMessage.SeqNumber, historyHash.ToString())
 }
 
-func (el *EventLogger) OnAttack(msgData *messages.MessageData, committedValue int64) {
+func (el *EventLogger) OnAttack(
+	sourceMessage *messages.SourceMessage, committedValue int64) {
 	el.logger.Printf(
 		"Detected a duplicated seq number attack. " +
 			"Transaction: {%s;%d}, received value: %d, committed value: %d, timestamp: %d\n",
-		msgData.Author, msgData.SeqNumber, msgData.Value, committedValue, utils.GetNow())
+		sourceMessage.Author, sourceMessage.SeqNumber, sourceMessage.Value, committedValue, utils.GetNow())
 }
 
 func (el *EventLogger) OnMessageSent(msgId int64) {

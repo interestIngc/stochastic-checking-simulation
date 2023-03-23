@@ -67,13 +67,13 @@ func newMessageState() *messageState {
 }
 
 type Process struct {
-	actorPid   *actor.PID
-	pid        string
-	actorPids  map[string]*actor.PID
-	pids               []string
+	actorPid  *actor.PID
+	pid       string
+	actorPids map[string]*actor.PID
+	pids      []string
 
 	transactionCounter int64
-	messageCounter int64
+	messageCounter     int64
 
 	deliveredMessages map[string]map[int64]protocols.ValueType
 	messagesLog       map[string]map[int64]*messageState
@@ -121,7 +121,7 @@ func (p *Process) generateGossipSample() map[string]bool {
 func (p *Process) sample(
 	context actor.SenderContext,
 	stage messages.ScalableProtocolMessage_Stage,
-	msgData *messages.MessageData,
+	sourceMessage *messages.SourceMessage,
 	size int,
 ) map[string]bool {
 	sample := make(map[string]bool)
@@ -135,8 +135,8 @@ func (p *Process) sample(
 		context,
 		sample,
 		&messages.ScalableProtocolMessage{
-			Stage:       stage,
-			MessageData: msgData,
+			Stage:         stage,
+			SourceMessage: sourceMessage,
 		})
 
 	return sample
@@ -179,9 +179,8 @@ func (p *Process) InitProcess(
 
 func (p *Process) initMessageState(
 	context actor.SenderContext,
-	msgData *messages.MessageData,
-) *messageState {
-	msgState := p.messagesLog[msgData.Author][msgData.SeqNumber]
+	sourceMessage *messages.SourceMessage) *messageState {
+	msgState := p.messagesLog[sourceMessage.Author][sourceMessage.SeqNumber]
 
 	if msgState == nil {
 		msgState = newMessageState()
@@ -195,30 +194,30 @@ func (p *Process) initMessageState(
 			context,
 			msgState.gossipSample,
 			&messages.ScalableProtocolMessage{
-				Stage:       messages.ScalableProtocolMessage_GOSSIP_SUBSCRIBE,
-				MessageData: msgData,
+				Stage:         messages.ScalableProtocolMessage_GOSSIP_SUBSCRIBE,
+				SourceMessage: sourceMessage,
 			})
 
 		msgState.echoSample =
 			p.sample(
 				context,
 				messages.ScalableProtocolMessage_ECHO_SUBSCRIBE,
-				msgData,
+				sourceMessage,
 				p.echoSampleSize)
 		msgState.readySample =
 			p.sample(
 				context,
 				messages.ScalableProtocolMessage_READY_SUBSCRIBE,
-				msgData,
+				sourceMessage,
 				p.readySampleSize)
 		msgState.deliverySample =
 			p.sample(
 				context,
 				messages.ScalableProtocolMessage_READY_SUBSCRIBE,
-				msgData,
+				sourceMessage,
 				p.deliverySampleSize)
 
-		p.messagesLog[msgData.Author][msgData.SeqNumber] = msgState
+		p.messagesLog[sourceMessage.Author][sourceMessage.SeqNumber] = msgState
 	}
 
 	return msgState
@@ -237,35 +236,42 @@ func (p *Process) sendMessage(
 }
 
 func (p *Process) broadcastToSet(
-	context actor.SenderContext, set map[string]bool, msg *messages.ScalableProtocolMessage) {
+	context actor.SenderContext,
+	set map[string]bool,
+	msg *messages.ScalableProtocolMessage) {
 	for pid := range set {
 		p.sendMessage(context, p.actorPids[pid], msg)
 	}
 }
 
-func (p *Process) delivered(msgData *messages.MessageData) bool {
-	deliveredValue, delivered := p.deliveredMessages[msgData.Author][msgData.SeqNumber]
-	if delivered {
-		if deliveredValue != protocols.ValueType(msgData.Value) {
-			p.logger.OnAttack(msgData, int64(deliveredValue))
-		}
+func (p *Process) delivered(sourceMessage *messages.SourceMessage) bool {
+	deliveredValue, delivered :=
+		p.deliveredMessages[sourceMessage.Author][sourceMessage.SeqNumber]
+
+	if delivered && deliveredValue != protocols.ValueType(sourceMessage.Value) {
+		p.logger.OnAttack(sourceMessage, int64(deliveredValue))
 	}
+
 	return delivered
 }
 
-func (p *Process) deliver(msgData *messages.MessageData) {
-	p.deliveredMessages[msgData.Author][msgData.SeqNumber] = protocols.ValueType(msgData.Value)
-	messagesReceived := p.messagesLog[msgData.Author][msgData.SeqNumber].receivedMessagesCnt
+func (p *Process) deliver(sourceMessage *messages.SourceMessage) {
+	p.deliveredMessages[sourceMessage.Author][sourceMessage.SeqNumber] =
+		protocols.ValueType(sourceMessage.Value)
+	messagesReceived :=
+		p.messagesLog[sourceMessage.Author][sourceMessage.SeqNumber].receivedMessagesCnt
 
-	p.logger.OnAccept(msgData, messagesReceived)
+	p.logger.OnAccept(sourceMessage, messagesReceived)
 }
 
 func (p *Process) broadcastGossip(
-	context actor.SenderContext, msgState *messageState, msgData *messages.MessageData) {
+	context actor.SenderContext,
+	msgState *messageState,
+	sourceMessage *messages.SourceMessage) {
 	msgState.gossipMessage =
 		&messages.ScalableProtocolMessage{
-			Stage:       messages.ScalableProtocolMessage_GOSSIP,
-			MessageData: msgData,
+			Stage:         messages.ScalableProtocolMessage_GOSSIP,
+			SourceMessage: sourceMessage,
 		}
 	p.broadcastToSet(
 		context,
@@ -274,30 +280,32 @@ func (p *Process) broadcastGossip(
 }
 
 func (p *Process) broadcastReady(
-	context actor.SenderContext, msgState *messageState, msgData *messages.MessageData) {
-	value := protocols.ValueType(msgData.Value)
+	context actor.SenderContext,
+	msgState *messageState,
+	sourceMessage *messages.SourceMessage) {
+	value := protocols.ValueType(sourceMessage.Value)
 	msgState.sentReadyMessages[value] = true
 
 	p.broadcastToSet(
 		context,
 		msgState.readySubscriptionSet,
 		&messages.ScalableProtocolMessage{
-			Stage:       messages.ScalableProtocolMessage_READY,
-			MessageData: msgData,
+			Stage:         messages.ScalableProtocolMessage_READY,
+			SourceMessage: sourceMessage,
 		})
 }
 
 func (p *Process) maybeSendReadyFromSieve(
 	context actor.SenderContext,
 	msgState *messageState,
-	msgData *messages.MessageData) {
-	value := protocols.ValueType(msgData.Value)
+	sourceMessage *messages.SourceMessage) {
+	value := protocols.ValueType(sourceMessage.Value)
 
 	if !msgState.sentReadyFromSieve &&
 		msgState.echoMessage != nil &&
-		value == protocols.ValueType(msgState.echoMessage.GetMessageData().Value) &&
+		value == protocols.ValueType(msgState.echoMessage.SourceMessage.Value) &&
 		msgState.echoMessagesStat[value] >= p.echoThreshold {
-		p.broadcastReady(context, msgState, msgData)
+		p.broadcastReady(context, msgState, sourceMessage)
 
 		msgState.sentReadyFromSieve = true
 	}
@@ -315,15 +323,15 @@ func (p *Process) Receive(context actor.Context) {
 		p.transactionManager.SendOutTransaction(context, p)
 	case *messages.ScalableProtocolMessage:
 		msg := message.(*messages.ScalableProtocolMessage)
-		msgData := msg.GetMessageData()
-		value := protocols.ValueType(msgData.Value)
+		sourceMessage := msg.SourceMessage
+		value := protocols.ValueType(sourceMessage.Value)
 
 		sender := context.Sender()
 		senderPid := utils.MakeCustomPid(sender)
 
 		p.logger.OnMessageReceived(senderPid, msg.Stamp)
 
-		msgState := p.initMessageState(context, msgData)
+		msgState := p.initMessageState(context, sourceMessage)
 		msgState.receivedMessagesCnt++
 
 		switch msg.Stage {
@@ -338,19 +346,19 @@ func (p *Process) Receive(context actor.Context) {
 			}
 		case messages.ScalableProtocolMessage_GOSSIP:
 			if msgState.gossipMessage == nil {
-				p.broadcastGossip(context, msgState, msgData)
+				p.broadcastGossip(context, msgState, sourceMessage)
 			}
 			if msgState.echoMessage == nil {
 				msgState.echoMessage =
 					&messages.ScalableProtocolMessage{
-						Stage:       messages.ScalableProtocolMessage_ECHO,
-						MessageData: msgData,
+						Stage:         messages.ScalableProtocolMessage_ECHO,
+						SourceMessage: sourceMessage,
 					}
 				p.broadcastToSet(
 					context,
 					msgState.echoSubscriptionSet,
 					msgState.echoMessage)
-				p.maybeSendReadyFromSieve(context, msgState, msgData)
+				p.maybeSendReadyFromSieve(context, msgState, sourceMessage)
 			}
 		case messages.ScalableProtocolMessage_ECHO_SUBSCRIBE:
 			if msgState.echoSubscriptionSet[senderPid] {
@@ -369,7 +377,7 @@ func (p *Process) Receive(context actor.Context) {
 			msgState.receivedEcho[senderPid] = true
 			msgState.echoMessagesStat[value]++
 
-			p.maybeSendReadyFromSieve(context, msgState, msgData)
+			p.maybeSendReadyFromSieve(context, msgState, sourceMessage)
 		case messages.ScalableProtocolMessage_READY_SUBSCRIBE:
 			if msgState.readySubscriptionSet[senderPid] {
 				return
@@ -383,9 +391,9 @@ func (p *Process) Receive(context actor.Context) {
 					sender,
 					&messages.ScalableProtocolMessage{
 						Stage: messages.ScalableProtocolMessage_READY,
-						MessageData: &messages.MessageData{
-							Author:    msgData.Author,
-							SeqNumber: msgData.SeqNumber,
+						SourceMessage: &messages.SourceMessage{
+							Author:    sourceMessage.Author,
+							SeqNumber: sourceMessage.SeqNumber,
 							Value:     int64(val),
 						},
 					},
@@ -403,16 +411,16 @@ func (p *Process) Receive(context actor.Context) {
 
 				if !msgState.sentReadyMessages[value] &&
 					msgState.readySampleStat[value] >= p.readyThreshold {
-					p.broadcastReady(context, msgState, msgData)
+					p.broadcastReady(context, msgState, sourceMessage)
 				}
 			}
 
 			if msgState.deliverySample[senderPid] {
 				msgState.deliverySampleStat[value]++
 
-				if !p.delivered(msgData) &&
+				if !p.delivered(sourceMessage) &&
 					msgState.deliverySampleStat[value] >= p.deliveryThreshold {
-					p.deliver(msgData)
+					p.deliver(sourceMessage)
 				}
 			}
 		}
@@ -420,14 +428,14 @@ func (p *Process) Receive(context actor.Context) {
 }
 
 func (p *Process) Broadcast(context actor.SenderContext, value int64) {
-	msgData := &messages.MessageData{
+	sourceMessage := &messages.SourceMessage{
 		Author:    p.pid,
 		SeqNumber: p.transactionCounter,
 		Value:     value,
 	}
 
-	msgState := p.initMessageState(context, msgData)
-	p.broadcastGossip(context, msgState, msgData)
+	msgState := p.initMessageState(context, sourceMessage)
+	p.broadcastGossip(context, msgState, sourceMessage)
 
 	p.logger.OnTransactionInit(p.transactionCounter)
 

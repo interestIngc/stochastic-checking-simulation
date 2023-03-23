@@ -38,7 +38,7 @@ type CorrectProcess struct {
 	actorPids map[string]*actor.PID
 
 	transactionCounter int64
-	messageCounter int64
+	messageCounter     int64
 
 	acceptedMessages map[string]map[int64]protocols.ValueType
 	messagesLog      map[string]map[int64]*messageState
@@ -99,11 +99,13 @@ func (p *CorrectProcess) InitProcess(
 	p.logger = eventlogger.InitEventLogger(p.pid, logger)
 }
 
-func (p *CorrectProcess) initMessageState(msgData *messages.MessageData) *messageState {
+func (p *CorrectProcess) initMessageState(
+	sourceMessage *messages.SourceMessage) *messageState {
 	msgState := newMessageState()
-	msgState.witnessSet, _ = p.wSelector.GetWitnessSet(msgData.Author, msgData.SeqNumber, p.historyHash)
+	msgState.witnessSet, _ =
+		p.wSelector.GetWitnessSet(sourceMessage.Author, sourceMessage.SeqNumber, p.historyHash)
 
-	p.messagesLog[msgData.Author][msgData.SeqNumber] = msgState
+	p.messagesLog[sourceMessage.Author][sourceMessage.SeqNumber] = msgState
 
 	return msgState
 }
@@ -120,32 +122,39 @@ func (p *CorrectProcess) sendMessage(
 	p.messageCounter++
 }
 
-func (p *CorrectProcess) broadcast(context actor.SenderContext, message *messages.ConsistentProtocolMessage) {
+func (p *CorrectProcess) broadcast(
+	context actor.SenderContext,
+	message *messages.ConsistentProtocolMessage) {
 	for _, pid := range p.actorPids {
 		p.sendMessage(context, pid, message)
 	}
 }
 
-func (p *CorrectProcess) deliver(msgData *messages.MessageData) {
-	p.acceptedMessages[msgData.Author][msgData.SeqNumber] = protocols.ValueType(msgData.Value)
+func (p *CorrectProcess) deliver(sourceMessage *messages.SourceMessage) {
+	p.acceptedMessages[sourceMessage.Author][sourceMessage.SeqNumber] =
+		protocols.ValueType(sourceMessage.Value)
 	p.historyHash.Insert(
-		utils.TransactionToBytes(msgData.Author, msgData.SeqNumber))
-	messagesReceived := p.messagesLog[msgData.Author][msgData.SeqNumber].receivedMessagesCnt
-	delete(p.messagesLog[msgData.Author], msgData.SeqNumber)
+		utils.TransactionToBytes(sourceMessage.Author, sourceMessage.SeqNumber))
 
-	p.logger.OnAccept(msgData, messagesReceived)
-	p.logger.OnHistoryHashUpdate(msgData, p.historyHash)
+	messagesReceived :=
+		p.messagesLog[sourceMessage.Author][sourceMessage.SeqNumber].receivedMessagesCnt
+
+	delete(p.messagesLog[sourceMessage.Author], sourceMessage.SeqNumber)
+	p.logger.OnAccept(sourceMessage, messagesReceived)
+	p.logger.OnHistoryHashUpdate(sourceMessage, p.historyHash)
 }
 
 func (p *CorrectProcess) verify(
-	context actor.SenderContext, senderPid string, msgData *messages.MessageData) bool {
-	value := protocols.ValueType(msgData.Value)
-	msgState := p.messagesLog[msgData.Author][msgData.SeqNumber]
+	context actor.SenderContext,
+	senderPid string,
+	sourceMessage *messages.SourceMessage) bool {
+	value := protocols.ValueType(sourceMessage.Value)
+	msgState := p.messagesLog[sourceMessage.Author][sourceMessage.SeqNumber]
 
-	acceptedValue, accepted := p.acceptedMessages[msgData.Author][msgData.SeqNumber]
+	acceptedValue, accepted := p.acceptedMessages[sourceMessage.Author][sourceMessage.SeqNumber]
 	if accepted {
 		if acceptedValue != value {
-			p.logger.OnAttack(msgData, int64(acceptedValue))
+			p.logger.OnAttack(sourceMessage, int64(acceptedValue))
 			return false
 		}
 	} else if msgState != nil {
@@ -154,16 +163,16 @@ func (p *CorrectProcess) verify(
 			msgState.receivedEcho[senderPid] = true
 			msgState.echoCount[value]++
 			if msgState.echoCount[value] >= p.witnessThreshold {
-				p.deliver(msgData)
+				p.deliver(sourceMessage)
 			}
 		}
 	} else {
-		msgState = p.initMessageState(msgData)
+		msgState = p.initMessageState(sourceMessage)
 		msgState.receivedMessagesCnt++
 
 		message := &messages.ConsistentProtocolMessage{
-			Stage:       messages.ConsistentProtocolMessage_VERIFY,
-			MessageData: msgData,
+			Stage:         messages.ConsistentProtocolMessage_VERIFY,
+			SourceMessage: sourceMessage,
 		}
 		for pid := range msgState.witnessSet {
 			p.sendMessage(context, p.actorPids[pid], message)
@@ -184,19 +193,19 @@ func (p *CorrectProcess) Receive(context actor.Context) {
 		p.transactionManager.SendOutTransaction(context, p)
 	case *messages.ConsistentProtocolMessage:
 		msg := message.(*messages.ConsistentProtocolMessage)
-		msgData := msg.GetMessageData()
+		sourceMessage := msg.SourceMessage
 		senderPid := utils.MakeCustomPid(context.Sender())
 
 		p.logger.OnMessageReceived(senderPid, msg.Stamp)
 
-		doBroadcast := p.verify(context, senderPid, msgData)
+		doBroadcast := p.verify(context, senderPid, sourceMessage)
 
 		if msg.Stage == messages.ConsistentProtocolMessage_VERIFY && doBroadcast {
 			p.broadcast(
 				context,
 				&messages.ConsistentProtocolMessage{
-					Stage:       messages.ConsistentProtocolMessage_ECHO,
-					MessageData: msgData,
+					Stage:         messages.ConsistentProtocolMessage_ECHO,
+					SourceMessage: sourceMessage,
 				})
 		}
 	}
@@ -206,7 +215,7 @@ func (p *CorrectProcess) Broadcast(context actor.SenderContext, value int64) {
 	p.verify(
 		context,
 		p.pid,
-		&messages.MessageData{
+		&messages.SourceMessage{
 			Author:    p.pid,
 			SeqNumber: p.transactionCounter,
 			Value:     value,

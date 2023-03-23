@@ -13,13 +13,13 @@ message FaultyBroadcast {
   int64 value2 = 2;
 }
 
-message MessageData {
+message SourceMessage {
   int64 value = 1;
   int64 seqNumber = 2;
   string author = 3;
 }
 
-message BrachaMessage {
+message BrachaProtocolMessage {
   enum Stage {
     INITIAL = 0;
     ECHO = 1;
@@ -27,7 +27,7 @@ message BrachaMessage {
   }
 
   Stage stage = 1;
-  MessageData messageData = 2;
+  SourceMessage sourceMessage = 2;
   int64 stamp = 3;
 }
 
@@ -38,7 +38,7 @@ message ConsistentProtocolMessage {
   }
 
   Stage stage = 1;
-  MessageData messageData = 2;
+  SourceMessage sourceMessage = 2;
   int64 stamp = 3;
 }
 
@@ -53,11 +53,11 @@ message ReliableProtocolMessage {
   }
 
   Stage stage = 1;
-  MessageData messageData = 2;
+  SourceMessage sourceMessage = 2;
   int64 stamp = 3;
 }
 
-message RecoveryMessage {
+message RecoveryProtocolMessage {
   enum Stage {
     RECOVER = 0;
     REPLY = 1;
@@ -81,6 +81,6 @@ message ScalableProtocolMessage {
   }
 
   Stage stage = 1;
-  MessageData messageData = 2;
+  SourceMessage sourceMessage = 2;
   int64 stamp = 3;
 }

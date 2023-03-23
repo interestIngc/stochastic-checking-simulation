@@ -47,11 +47,11 @@ func newMessageState() *messageState {
 }
 
 type Process struct {
-	actorPid   *actor.PID
-	pid        string
+	actorPid           *actor.PID
+	pid                string
 	actorPids          map[string]*actor.PID
 	transactionCounter int64
-	messageCounter int64
+	messageCounter     int64
 
 	acceptedMessages map[string]map[int64]protocols.ValueType
 	messagesLog      map[string]map[int64]*messageState
@@ -92,11 +92,11 @@ func (p *Process) InitProcess(
 	p.logger = eventlogger.InitEventLogger(p.pid, logger)
 }
 
-func (p *Process) initMessageState(msgData *messages.MessageData) *messageState {
-	msgState := p.messagesLog[msgData.Author][msgData.SeqNumber]
+func (p *Process) initMessageState(sourceMessage *messages.SourceMessage) *messageState {
+	msgState := p.messagesLog[sourceMessage.Author][sourceMessage.SeqNumber]
 	if msgState == nil {
 		msgState = newMessageState()
-		p.messagesLog[msgData.Author][msgData.SeqNumber] = msgState
+		p.messagesLog[sourceMessage.Author][sourceMessage.SeqNumber] = msgState
 	}
 	return msgState
 }
@@ -104,7 +104,7 @@ func (p *Process) initMessageState(msgData *messages.MessageData) *messageState 
 func (p *Process) sendMessage(
 	context actor.SenderContext,
 	to *actor.PID,
-	message *messages.BrachaMessage) {
+	message *messages.BrachaProtocolMessage) {
 	message.Stamp = p.messageCounter
 
 	context.RequestWithCustomSender(to, message, p.actorPid)
@@ -113,7 +113,7 @@ func (p *Process) sendMessage(
 	p.messageCounter++
 }
 
-func (p *Process) broadcast(context actor.SenderContext, message *messages.BrachaMessage) {
+func (p *Process) broadcast(context actor.SenderContext, message *messages.BrachaProtocolMessage) {
 	for _, pid := range p.actorPids {
 		p.sendMessage(context, pid, message)
 	}
@@ -121,36 +121,37 @@ func (p *Process) broadcast(context actor.SenderContext, message *messages.Brach
 
 func (p *Process) broadcastEcho(
 	context actor.SenderContext,
-	msgData *messages.MessageData,
+	sourceMessage *messages.SourceMessage,
 	msgState *messageState) {
 	p.broadcast(
 		context,
-		&messages.BrachaMessage{
-			Stage:       messages.BrachaMessage_ECHO,
-			MessageData: msgData,
+		&messages.BrachaProtocolMessage{
+			Stage:         messages.BrachaProtocolMessage_ECHO,
+			SourceMessage: sourceMessage,
 		})
 	msgState.stage = SentEcho
 }
 
 func (p *Process) broadcastReady(
 	context actor.SenderContext,
-	msgData *messages.MessageData,
+	sourceMessage *messages.SourceMessage,
 	msgState *messageState) {
 	p.broadcast(
 		context,
-		&messages.BrachaMessage{
-			Stage:       messages.BrachaMessage_READY,
-			MessageData: msgData,
+		&messages.BrachaProtocolMessage{
+			Stage:         messages.BrachaProtocolMessage_READY,
+			SourceMessage: sourceMessage,
 		})
 	msgState.stage = SentReady
 }
 
-func (p *Process) deliver(msgData *messages.MessageData) {
-	p.acceptedMessages[msgData.Author][msgData.SeqNumber] = protocols.ValueType(msgData.Value)
-	messagesReceived := p.messagesLog[msgData.Author][msgData.SeqNumber].receivedMessagesCnt
-	delete(p.messagesLog[msgData.Author], msgData.SeqNumber)
+func (p *Process) deliver(sourceMessage *messages.SourceMessage) {
+	p.acceptedMessages[sourceMessage.Author][sourceMessage.SeqNumber] =
+		protocols.ValueType(sourceMessage.Value)
+	messagesReceived := p.messagesLog[sourceMessage.Author][sourceMessage.SeqNumber].receivedMessagesCnt
+	delete(p.messagesLog[sourceMessage.Author], sourceMessage.SeqNumber)
 
-	p.logger.OnAccept(msgData, messagesReceived)
+	p.logger.OnAccept(sourceMessage, messagesReceived)
 }
 
 func (p *Process) Receive(context actor.Context) {
@@ -163,31 +164,31 @@ func (p *Process) Receive(context actor.Context) {
 			TransactionsToSendOut: msg.Transactions,
 		}
 		p.transactionManager.SendOutTransaction(context, p)
-	case *messages.BrachaMessage:
-		msg := message.(*messages.BrachaMessage)
-		msgData := msg.GetMessageData()
-		value := protocols.ValueType(msgData.Value)
+	case *messages.BrachaProtocolMessage:
+		msg := message.(*messages.BrachaProtocolMessage)
+		sourceMessage := msg.SourceMessage
+		value := protocols.ValueType(sourceMessage.Value)
 
 		senderPid := utils.MakeCustomPid(context.Sender())
 		p.logger.OnMessageReceived(senderPid, msg.Stamp)
 
-		acceptedValue, accepted := p.acceptedMessages[msgData.Author][msgData.SeqNumber]
+		acceptedValue, accepted := p.acceptedMessages[sourceMessage.Author][sourceMessage.SeqNumber]
 		if accepted {
 			if acceptedValue != value {
-				p.logger.OnAttack(msgData, int64(acceptedValue))
+				p.logger.OnAttack(sourceMessage, int64(acceptedValue))
 			}
 			return
 		}
 
-		msgState := p.initMessageState(msgData)
+		msgState := p.initMessageState(sourceMessage)
 		msgState.receivedMessagesCnt++
 
 		switch msg.Stage {
-		case messages.BrachaMessage_INITIAL:
+		case messages.BrachaProtocolMessage_INITIAL:
 			if msgState.stage == Init {
-				p.broadcastEcho(context, msgData, msgState)
+				p.broadcastEcho(context, sourceMessage, msgState)
 			}
-		case messages.BrachaMessage_ECHO:
+		case messages.BrachaProtocolMessage_ECHO:
 			if msgState.stage == SentReady || msgState.receivedEcho[senderPid] {
 				return
 			}
@@ -196,13 +197,13 @@ func (p *Process) Receive(context actor.Context) {
 
 			if msgState.echoCount[value] >= p.messagesForEcho {
 				if msgState.stage == Init {
-					p.broadcastEcho(context, msgData, msgState)
+					p.broadcastEcho(context, sourceMessage, msgState)
 				}
 				if msgState.stage == SentEcho {
-					p.broadcastReady(context, msgData, msgState)
+					p.broadcastReady(context, sourceMessage, msgState)
 				}
 			}
-		case messages.BrachaMessage_READY:
+		case messages.BrachaProtocolMessage_READY:
 			if msgState.receivedReady[senderPid] {
 				return
 			}
@@ -211,23 +212,23 @@ func (p *Process) Receive(context actor.Context) {
 
 			if msgState.readyCount[value] >= p.messagesForReady {
 				if msgState.stage == Init {
-					p.broadcastEcho(context, msgData, msgState)
+					p.broadcastEcho(context, sourceMessage, msgState)
 				}
 				if msgState.stage == SentEcho {
-					p.broadcastReady(context, msgData, msgState)
+					p.broadcastReady(context, sourceMessage, msgState)
 				}
 			}
 			if msgState.readyCount[value] >= p.messagesForAccept {
-				p.deliver(msgData)
+				p.deliver(sourceMessage)
 			}
 		}
 	}
 }
 
 func (p *Process) Broadcast(context actor.SenderContext, value int64) {
-	message := &messages.BrachaMessage{
-		Stage: messages.BrachaMessage_INITIAL,
-		MessageData: &messages.MessageData{
+	message := &messages.BrachaProtocolMessage{
+		Stage: messages.BrachaProtocolMessage_INITIAL,
+		SourceMessage: &messages.SourceMessage{
 			Author:    p.pid,
 			SeqNumber: p.transactionCounter,
 			Value:     value,
