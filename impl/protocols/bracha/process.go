@@ -53,12 +53,12 @@ type Process struct {
 	transactionCounter int64
 	messageCounter     int64
 
-	acceptedMessages map[string]map[int64]protocols.ValueType
-	messagesLog      map[string]map[int64]*messageState
+	deliveredMessages map[string]map[int64]protocols.ValueType
+	messagesLog       map[string]map[int64]*messageState
 
-	messagesForEcho   int
-	messagesForReady  int
-	messagesForAccept int
+	messagesForEcho     int
+	messagesForReady    int
+	messagesForDelivery int
 
 	transactionManager *manager.TransactionManager
 	logger             *eventlogger.EventLogger
@@ -78,14 +78,14 @@ func (p *Process) InitProcess(
 
 	p.messagesForEcho = int(math.Ceil(float64(len(actorPids)+parameters.FaultyProcesses+1) / float64(2)))
 	p.messagesForReady = parameters.FaultyProcesses + 1
-	p.messagesForAccept = 2*parameters.FaultyProcesses + 1
+	p.messagesForDelivery = 2*parameters.FaultyProcesses + 1
 
-	p.acceptedMessages = make(map[string]map[int64]protocols.ValueType)
+	p.deliveredMessages = make(map[string]map[int64]protocols.ValueType)
 	p.messagesLog = make(map[string]map[int64]*messageState)
 	for _, currActorPid := range actorPids {
 		pid := utils.MakeCustomPid(currActorPid)
 		p.actorPids[pid] = currActorPid
-		p.acceptedMessages[pid] = make(map[int64]protocols.ValueType)
+		p.deliveredMessages[pid] = make(map[int64]protocols.ValueType)
 		p.messagesLog[pid] = make(map[int64]*messageState)
 	}
 
@@ -145,13 +145,26 @@ func (p *Process) broadcastReady(
 	msgState.stage = SentReady
 }
 
-func (p *Process) deliver(sourceMessage *messages.SourceMessage) {
-	p.acceptedMessages[sourceMessage.Author][sourceMessage.SeqNumber] =
-		protocols.ValueType(sourceMessage.Value)
-	messagesReceived := p.messagesLog[sourceMessage.Author][sourceMessage.SeqNumber].receivedMessagesCnt
-	delete(p.messagesLog[sourceMessage.Author], sourceMessage.SeqNumber)
+func (p *Process) delivered(sourceMessage *messages.SourceMessage) bool {
+	deliveredValue, delivered :=
+		p.deliveredMessages[sourceMessage.Author][sourceMessage.SeqNumber]
 
-	p.logger.OnAccept(sourceMessage, messagesReceived)
+	value := protocols.ValueType(sourceMessage.Value)
+	if delivered && deliveredValue != value {
+		p.logger.OnAttack(sourceMessage, int64(deliveredValue))
+	}
+
+	return delivered
+}
+
+func (p *Process) deliver(sourceMessage *messages.SourceMessage) {
+	p.deliveredMessages[sourceMessage.Author][sourceMessage.SeqNumber] =
+		protocols.ValueType(sourceMessage.Value)
+	messagesReceived :=
+		p.messagesLog[sourceMessage.Author][sourceMessage.SeqNumber].receivedMessagesCnt
+
+	delete(p.messagesLog[sourceMessage.Author], sourceMessage.SeqNumber)
+	p.logger.OnDeliver(sourceMessage, messagesReceived)
 }
 
 func (p *Process) Receive(context actor.Context) {
@@ -172,11 +185,7 @@ func (p *Process) Receive(context actor.Context) {
 		senderPid := utils.MakeCustomPid(context.Sender())
 		p.logger.OnMessageReceived(senderPid, msg.Stamp)
 
-		acceptedValue, accepted := p.acceptedMessages[sourceMessage.Author][sourceMessage.SeqNumber]
-		if accepted {
-			if acceptedValue != value {
-				p.logger.OnAttack(sourceMessage, int64(acceptedValue))
-			}
+		if p.delivered(sourceMessage) {
 			return
 		}
 
@@ -218,7 +227,7 @@ func (p *Process) Receive(context actor.Context) {
 					p.broadcastReady(context, sourceMessage, msgState)
 				}
 			}
-			if msgState.readyCount[value] >= p.messagesForAccept {
+			if msgState.readyCount[value] >= p.messagesForDelivery {
 				p.deliver(sourceMessage)
 			}
 		}

@@ -110,7 +110,6 @@ func main() {
 		currIp := strings.Join(ipBytesAsStr, ".")
 		if i == *processIndex {
 			processIp = currIp
-			fmt.Println(processIp)
 			//processPort = port
 		}
 		pids[i] = actor.NewPID(joinWithPort(currIp, config.Port), "pid")

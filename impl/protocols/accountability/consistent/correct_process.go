@@ -40,8 +40,8 @@ type CorrectProcess struct {
 	transactionCounter int64
 	messageCounter     int64
 
-	acceptedMessages map[string]map[int64]protocols.ValueType
-	messagesLog      map[string]map[int64]*messageState
+	deliveredMessages map[string]map[int64]protocols.ValueType
+	messagesLog       map[string]map[int64]*messageState
 
 	witnessThreshold int
 
@@ -64,7 +64,7 @@ func (p *CorrectProcess) InitProcess(
 	p.transactionCounter = 0
 	p.messageCounter = 0
 
-	p.acceptedMessages = make(map[string]map[int64]protocols.ValueType)
+	p.deliveredMessages = make(map[string]map[int64]protocols.ValueType)
 	p.messagesLog = make(map[string]map[int64]*messageState)
 
 	p.witnessThreshold = parameters.WitnessThreshold
@@ -74,7 +74,7 @@ func (p *CorrectProcess) InitProcess(
 		pid := utils.MakeCustomPid(currActorPid)
 		pids[i] = pid
 		p.actorPids[pid] = currActorPid
-		p.acceptedMessages[pid] = make(map[int64]protocols.ValueType)
+		p.deliveredMessages[pid] = make(map[int64]protocols.ValueType)
 		p.messagesLog[pid] = make(map[int64]*messageState)
 	}
 
@@ -131,7 +131,7 @@ func (p *CorrectProcess) broadcast(
 }
 
 func (p *CorrectProcess) deliver(sourceMessage *messages.SourceMessage) {
-	p.acceptedMessages[sourceMessage.Author][sourceMessage.SeqNumber] =
+	p.deliveredMessages[sourceMessage.Author][sourceMessage.SeqNumber] =
 		protocols.ValueType(sourceMessage.Value)
 	p.historyHash.Insert(
 		utils.TransactionToBytes(sourceMessage.Author, sourceMessage.SeqNumber))
@@ -140,7 +140,7 @@ func (p *CorrectProcess) deliver(sourceMessage *messages.SourceMessage) {
 		p.messagesLog[sourceMessage.Author][sourceMessage.SeqNumber].receivedMessagesCnt
 
 	delete(p.messagesLog[sourceMessage.Author], sourceMessage.SeqNumber)
-	p.logger.OnAccept(sourceMessage, messagesReceived)
+	p.logger.OnDeliver(sourceMessage, messagesReceived)
 	p.logger.OnHistoryHashUpdate(sourceMessage, p.historyHash)
 }
 
@@ -151,10 +151,11 @@ func (p *CorrectProcess) verify(
 	value := protocols.ValueType(sourceMessage.Value)
 	msgState := p.messagesLog[sourceMessage.Author][sourceMessage.SeqNumber]
 
-	acceptedValue, accepted := p.acceptedMessages[sourceMessage.Author][sourceMessage.SeqNumber]
-	if accepted {
-		if acceptedValue != value {
-			p.logger.OnAttack(sourceMessage, int64(acceptedValue))
+	deliveredValue, delivered :=
+		p.deliveredMessages[sourceMessage.Author][sourceMessage.SeqNumber]
+	if delivered {
+		if deliveredValue != value {
+			p.logger.OnAttack(sourceMessage, int64(deliveredValue))
 			return false
 		}
 	} else if msgState != nil {

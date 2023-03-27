@@ -24,32 +24,44 @@ func (el *EventLogger) OnTransactionInit(seqNumber int64) {
 		el.pid, seqNumber, utils.GetNow())
 }
 
-func (el *EventLogger) OnAccept(
+func (el *EventLogger) OnDeliver(
 	sourceMessage *messages.SourceMessage, messagesReceived int) {
 	el.logger.Printf(
-		"Accepted transaction {%s;%d}. Value: %d, messages received: %d, timestamp: %d\n",
-		sourceMessage.Author, sourceMessage.SeqNumber, sourceMessage.Value, messagesReceived, utils.GetNow())
+		"Delivered transaction {%s;%d}. Value: %d, messages received: %d, timestamp: %d\n",
+		sourceMessage.Author,
+		sourceMessage.SeqNumber,
+		sourceMessage.Value,
+		messagesReceived,
+		utils.GetNow())
 }
 
 func (el *EventLogger) OnHistoryHashUpdate(
 	sourceMessage *messages.SourceMessage, historyHash *hashing.HistoryHash) {
 	el.logger.Printf(
-		"History hash after accepting transaction {%s;%d} is %s\n",
+		"History hash after delivering transaction {%s;%d} is %s\n",
 		sourceMessage.Author, sourceMessage.SeqNumber, historyHash.ToString())
 }
 
 func (el *EventLogger) OnAttack(
 	sourceMessage *messages.SourceMessage, committedValue int64) {
 	el.logger.Printf(
-		"Detected a duplicated seq number attack. " +
+		"Detected a duplicated seq number attack. "+
 			"Transaction: {%s;%d}, received value: %d, committed value: %d, timestamp: %d\n",
-		sourceMessage.Author, sourceMessage.SeqNumber, sourceMessage.Value, committedValue, utils.GetNow())
+		sourceMessage.Author,
+		sourceMessage.SeqNumber,
+		sourceMessage.Value,
+		committedValue,
+		utils.GetNow())
 }
 
 func (el *EventLogger) OnMessageSent(msgId int64) {
-	el.logger.Printf("Sent message: {%s;%d}, timestamp: %d\n", el.pid, msgId, utils.GetNow())
+	el.logger.Printf(
+		"Sent message: {%s;%d}, timestamp: %d\n",
+		el.pid, msgId, utils.GetNow())
 }
 
 func (el *EventLogger) OnMessageReceived(senderPid string, msgId int64) {
-	el.logger.Printf("Received message: {%s;%d}, timestamp: %d\n", senderPid, msgId, utils.GetNow())
+	el.logger.Printf(
+		"Received message: {%s;%d}, timestamp: %d\n",
+		senderPid, msgId, utils.GetNow())
 }
