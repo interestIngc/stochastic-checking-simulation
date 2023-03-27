@@ -5,6 +5,7 @@ import (
 	"log"
 	"stochastic-checking-simulation/impl/messages"
 	"stochastic-checking-simulation/impl/parameters"
+	"stochastic-checking-simulation/impl/protocols"
 	"stochastic-checking-simulation/impl/utils"
 )
 
@@ -16,9 +17,11 @@ func (p *FaultyProcess) InitProcess(
 	currPid *actor.PID,
 	pids []*actor.PID,
 	parameters *parameters.Parameters,
-	logger *log.Logger) {
+	logger *log.Logger,
+	transactionManager *protocols.TransactionManager,
+) {
 	p.process = &CorrectProcess{}
-	p.process.InitProcess(currPid, pids, parameters, logger)
+	p.process.InitProcess(currPid, pids, parameters, logger, transactionManager)
 }
 
 func (p *FaultyProcess) Receive(context actor.Context) {

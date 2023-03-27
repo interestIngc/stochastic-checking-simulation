@@ -7,7 +7,6 @@ import (
 	"log"
 	"math/rand"
 	"stochastic-checking-simulation/impl/eventlogger"
-	"stochastic-checking-simulation/impl/manager"
 	"stochastic-checking-simulation/impl/messages"
 	"stochastic-checking-simulation/impl/parameters"
 	"stochastic-checking-simulation/impl/protocols"
@@ -86,8 +85,8 @@ type Process struct {
 	deliverySampleSize int
 	deliveryThreshold  int
 
-	transactionManager *manager.TransactionManager
 	logger             *eventlogger.EventLogger
+	transactionManager *protocols.TransactionManager
 }
 
 func (p *Process) getRandomPid(random *rand.Rand) string {
@@ -146,7 +145,9 @@ func (p *Process) InitProcess(
 	actorPid *actor.PID,
 	actorPids []*actor.PID,
 	parameters *parameters.Parameters,
-	logger *log.Logger) {
+	logger *log.Logger,
+	transactionManager *protocols.TransactionManager,
+) {
 	p.actorPid = actorPid
 	p.pid = utils.MakeCustomPid(actorPid)
 	p.pids = make([]string, len(actorPids))
@@ -175,6 +176,7 @@ func (p *Process) InitProcess(
 	p.deliveryThreshold = parameters.DeliveryThreshold
 
 	p.logger = eventlogger.InitEventLogger(p.pid, logger)
+	p.transactionManager = transactionManager
 }
 
 func (p *Process) initMessageState(
@@ -315,12 +317,7 @@ func (p *Process) Receive(context actor.Context) {
 	message := context.Message()
 	switch message.(type) {
 	case *messages.Simulate:
-		msg := message.(*messages.Simulate)
-
-		p.transactionManager = &manager.TransactionManager{
-			TransactionsToSendOut: msg.Transactions,
-		}
-		p.transactionManager.SendOutTransaction(context, p)
+		p.transactionManager.Simulate(context, p)
 	case *messages.ScalableProtocolMessage:
 		msg := message.(*messages.ScalableProtocolMessage)
 		sourceMessage := msg.SourceMessage

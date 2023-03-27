@@ -63,10 +63,22 @@ func main() {
 
 	logger := log.Default()
 	for i := 0; i < faultyProcessesCount; i++ {
-		faultyProcesses[i].InitProcess(pids[i], pids, parameters, logger)
+		faultyProcesses[i].InitProcess(
+			pids[i],
+			pids,
+			parameters,
+			logger,
+			protocols.NewTransactionManager(1, 1),
+		)
 	}
 	for i := 0; i < processCount-faultyProcessesCount; i++ {
-		correctProcesses[i].InitProcess(pids[i+faultyProcessesCount], pids, parameters, logger)
+		correctProcesses[i].InitProcess(
+			pids[i+faultyProcessesCount],
+			pids,
+			parameters,
+			logger,
+			protocols.NewTransactionManager(1, 1),
+		)
 	}
 
 	faultyProcesses[0].FaultyBroadcast(system.Root, 0, 5)

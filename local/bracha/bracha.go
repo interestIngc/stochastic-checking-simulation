@@ -6,6 +6,7 @@ import (
 	"github.com/asynkron/protoactor-go/remote"
 	"log"
 	"stochastic-checking-simulation/impl/parameters"
+	"stochastic-checking-simulation/impl/protocols"
 	"stochastic-checking-simulation/impl/protocols/bracha"
 )
 
@@ -36,7 +37,13 @@ func main() {
 
 	logger := log.Default()
 	for i := 0; i < processCount; i++ {
-		processes[i].InitProcess(pids[i], pids, parameters, logger)
+		processes[i].InitProcess(
+			pids[i],
+			pids,
+			parameters,
+			logger,
+			protocols.NewTransactionManager(1, 1),
+		)
 	}
 
 	processes[0].Broadcast(system.Root, 5)

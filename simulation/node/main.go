@@ -23,14 +23,18 @@ import (
 	"strings"
 )
 
-var (
-	inputFile = flag.String("input_file", "", "path to the input file in json format")
-	logFile   = flag.String("log_file", "",
-		"path to the file where to save logs produced by the process")
-	processIndex = flag.Int("i", 0, "index of the current process in the system")
-)
-
 const Bytes = 4
+
+var (
+	inputFile = flag.String("input_file", "", "Path to the input file in json format")
+	logFile   = flag.String("log_file", "",
+		"Path to the file where to save logs produced by the process")
+	processIndex = flag.Int("i", 0, "Index of the current process in the system")
+	transactions = flag.Int("transactions", 5,
+		"number of transactions for the process to broadcast")
+	transactionInitTimeoutNs = flag.Int("transaction_init_timeout_ns", 10000000,
+		"timeout the process should wait before initialising a new transaction")
+)
 
 type Input struct {
 	Protocol   string                `json:"protocol"`
@@ -151,7 +155,13 @@ func main() {
 		utils.ExitWithError(logger, fmt.Sprintf("Error while spawning the process happened: %s", e))
 	}
 
-	process.InitProcess(currPid, pids, &input.Parameters, logger)
+	process.InitProcess(
+		currPid,
+		pids,
+		&input.Parameters,
+		logger,
+		protocols.NewTransactionManager(*transactions, *transactionInitTimeoutNs),
+	)
 	logger.Printf("%s: started\n", utils.MakeCustomPid(currPid))
 
 	system.Root.RequestWithCustomSender(mainServer, &messages.Started{}, currPid)

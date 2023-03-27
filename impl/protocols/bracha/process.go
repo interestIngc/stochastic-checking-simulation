@@ -5,7 +5,6 @@ import (
 	"log"
 	"math"
 	"stochastic-checking-simulation/impl/eventlogger"
-	"stochastic-checking-simulation/impl/manager"
 	"stochastic-checking-simulation/impl/messages"
 	"stochastic-checking-simulation/impl/parameters"
 	"stochastic-checking-simulation/impl/protocols"
@@ -60,15 +59,17 @@ type Process struct {
 	messagesForReady    int
 	messagesForDelivery int
 
-	transactionManager *manager.TransactionManager
 	logger             *eventlogger.EventLogger
+	transactionManager *protocols.TransactionManager
 }
 
 func (p *Process) InitProcess(
 	actorPid *actor.PID,
 	actorPids []*actor.PID,
 	parameters *parameters.Parameters,
-	logger *log.Logger) {
+	logger *log.Logger,
+	transactionManager *protocols.TransactionManager,
+) {
 	p.actorPid = actorPid
 	p.pid = utils.MakeCustomPid(actorPid)
 	p.actorPids = make(map[string]*actor.PID)
@@ -90,6 +91,7 @@ func (p *Process) InitProcess(
 	}
 
 	p.logger = eventlogger.InitEventLogger(p.pid, logger)
+	p.transactionManager = transactionManager
 }
 
 func (p *Process) initMessageState(sourceMessage *messages.SourceMessage) *messageState {
@@ -171,12 +173,7 @@ func (p *Process) Receive(context actor.Context) {
 	message := context.Message()
 	switch message.(type) {
 	case *messages.Simulate:
-		msg := message.(*messages.Simulate)
-
-		p.transactionManager = &manager.TransactionManager{
-			TransactionsToSendOut: msg.Transactions,
-		}
-		p.transactionManager.SendOutTransaction(context, p)
+		p.transactionManager.Simulate(context, p)
 	case *messages.BrachaProtocolMessage:
 		msg := message.(*messages.BrachaProtocolMessage)
 		sourceMessage := msg.SourceMessage
