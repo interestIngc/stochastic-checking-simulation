@@ -10,16 +10,14 @@ import (
 type MainServer struct {
 	currPid          *actor.PID
 	processCount     int
-	times            int
 	startedProcesses *actor.PIDSet
 
 	logger *log.Logger
 }
 
-func (ms *MainServer) InitMainServer(currPid *actor.PID, processCount int, times int, logger *log.Logger) {
+func (ms *MainServer) InitMainServer(currPid *actor.PID, processCount int, logger *log.Logger) {
 	ms.currPid = currPid
 	ms.processCount = processCount
-	ms.times = times
 	ms.startedProcesses = actor.NewPIDSet()
 	ms.logger = logger
 }
@@ -28,9 +26,7 @@ func (ms *MainServer) simulate(context actor.SenderContext) {
 	for _, pid := range ms.startedProcesses.Values() {
 		context.RequestWithCustomSender(
 			pid,
-			&messages.Simulate{
-				Transactions: int64(ms.times),
-			},
+			&messages.Simulate{},
 			ms.currPid)
 	}
 }

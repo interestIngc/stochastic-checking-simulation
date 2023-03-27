@@ -10,7 +10,6 @@ import (
 	"io"
 	"log"
 	"os"
-	"stochastic-checking-simulation/config"
 	"stochastic-checking-simulation/impl/messages"
 	"stochastic-checking-simulation/impl/parameters"
 	"stochastic-checking-simulation/impl/protocols"
@@ -34,6 +33,9 @@ var (
 		"number of transactions for the process to broadcast")
 	transactionInitTimeoutNs = flag.Int("transaction_init_timeout_ns", 10000000,
 		"timeout the process should wait before initialising a new transaction")
+	baseIpAddress = flag.String("base_ip", "10.0.0.0",
+		"Address of the main server. Ip addresses for nodes are assigned by incrementing base_ip n times")
+	port         = flag.Int("port", 5001, "Port on which node should be started")
 )
 
 type Input struct {
@@ -75,7 +77,7 @@ func main() {
 
 	ipBytes := make([]int, Bytes)
 
-	for i, currByte := range strings.Split(config.BaseIpAddress, ".") {
+	for i, currByte := range strings.Split(*baseIpAddress, ".") {
 		ipBytes[i], e = strconv.Atoi(currByte)
 		if e != nil {
 			utils.ExitWithError(logger, fmt.Sprintf("Byte %d in base ip address is invalid", i))
@@ -89,10 +91,10 @@ func main() {
 	//var processPort int
 	pids := make([]*actor.PID, processCount)
 
-	//port := config.Port
+	//currPort := *port
 
 	for i := 0; i < processCount; i++ {
-		//port++
+		//currPort++
 		leftByteInd := Bytes - 1
 		for ; leftByteInd >= 0 && ipBytes[leftByteInd] == 255; leftByteInd-- {
 		}
@@ -114,13 +116,13 @@ func main() {
 		currIp := strings.Join(ipBytesAsStr, ".")
 		if i == *processIndex {
 			processIp = currIp
-			//processPort = port
+			//processPort = currPort
 		}
-		pids[i] = actor.NewPID(joinWithPort(currIp, config.Port), "pid")
-		//pids[i] = actor.NewPID(joinWithPort(config.BaseIpAddress, port), "pid")
+		pids[i] = actor.NewPID(joinWithPort(currIp, *port), "pid")
+		//pids[i] = actor.NewPID(joinWithPort(*baseIpAddress, currPort), "pid")
 	}
 
-	mainServer := actor.NewPID(joinWithPort(config.BaseIpAddress, config.Port), "mainserver")
+	mainServer := actor.NewPID(joinWithPort(*baseIpAddress, *port), "mainserver")
 
 	var process protocols.Process
 
@@ -138,8 +140,8 @@ func main() {
 	}
 
 	system := actor.NewActorSystem()
-	remoteConfig := remote.Configure(processIp, config.Port)
-	//remoteConfig := remote.Configure(config.BaseIpAddress, processPort)
+	remoteConfig := remote.Configure(processIp, *port)
+	//remoteConfig := remote.Configure(*baseIpAddress, processPort)
 	remoter := remote.NewRemote(system, remoteConfig)
 	remoter.Start()
 

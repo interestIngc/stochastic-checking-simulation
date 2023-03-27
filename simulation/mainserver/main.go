@@ -7,17 +7,17 @@ import (
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/remote"
 	"log"
-	"stochastic-checking-simulation/config"
 	"stochastic-checking-simulation/impl/utils"
 )
 
 var (
-	processCount = flag.Int("n", 0, "number of processes in the system (excluding the main server)")
-	times        = flag.Int("times", 5, "number of transactions for each process to broadcast")
+	processCount = flag.Int("n", 0, "Number of processes in the system (excluding the main server)")
 	logFile      = flag.String(
 		"log_file",
 		"",
-		"path to the file where to save logs produced by the main server")
+		"Path to the file where to save logs produced by the main server")
+	baseIpAddress = flag.String("base_ip", "10.0.0.0", "Address of the main server")
+	port          = flag.Int("port", 5001, "Port on which the main server should be started")
 )
 
 func main() {
@@ -27,7 +27,7 @@ func main() {
 	logger := log.New(f, "", log.LstdFlags)
 
 	system := actor.NewActorSystem()
-	remoteConfig := remote.Configure(config.BaseIpAddress, config.Port)
+	remoteConfig := remote.Configure(*baseIpAddress, *port)
 	remoter := remote.NewRemote(system, remoteConfig)
 	remoter.Start()
 
@@ -43,8 +43,8 @@ func main() {
 		utils.ExitWithError(logger, fmt.Sprintf("Could not start the main server: %s\n", e))
 	}
 
-	server.InitMainServer(pid, *processCount, *times, logger)
-	logger.Printf("Main server started at: %s:%d\n", config.BaseIpAddress, config.Port)
+	server.InitMainServer(pid, *processCount, logger)
+	logger.Printf("Main server started at %s:%d\n", *baseIpAddress, *port)
 
 	_, _ = console.ReadLine()
 }
