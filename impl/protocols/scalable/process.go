@@ -229,7 +229,7 @@ func (p *Process) sendMessage(
 	message *messages.ScalableProtocolMessage) {
 	message.Stamp = p.messageCounter
 
-	context.RequestWithCustomSender(to, message, p.actorPid)
+	context.RequestWithCustomSender(to, message.Copy(), p.actorPid)
 
 	p.logger.OnMessageSent(p.messageCounter)
 	p.messageCounter++

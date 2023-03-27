@@ -116,7 +116,7 @@ func (p *CorrectProcess) sendMessage(
 	message *messages.ConsistentProtocolMessage) {
 	message.Stamp = p.messageCounter
 
-	context.RequestWithCustomSender(to, message, p.actorPid)
+	context.RequestWithCustomSender(to, message.Copy(), p.actorPid)
 
 	p.logger.OnMessageSent(p.messageCounter)
 	p.messageCounter++
