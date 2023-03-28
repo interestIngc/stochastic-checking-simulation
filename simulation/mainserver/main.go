@@ -16,8 +16,8 @@ var (
 		"log_file",
 		"",
 		"Path to the file where to save logs produced by the main server")
-	baseIpAddress = flag.String("base_ip", "10.0.0.0", "Address of the main server")
-	port          = flag.Int("port", 5001, "Port on which the main server should be started")
+	ipAddress = flag.String("ip", "10.0.0.0", "Ip address of the main server")
+	port      = flag.Int("port", 5001, "Port on which the main server should be started")
 )
 
 func main() {
@@ -27,7 +27,7 @@ func main() {
 	logger := log.New(f, "", log.LstdFlags)
 
 	system := actor.NewActorSystem()
-	remoteConfig := remote.Configure(*baseIpAddress, *port)
+	remoteConfig := remote.Configure(*ipAddress, *port)
 	remoter := remote.NewRemote(system, remoteConfig)
 	remoter.Start()
 
@@ -44,7 +44,7 @@ func main() {
 	}
 
 	server.InitMainServer(pid, *processCount, logger)
-	logger.Printf("Main server started at %s:%d\n", *baseIpAddress, *port)
+	logger.Printf("Main server started at %s:%d\n", *ipAddress, *port)
 
 	_, _ = console.ReadLine()
 }

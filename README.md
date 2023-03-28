@@ -3,30 +3,38 @@
 ## Command to start the main server (must be called before starting nodes)
 
 ```
-go run simulation/mainserver/*.go --n @{N} --times @{Times} --log_file @{LogFile}
+go run simulation/mainserver/*.go --n @{N} --log_file @{LogFile} --ip @{Ip} --port @{Port}
 ```
 
 ### Where
 @{N} - number of processes in the system (excluding the main server)  
-@{Times} - number of transactions for each process to broadcast, defaults to 5  
-@{LogFile} - path to the file where to save logs produced by the mainserver
+@{LogFile} - path to the file where to save logs produced by the main server  
+@{Ip} - ip address of the main server, defaults to 10.0.0.0  
+@{Port} - Port on which the main server should be started, defaults to 5001  
 
 ### Example command
 
 ```
-go run simulation/mainserver/*.go --n 2 --times 3 --log_file mainserver.txt
+go run simulation/mainserver/*.go --n 2 --log_file mainserver.txt --ip 127.0.0.1 --port 8080
 ```
 
 ## Command to start a node:
 
 ```
-go run simulation/node/main.go --input_file @{InputFile} -i @{I} --log_file @{LogFile}
+go run simulation/node/main.go --input_file @{InputFile} --log_file @{LogFile} --i @{I} \
+--transactions @{Transactions} --transaction_init_timeout_ns @{TransactionInitTimeoutNs} \
+--base_ip @{BaseIp} --port @{Port}
 ```
 
 ### Where
-@{I} - index of the current process in the system from 0 to @{N} - 1  
 @{LogFile} - path to the file where to save logs produced by the process  
-@{InputFile} - path to the input file in json format.
+@{InputFile} - path to the input file in json format  
+@{I} - index of the current process in the system from 0 to @{N} - 1  
+@{Transactions} - number of transactions for the process to broadcast, defaults to 5  
+@{TransactionInitTimeoutNs} - timeout the process should wait before initialising a new transaction, defaults to 10000000  
+@{BaseIp} - address of the main server, defaults to 10.0.0.0. 
+Ip addresses for nodes are assigned by incrementing base_ip n times  
+@{Port} - port on which the node should be started, defaults to 5001  
 
 #### Description of the input file
 
@@ -87,4 +95,11 @@ Used only in the reliable accountability protocol
     "number_of_bins": 32
   }
 }
+```
+
+### Example command
+
+```
+go run simulation/node/main.go --input_file input.json --log_file process0.txt --i 0 \
+--base_ip 127.0.0.1 --port 8080 --transactions 10 --transaction_init_timeout_ns 1000000
 ```
