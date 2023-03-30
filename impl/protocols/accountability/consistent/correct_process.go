@@ -106,8 +106,9 @@ func (p *CorrectProcess) initMessageState(
 	msgState := newMessageState()
 	msgState.witnessSet, _ =
 		p.wSelector.GetWitnessSet(sourceMessage.Author, sourceMessage.SeqNumber, p.historyHash)
-
 	p.messagesLog[sourceMessage.Author][sourceMessage.SeqNumber] = msgState
+
+	p.logger.OnWitnessSetSelected("own", sourceMessage, msgState.witnessSet)
 
 	return msgState
 }
@@ -210,16 +211,14 @@ func (p *CorrectProcess) Receive(context actor.Context) {
 }
 
 func (p *CorrectProcess) Broadcast(context actor.SenderContext, value int64) {
-	p.verify(
-		context,
-		p.pid,
-		&messages.SourceMessage{
-			Author:    p.pid,
-			SeqNumber: p.transactionCounter,
-			Value:     value,
-		})
+	sourceMessage := &messages.SourceMessage{
+		Author:    p.pid,
+		SeqNumber: p.transactionCounter,
+		Value:     value,
+	}
+	p.verify(context, p.pid, sourceMessage)
 
-	p.logger.OnTransactionInit(p.transactionCounter)
+	p.logger.OnTransactionInit(sourceMessage)
 
 	p.transactionCounter++
 }

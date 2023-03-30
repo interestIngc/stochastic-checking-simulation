@@ -232,17 +232,18 @@ func (p *Process) Receive(context actor.Context) {
 }
 
 func (p *Process) Broadcast(context actor.SenderContext, value int64) {
+	sourceMessage := &messages.SourceMessage{
+		Author:    p.pid,
+		SeqNumber: p.transactionCounter,
+		Value:     value,
+	}
 	message := &messages.BrachaProtocolMessage{
-		Stage: messages.BrachaProtocolMessage_INITIAL,
-		SourceMessage: &messages.SourceMessage{
-			Author:    p.pid,
-			SeqNumber: p.transactionCounter,
-			Value:     value,
-		},
+		Stage:         messages.BrachaProtocolMessage_INITIAL,
+		SourceMessage: sourceMessage,
 	}
 	p.broadcast(context, message)
 
-	p.logger.OnTransactionInit(p.transactionCounter)
+	p.logger.OnTransactionInit(sourceMessage)
 
 	p.transactionCounter++
 }

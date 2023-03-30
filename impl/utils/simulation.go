@@ -9,7 +9,7 @@ import (
 )
 
 func MakeCustomPid(pid *actor.PID) string {
-	return fmt.Sprintf("Address:%s,Id:%s", pid.Address, pid.Id)
+	return fmt.Sprintf("%s,%s", pid.Address, pid.Id)
 }
 
 func ExitWithError(logger *log.Logger, errorMessage string) {

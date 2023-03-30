@@ -434,7 +434,7 @@ func (p *Process) Broadcast(context actor.SenderContext, value int64) {
 	msgState := p.initMessageState(context, sourceMessage)
 	p.broadcastGossip(context, msgState, sourceMessage)
 
-	p.logger.OnTransactionInit(p.transactionCounter)
+	p.logger.OnTransactionInit(sourceMessage)
 
 	p.transactionCounter++
 }
