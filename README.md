@@ -9,7 +9,7 @@ go run simulation/mainserver/*.go --n @{N} --log_file @{LogFile} --ip @{Ip} --po
 ### Where
 @{N} - number of processes in the system (excluding the main server)  
 @{LogFile} - path to the file where to save logs produced by the main server  
-@{Ip} - ip address of the main server, defaults to 10.0.0.0  
+@{Ip} - ip address of the main server, defaults to 10.0.0.1  
 @{Port} - Port on which the main server should be started, defaults to 5001  
 
 ### Example command
@@ -32,7 +32,7 @@ go run simulation/node/main.go --input_file @{InputFile} --log_file @{LogFile} -
 @{I} - index of the current process in the system from 0 to @{N} - 1  
 @{Transactions} - number of transactions for the process to broadcast, defaults to 5  
 @{TransactionInitTimeoutNs} - timeout the process should wait before initialising a new transaction, defaults to 10000000  
-@{BaseIp} - address of the main server, defaults to 10.0.0.0. 
+@{BaseIp} - address of the main server, defaults to 10.0.0.1. 
 Ip addresses for nodes are assigned by incrementing base_ip n times  
 @{Port} - port on which the node should be started, defaults to 5001  
 

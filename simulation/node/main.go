@@ -33,7 +33,7 @@ var (
 		"number of transactions for the process to broadcast")
 	transactionInitTimeoutNs = flag.Int("transaction_init_timeout_ns", 10000000,
 		"timeout the process should wait before initialising a new transaction")
-	baseIpAddress = flag.String("base_ip", "10.0.0.0",
+	baseIpAddress = flag.String("base_ip", "10.0.0.1",
 		"Address of the main server. Ip addresses for nodes are assigned by incrementing base_ip n times")
 	port         = flag.Int("port", 5001, "Port on which the node should be started")
 )

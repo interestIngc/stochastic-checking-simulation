@@ -16,7 +16,7 @@ var (
 		"log_file",
 		"",
 		"Path to the file where to save logs produced by the main server")
-	ipAddress = flag.String("ip", "10.0.0.0", "Ip address of the main server")
+	ipAddress = flag.String("ip", "10.0.0.1", "Ip address of the main server")
 	port      = flag.Int("port", 5001, "Port on which the main server should be started")
 )
 
