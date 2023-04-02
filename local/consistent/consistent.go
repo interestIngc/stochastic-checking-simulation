@@ -14,6 +14,7 @@ func main() {
 	processCount := 256
 	faultyProcessesCount := 20
 	parameters := &parameters.Parameters{
+		ProcessCount:            processCount,
 		FaultyProcesses:         faultyProcessesCount,
 		MinOwnWitnessSetSize:    16,
 		MinPotWitnessSetSize:    32,

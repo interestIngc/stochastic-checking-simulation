@@ -13,6 +13,7 @@ import (
 func main() {
 	processCount := 256
 	parameters := &parameters.Parameters{
+		ProcessCount:       processCount,
 		GossipSampleSize:   20,
 		EchoSampleSize:     16,
 		EchoThreshold:      10,

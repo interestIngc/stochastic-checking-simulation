@@ -13,13 +13,14 @@ import (
 func main() {
 	processCount := 256
 	parameters := &parameters.Parameters{
+		ProcessCount:            processCount,
 		FaultyProcesses:         20,
 		MinOwnWitnessSetSize:    16,
 		MinPotWitnessSetSize:    32,
 		OwnWitnessSetRadius:     1900.0,
 		PotWitnessSetRadius:     1910.0,
 		WitnessThreshold:        4,
-		RecoverySwitchTimeoutNs: 1000000000,
+		RecoverySwitchTimeoutNs: 1000000,
 		NodeIdSize:              256,
 		NumberOfBins:            32,
 	}

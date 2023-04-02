@@ -13,6 +13,7 @@ import (
 func main() {
 	processCount := 256
 	parameters := &parameters.Parameters{
+		ProcessCount:    processCount,
 		FaultyProcesses: 20,
 	}
 
