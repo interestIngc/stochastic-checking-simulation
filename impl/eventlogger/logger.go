@@ -42,6 +42,12 @@ func (el *EventLogger) OnWitnessSetSelected(
 		wsType, sourceMessage.ToId(), pids)
 }
 
+func (el *EventLogger) OnRecoveryProtocolSwitch(sourceMessage *messages.SourceMessage) {
+	el.logger.Printf(
+		"Switching to the recovery protocol; transaction: %s, timestamp: %d\n",
+		sourceMessage.ToId(), utils.GetNow())
+}
+
 func (el *EventLogger) OnDeliver(
 	sourceMessage *messages.SourceMessage, messagesReceived int) {
 	el.logger.Printf(

@@ -228,6 +228,7 @@ func (p *Process) registerMessage(
 			actor.NewFuture(context.ActorSystem(), p.recoverySwitchTimeoutNs),
 			func(res interface{}, err error) {
 				if !p.delivered(sourceMessage) {
+					p.logger.OnRecoveryProtocolSwitch(sourceMessage)
 					recoveryState := p.initRecoveryMessageState(sourceMessage)
 					p.broadcastRecover(context, sourceMessage, recoveryState)
 				}
@@ -630,7 +631,13 @@ func (p *Process) Broadcast(context actor.SenderContext, value int64) {
 		Value:     value,
 	}
 
-	p.initMessageState(context, sourceMessage)
+	p.sendProtocolMessage(
+		context,
+		p.actorPid,
+		&messages.ReliableProtocolMessage{
+			Stage:         messages.ReliableProtocolMessage_NOTIFY,
+			SourceMessage: sourceMessage,
+		})
 
 	p.logger.OnTransactionInit(sourceMessage)
 
