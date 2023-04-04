@@ -35,7 +35,7 @@ var (
 		"timeout the process should wait before initialising a new transaction")
 	baseIpAddress = flag.String("base_ip", "10.0.0.1",
 		"Address of the main server. Ip addresses for nodes are assigned by incrementing base_ip n times")
-	port         = flag.Int("port", 5001, "Port on which the node should be started")
+	port = flag.Int("port", 5001, "Port on which the node should be started")
 )
 
 type Input struct {
@@ -118,8 +118,8 @@ func main() {
 			processIp = currIp
 			//processPort = currPort
 		}
-		pids[i] = actor.NewPID(joinWithPort(currIp, *port), "pid")
-		//pids[i] = actor.NewPID(joinWithPort(*baseIpAddress, currPort), "pid")
+		pids[i] = actor.NewPID(joinWithPort(currIp, *port), "main")
+		//pids[i] = actor.NewPID(joinWithPort(*baseIpAddress, currPort), "main")
 	}
 
 	mainServer := actor.NewPID(joinWithPort(*baseIpAddress, *port), "mainserver")
