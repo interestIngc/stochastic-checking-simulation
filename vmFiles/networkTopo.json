@@ -1,0 +1,207 @@
+{
+    "networks": {
+        "s0": null,
+        "s1": null,
+        "s2": null,
+        "s3": null,
+        "s4": null,
+        "s5": {
+            "s3": {
+                "bw": 1000,
+                "delay": "147ms",
+                "loss": 0.0028,
+                "max_queue_size": 100000
+            }
+        },
+        "s6": null,
+        "s7": null,
+        "s8": {
+            "s0": {
+                "bw": 1000,
+                "delay": "49ms",
+                "loss": 0.0124,
+                "max_queue_size": 100000
+            },
+            "s4": {
+                "bw": 1000,
+                "delay": "29ms",
+                "loss": 0.0228,
+                "max_queue_size": 100000
+            },
+            "s5": {
+                "bw": 1000,
+                "delay": "60ms",
+                "loss": 0.0042,
+                "max_queue_size": 100000
+            }
+        },
+        "s9": {
+            "s7": {
+                "bw": 1000,
+                "delay": "117ms",
+                "loss": 0.0085,
+                "max_queue_size": 100000
+            }
+        },
+        "s10": {
+            "s1": {
+                "bw": 1000,
+                "delay": "97ms",
+                "loss": 0.0032,
+                "max_queue_size": 100000
+            },
+            "s2": {
+                "bw": 1000,
+                "delay": "117ms",
+                "loss": 0.0048,
+                "max_queue_size": 100000
+            },
+            "s8": {
+                "bw": 1000,
+                "delay": "146ms",
+                "loss": 0.0093,
+                "max_queue_size": 100000
+            }
+        },
+        "s11": null,
+        "s12": {
+            "s6": {
+                "bw": 1000,
+                "delay": "139ms",
+                "loss": 0.0029,
+                "max_queue_size": 100000
+            },
+            "s11": {
+                "bw": 1000,
+                "delay": "24ms",
+                "loss": 0.0007,
+                "max_queue_size": 100000
+            }
+        },
+        "s13": {
+            "s3": {
+                "bw": 1000,
+                "delay": "85ms",
+                "loss": 0.0143,
+                "max_queue_size": 100000
+            }
+        },
+        "s14": null,
+        "s15": {
+            "s7": {
+                "bw": 1000,
+                "delay": "38ms",
+                "loss": 0.0006,
+                "max_queue_size": 100000
+            },
+            "s8": {
+                "bw": 1000,
+                "delay": "34ms",
+                "loss": 0.0006,
+                "max_queue_size": 100000
+            },
+            "s12": {
+                "bw": 1000,
+                "delay": "114ms",
+                "loss": 0.0021,
+                "max_queue_size": 100000
+            },
+            "s14": {
+                "bw": 1000,
+                "delay": "90ms",
+                "loss": 0.0012,
+                "max_queue_size": 100000
+            }
+        }
+    },
+    "peers": {
+        "h0": {
+            "s3": {
+                "bw": 10,
+                "delay": "10ms",
+                "loss": 1,
+                "max_queue_size": 1000
+            }
+        },
+        "h1": {
+            "s0": {
+                "bw": 10,
+                "delay": "10ms",
+                "loss": 1,
+                "max_queue_size": 1000
+            }
+        },
+        "h2": {
+            "s7": {
+                "bw": 10,
+                "delay": "10ms",
+                "loss": 1,
+                "max_queue_size": 1000
+            }
+        },
+        "h3": {
+            "s11": {
+                "bw": 10,
+                "delay": "10ms",
+                "loss": 1,
+                "max_queue_size": 1000
+            }
+        },
+        "h4": {
+            "s14": {
+                "bw": 10,
+                "delay": "10ms",
+                "loss": 1,
+                "max_queue_size": 1000
+            }
+        },
+        "h5": {
+            "s14": {
+                "bw": 10,
+                "delay": "10ms",
+                "loss": 1,
+                "max_queue_size": 1000
+            }
+        },
+        "h6": {
+            "s1": {
+                "bw": 10,
+                "delay": "10ms",
+                "loss": 1,
+                "max_queue_size": 1000
+            }
+        },
+        "h7": {
+            "s0": {
+                "bw": 10,
+                "delay": "10ms",
+                "loss": 1,
+                "max_queue_size": 1000
+            }
+        },
+        "h8": {
+            "s4": {
+                "bw": 10,
+                "delay": "10ms",
+                "loss": 1,
+                "max_queue_size": 1000
+            }
+        },
+        "h9": {
+            "s5": {
+                "bw": 10,
+                "delay": "10ms",
+                "loss": 1,
+                "max_queue_size": 1000
+            }
+        },
+        "h10": {
+            "s3": {
+                "bw": 10,
+                "delay": "10ms",
+                "loss": 1,
+                "max_queue_size": 1000
+            }
+        }
+    }
+}
