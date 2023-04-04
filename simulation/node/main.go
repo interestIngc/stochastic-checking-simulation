@@ -151,7 +151,7 @@ func main() {
 				func() actor.Actor {
 					return process
 				}),
-			"pid",
+			"main",
 		)
 	if e != nil {
 		utils.ExitWithError(logger, fmt.Sprintf("Error while spawning the process happened: %s", e))
@@ -164,7 +164,7 @@ func main() {
 		logger,
 		protocols.NewTransactionManager(*transactions, *transactionInitTimeoutNs),
 	)
-	logger.Printf("%s: started\n", utils.MakeCustomPid(currPid))
+	logger.Printf("Process started: %s, running protocol: %s\n", utils.MakeCustomPid(currPid), input.Protocol)
 
 	system.Root.RequestWithCustomSender(mainServer, &messages.Started{}, currPid)
 

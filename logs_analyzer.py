@@ -1,12 +1,15 @@
+#!/usr/bin/env python3
+
 SENT_MESSAGE = "Sent message"
 RECEIVED_MESSAGE = "Received message"
 TRANSACTION_INIT = "Initialising transaction"
 TRANSACTION_COMMIT = "Delivered transaction"
+WITNESS_SET_SELECTED = "Witness set selected"
+PROCESS_STARTED = "Process started"
+WITNESS_SET_SELECTION = "Witness set selection"
 
-sent_messages = {}
-received_messages = {}
-transaction_inits = {}
-transaction_commit_infos = {}
+RELIABLE_ACCOUNTABILITY = "reliable_accountability"
+CONSISTENT_ACCOUNTABILITY = "consistent_accountability"
 
 
 class TransactionInfo:
@@ -15,32 +18,77 @@ class TransactionInfo:
         self.commit_timestamp = commit_timestamp
 
 
+sent_messages = {}
+received_messages = {}
+transaction_inits = {}
+transaction_commit_infos = {}
+transaction_histories = {}
+transaction_witness_sets = {
+    "own": {},
+    "pot": {}
+}
+protocol = ""
+
 n = int(input())
 
 
+def parse_data_from_logged_line(line, start_word):
+    return list(map(
+        lambda elem: elem.split(': ')[1],
+        line[line.find(start_word)::].split(', ')
+    ))
+
+
 def process_file(file):
+    global protocol
     f = open(file, "r")
     for line in f:
-        if SENT_MESSAGE in line:
-            start = line.find(SENT_MESSAGE)
-            data = list(map(lambda elem: elem.split(': ')[1], line[start::].split(', ')))
+        line = line.strip(" \n")
+        if PROCESS_STARTED in line:
+            _, protocol = parse_data_from_logged_line(line, PROCESS_STARTED)
+        elif SENT_MESSAGE in line:
+            data = parse_data_from_logged_line(line, SENT_MESSAGE)
             sent_messages[data[0]] = int(data[1])
         elif RECEIVED_MESSAGE in line:
-            start = line.find(RECEIVED_MESSAGE)
-            data = list(map(lambda elem: elem.split(': ')[1], line[start::].split(', ')))
+            data = parse_data_from_logged_line(line, RECEIVED_MESSAGE)
             received_messages[data[0]] = int(data[1])
         elif TRANSACTION_INIT in line:
-            start = line.find(TRANSACTION_INIT)
-            data = list(map(lambda elem: elem.split(': ')[1], line[start::].split(', ')))
+            data = parse_data_from_logged_line(line, TRANSACTION_INIT)
             transaction_inits[data[0]] = int(data[1])
         elif TRANSACTION_COMMIT in line:
-            start = line.find(TRANSACTION_COMMIT)
-            data = list(map(lambda elem: elem.split(': ')[1], line[start::].split(', ')))
+            data = parse_data_from_logged_line(line, TRANSACTION_COMMIT)
+            transaction = data[0]
             received_messages_cnt = int(data[2])
             commit_timestamp = int(data[3])
-            if transaction_commit_infos.get(data[0]) is None:
-                transaction_commit_infos[data[0]] = []
-            transaction_commit_infos[data[0]].append(TransactionInfo(received_messages_cnt, commit_timestamp))
+            if transaction_commit_infos.get(transaction) is None:
+                transaction_commit_infos[transaction] = []
+            transaction_commit_infos[transaction].append(TransactionInfo(received_messages_cnt, commit_timestamp))
+        elif WITNESS_SET_SELECTION in line:
+            data = parse_data_from_logged_line(line, WITNESS_SET_SELECTION)
+            transaction = data[0]
+
+            assert data[2][0] == '[' and data[2][-1] == ']'
+
+            history_str = data[2][1:-1]
+            history = set()
+            if len(history_str) != 0:
+                history = set(history_str.split(' '))
+
+            if transaction_histories.get(transaction) is None:
+                transaction_histories[transaction] = []
+            transaction_histories[transaction].append(history)
+        elif WITNESS_SET_SELECTED in line:
+            data = parse_data_from_logged_line(line, WITNESS_SET_SELECTED)
+            ws_type = data[0]
+            transaction = data[1]
+            pids_str = data[2]
+
+            assert pids_str[0] == '[' and pids_str[-1] == ']'
+            pids = set(pids_str[1:-1].split(' '))
+
+            if transaction_witness_sets[ws_type].get(transaction) is None:
+                transaction_witness_sets[ws_type][transaction] = []
+            transaction_witness_sets[ws_type][transaction].append(pids)
 
 
 def calc_message_latencies():
@@ -69,9 +117,13 @@ def calc_transaction_stat():
     sum_messages_exchanged = 0
     transaction_cnt = 0
     for transaction, init_timestamp in transaction_inits.items():
-        commit_info = transaction_commit_infos[transaction]
+        commit_info = transaction_commit_infos.get(transaction)
+        if commit_info is None:
+            print(f"Transaction {transaction} was not committed")
+            continue
 
-        if commit_info is None or len(commit_info) != n:
+        if len(commit_info) != n:
+            print(f"Transaction {transaction} wasn't committed by all the processes")
             continue
 
         transaction_cnt += 1
@@ -91,10 +143,39 @@ def calc_transaction_stat():
     return min_latency, max_latency, sum_latency / transaction_cnt, int(sum_messages_exchanged / transaction_cnt)
 
 
+def get_distance_metrics(sets):
+    union_set = sets[0]
+    intersection_set = sets[0]
+    for i in range(1, len(sets)):
+        union_set = union_set.union(sets[i])
+        intersection_set = intersection_set.intersection(sets[i])
+    return len(union_set) - len(intersection_set)
+
+
+def get_witness_sets_diff_metrics(ws_type):
+    metrics = []
+    for transaction, witness_sets in transaction_witness_sets[ws_type].items():
+        if len(witness_sets) != n:
+            continue
+        metrics.append(get_distance_metrics(witness_sets))
+
+    return metrics
+
+
+def get_histories_diff_metrics():
+    metrics = []
+    for transaction, histories in transaction_histories.items():
+        if len(histories) != n:
+            continue
+        metrics.append(get_distance_metrics(histories))
+
+    return metrics
+
+
 files = []
 
 for i in range(n):
-    files.append(f"process{i}.txt")
+    files.append(f"outputs/process{i}.txt")
 
 for file in files:
     process_file(file)
@@ -104,15 +185,30 @@ min_transaction_latency, max_transaction_latency, avg_transaction_latency, avg_m
     calc_transaction_stat()
 
 print("Message latencies:")
-print(f"\tMinimal: {min_message_latency}")
-print(f"\tMaximal: {max_message_latency}")
-print(f"\tAverage: {avg_message_latency}")
+print(f"\tMinimal: {min_message_latency / 1e6}")
+print(f"\tMaximal: {max_message_latency / 1e6}")
+print(f"\tAverage: {avg_message_latency / 1e6}")
 print()
 
 print("Transaction latency statistics:")
-print(f"\tMinimal: {min_transaction_latency}")
-print(f"\tMaximal: {max_transaction_latency}")
-print(f"\tAverage: {avg_transaction_latency}")
+print(f"\tMinimal: {min_transaction_latency / 1e6}")
+print(f"\tMaximal: {max_transaction_latency / 1e6}")
+print(f"\tAverage: {avg_transaction_latency / 1e6}")
 print()
 
 print(f"Average number of exchanged messages per one transaction: {avg_messages_exchanged}")
+print()
+
+if protocol in {CONSISTENT_ACCOUNTABILITY, RELIABLE_ACCOUNTABILITY}:
+    own_witness_sets_diff_metrics = get_witness_sets_diff_metrics(ws_type="own")
+    print(f"Difference metrics for own witness sets: {own_witness_sets_diff_metrics}")
+    print()
+
+    if protocol == RELIABLE_ACCOUNTABILITY:
+        pot_witness_sets_diff_metrics = get_witness_sets_diff_metrics(ws_type="pot")
+        print(f"Difference metrics for pot witness sets: {pot_witness_sets_diff_metrics}")
+        print()
+
+    histories_diff_metrics = get_histories_diff_metrics()
+    print(f"Difference metrics of histories: {histories_diff_metrics}")
+    print()
