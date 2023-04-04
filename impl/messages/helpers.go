@@ -14,6 +14,10 @@ func (s *SourceMessage) ToId() string {
 	return fmt.Sprintf("{%s;%d}", s.Author, s.SeqNumber)
 }
 
+func (s *SourceMessage) ToString() string {
+	return fmt.Sprintf("{%s;%d;%d}", s.Author, s.SeqNumber, s.Value)
+}
+
 func (m *BrachaProtocolMessage) Copy() *BrachaProtocolMessage {
 	return &BrachaProtocolMessage{
 		Stage:         m.Stage,

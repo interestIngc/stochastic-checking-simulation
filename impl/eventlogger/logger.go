@@ -38,7 +38,7 @@ func (el *EventLogger) OnWitnessSetSelected(
 	}
 
 	el.logger.Printf(
-		"Selected witness set, type: %s, transaction: %s, pids: %v\n",
+		"Witness set selected; type: %s, transaction: %s, pids: %v\n",
 		wsType, sourceMessage.ToId(), pids)
 }
 
@@ -58,18 +58,21 @@ func (el *EventLogger) OnDeliver(
 		utils.GetNow())
 }
 
-func (el *EventLogger) OnHistoryHashUpdate(
-	sourceMessage *messages.SourceMessage, historyHash *hashing.HistoryHash) {
+func (el *EventLogger) OnHistoryUsedInWitnessSetSelection(
+	sourceMessage *messages.SourceMessage,
+	historyHash *hashing.HistoryHash,
+	deliveredMessagesHistory []string,
+) {
 	el.logger.Printf(
-		"History hash after delivering transaction %s is %s\n",
-		sourceMessage.ToId(), historyHash.ToString())
+		"Witness set selection; transaction: %s, history hash: %s, history: %v\n",
+		sourceMessage.ToId(), historyHash.ToString(), deliveredMessagesHistory)
 }
 
 func (el *EventLogger) OnAttack(
 	sourceMessage *messages.SourceMessage, committedValue int64) {
 	el.logger.Printf(
-		"Detected a duplicated seq number attack. "+
-			"Transaction: %s, received value: %d, committed value: %d, timestamp: %d\n",
+		"Detected a duplicated seq number attack; "+
+			"transaction: %s, received value: %d, committed value: %d, timestamp: %d\n",
 		sourceMessage.ToId(),
 		sourceMessage.Value,
 		committedValue,

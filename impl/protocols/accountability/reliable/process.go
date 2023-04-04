@@ -121,10 +121,11 @@ type Process struct {
 	transactionCounter int64
 	messageCounter     int64
 
-	deliveredMessages   map[string]map[int64]protocols.ValueType
-	messagesLog         map[string]map[int64]*messageState
-	lastSentPMessages   map[string]map[int64]*messages.ReliableProtocolMessage
-	recoveryMessagesLog map[string]map[int64]*recoveryMessageState
+	deliveredMessages        map[string]map[int64]protocols.ValueType
+	deliveredMessagesHistory []string
+	messagesLog              map[string]map[int64]*messageState
+	lastSentPMessages        map[string]map[int64]*messages.ReliableProtocolMessage
+	recoveryMessagesLog      map[string]map[int64]*recoveryMessageState
 
 	quorumThreshold         int
 	readyMessagesThreshold  int
@@ -199,9 +200,11 @@ func (p *Process) initMessageState(
 	sourceMessage *messages.SourceMessage,
 ) *messageState {
 	msgState := newMessageState()
+	p.messagesLog[sourceMessage.Author][sourceMessage.SeqNumber] = msgState
+
+	p.logger.OnHistoryUsedInWitnessSetSelection(sourceMessage, p.historyHash, p.deliveredMessagesHistory)
 	msgState.ownWitnessSet, msgState.potWitnessSet =
 		p.wSelector.GetWitnessSet(sourceMessage.Author, sourceMessage.SeqNumber, p.historyHash)
-	p.messagesLog[sourceMessage.Author][sourceMessage.SeqNumber] = msgState
 
 	p.logger.OnWitnessSetSelected("own", sourceMessage, msgState.ownWitnessSet)
 	p.logger.OnWitnessSetSelected("pot", sourceMessage, msgState.potWitnessSet)
@@ -394,6 +397,7 @@ func (p *Process) delivered(sourceMessage *messages.SourceMessage) bool {
 func (p *Process) deliver(sourceMessage *messages.SourceMessage) {
 	p.deliveredMessages[sourceMessage.Author][sourceMessage.SeqNumber] =
 		protocols.ValueType(sourceMessage.Value)
+	p.deliveredMessagesHistory = append(p.deliveredMessagesHistory, sourceMessage.ToString())
 	p.historyHash.Insert(
 		utils.TransactionToBytes(sourceMessage.Author, sourceMessage.SeqNumber))
 
@@ -411,7 +415,6 @@ func (p *Process) deliver(sourceMessage *messages.SourceMessage) {
 	}
 
 	p.logger.OnDeliver(sourceMessage, messagesReceived)
-	p.logger.OnHistoryHashUpdate(sourceMessage, p.historyHash)
 }
 
 func (p *Process) Receive(context actor.Context) {

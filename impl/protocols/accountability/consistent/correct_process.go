@@ -39,8 +39,9 @@ type CorrectProcess struct {
 	transactionCounter int64
 	messageCounter     int64
 
-	deliveredMessages map[string]map[int64]protocols.ValueType
-	messagesLog       map[string]map[int64]*messageState
+	deliveredMessages        map[string]map[int64]protocols.ValueType
+	deliveredMessagesHistory []string
+	messagesLog              map[string]map[int64]*messageState
 
 	witnessThreshold int
 
@@ -104,9 +105,12 @@ func (p *CorrectProcess) InitProcess(
 func (p *CorrectProcess) initMessageState(
 	sourceMessage *messages.SourceMessage) *messageState {
 	msgState := newMessageState()
+	p.messagesLog[sourceMessage.Author][sourceMessage.SeqNumber] = msgState
+
+	p.logger.OnHistoryUsedInWitnessSetSelection(sourceMessage, p.historyHash, p.deliveredMessagesHistory)
+
 	msgState.witnessSet, _ =
 		p.wSelector.GetWitnessSet(sourceMessage.Author, sourceMessage.SeqNumber, p.historyHash)
-	p.messagesLog[sourceMessage.Author][sourceMessage.SeqNumber] = msgState
 
 	p.logger.OnWitnessSetSelected("own", sourceMessage, msgState.witnessSet)
 
@@ -136,6 +140,7 @@ func (p *CorrectProcess) broadcast(
 func (p *CorrectProcess) deliver(sourceMessage *messages.SourceMessage) {
 	p.deliveredMessages[sourceMessage.Author][sourceMessage.SeqNumber] =
 		protocols.ValueType(sourceMessage.Value)
+	p.deliveredMessagesHistory = append(p.deliveredMessagesHistory, sourceMessage.ToString())
 	p.historyHash.Insert(
 		utils.TransactionToBytes(sourceMessage.Author, sourceMessage.SeqNumber))
 
@@ -144,7 +149,6 @@ func (p *CorrectProcess) deliver(sourceMessage *messages.SourceMessage) {
 
 	delete(p.messagesLog[sourceMessage.Author], sourceMessage.SeqNumber)
 	p.logger.OnDeliver(sourceMessage, messagesReceived)
-	p.logger.OnHistoryHashUpdate(sourceMessage, p.historyHash)
 }
 
 func (p *CorrectProcess) verify(
