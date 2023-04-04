@@ -68,7 +68,7 @@ def simpleTest():
 	popens = {}
 
 	# server execution code
-	cmd = "./mainserver --n " + str(numberNodes-1) + " --log_file outputs/mainOut.txt --ip 10.0.0.1"
+	cmd = "./mainserver --n " + str(numberNodes-1) + " --log_file outputs/mainOut.txt"
 	popens[hosts[0]] = hosts[0].popen(cmd)
 	print(cmd)
 
@@ -79,7 +79,7 @@ def simpleTest():
 	for i in range(1,numberNodes):
 		# node execution code
 		nodeId = str(i-1)
-		cmd = "./node --input_file input.json --log_file outputs/process" + nodeId + ".txt --i " + nodeId + " --transactions 1 --base_ip 10.0.0.1"
+		cmd = "./node --input_file input.json --log_file outputs/process" + nodeId + ".txt --i " + nodeId + " --transactions 5 --transaction_init_timeout_ns 1000000000"
 		popens[hosts[i]] = hosts[i].popen(cmd)
 		#print(cmd)
 		

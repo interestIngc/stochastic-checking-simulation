@@ -1,22 +1,22 @@
 {
-  "protocol": "reliable_accountability",
+  "protocol": "bracha",
   "parameters": {
-    "n": 10,
+    "n": 100,
     "f": 0,
     "w": 4,
-    "v": 4,
+    "v": 5,
     "wr": 1900.0,
     "vr": 1910.0,
     "u": 2,
-    "recovery_timeout": 1000000,
+    "recovery_timeout": 10000000000,
     "node_id_size": 256,
-    "number_of_bins": 32,
-    "g_size": 2,
-    "e_size": 2,
-    "e_threshold": 1,
-    "r_size": 2,
-    "r_threshold": 1,
-    "d_size": 2,
-    "d_threshold": 1
+    "number_of_bins": 16,
+    "g_size": 4,
+    "e_size": 4,
+    "e_threshold": 3,
+    "r_size": 4,
+    "r_threshold": 3,
+    "d_size": 4,
+    "d_threshold": 3
   }
 }
