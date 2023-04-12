@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
+import json
 
 SENT_MESSAGE = "Sent message"
 RECEIVED_MESSAGE = "Received message"
 TRANSACTION_INIT = "Initialising transaction"
 TRANSACTION_COMMIT = "Delivered transaction"
 WITNESS_SET_SELECTED = "Witness set selected"
-PROCESS_STARTED = "Process started"
 WITNESS_SET_SELECTION = "Witness set selection"
 
 RELIABLE_ACCOUNTABILITY = "reliable_accountability"
@@ -28,9 +28,6 @@ transaction_witness_sets = {
     "own": {},
     "pot": {}
 }
-protocol = ""
-
-n = int(input())
 
 
 def parse_data_from_logged_line(line, start_word):
@@ -41,13 +38,10 @@ def parse_data_from_logged_line(line, start_word):
 
 
 def process_file(process_id):
-    global protocol
     f = open(f"outputs/process{process_id}.txt", "r")
     for line in f:
         line = line.strip(" \n")
-        if PROCESS_STARTED in line:
-            _, protocol = parse_data_from_logged_line(line, PROCESS_STARTED)
-        elif SENT_MESSAGE in line:
+        if SENT_MESSAGE in line:
             data = parse_data_from_logged_line(line, SENT_MESSAGE)
             sent_messages[data[0]] = int(data[1])
         elif RECEIVED_MESSAGE in line:
@@ -179,6 +173,11 @@ def get_histories_diff_metrics():
 
     return metrics
 
+
+input_file = open("input.json")
+input_json = json.load(input_file)
+protocol = input_json["protocol"]
+n = input_json["parameters"]["n"]
 
 for i in range(n):
     process_file(i)
