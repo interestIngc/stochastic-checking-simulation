@@ -2,6 +2,17 @@ package messages
 
 import "fmt"
 
+func (b *BroadcastInstance) ToString() string {
+	return fmt.Sprintf("{%s;%d}", b.Author, b.SeqNumber)
+}
+
+func (b *BroadcastInstance) Copy() *BroadcastInstance {
+	return &BroadcastInstance{
+		Author:    b.Author,
+		SeqNumber: b.SeqNumber,
+	}
+}
+
 func (s *SourceMessage) Copy() *SourceMessage {
 	return &SourceMessage{
 		Value:     s.Value,
@@ -36,17 +47,15 @@ func (m *ConsistentProtocolMessage) Copy() *ConsistentProtocolMessage {
 
 func (m *ReliableProtocolMessage) Copy() *ReliableProtocolMessage {
 	return &ReliableProtocolMessage{
-		Stage:         m.Stage,
-		SourceMessage: m.SourceMessage.Copy(),
-		Stamp:         m.Stamp,
+		Stage: m.Stage,
+		Value: m.Value,
 	}
 }
 
 func (m *RecoveryProtocolMessage) Copy() *RecoveryProtocolMessage {
 	return &RecoveryProtocolMessage{
-		RecoveryStage: m.RecoveryStage,
-		Message:       m.Message.Copy(),
-		Stamp:         m.Stamp,
+		Stage:   m.Stage,
+		ReliableProtocolMessage: m.ReliableProtocolMessage,
 	}
 }
 

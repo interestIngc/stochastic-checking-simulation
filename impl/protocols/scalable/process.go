@@ -282,7 +282,7 @@ func (p *Process) delivered(sourceMessage *messages.SourceMessage) bool {
 		p.deliveredMessages[sourceMessage.Author][sourceMessage.SeqNumber]
 
 	if delivered && deliveredValue != protocols.ValueType(sourceMessage.Value) {
-		p.logger.OnAttack(sourceMessage, int64(deliveredValue))
+		//p.logger.OnAttack(sourceMessage, int64(deliveredValue))
 	}
 
 	return delivered
@@ -291,10 +291,10 @@ func (p *Process) delivered(sourceMessage *messages.SourceMessage) bool {
 func (p *Process) deliver(sourceMessage *messages.SourceMessage) {
 	p.deliveredMessages[sourceMessage.Author][sourceMessage.SeqNumber] =
 		protocols.ValueType(sourceMessage.Value)
-	messagesReceived :=
-		p.messagesLog[sourceMessage.Author][sourceMessage.SeqNumber].receivedMessagesCnt
-
-	p.logger.OnDeliver(sourceMessage, messagesReceived)
+	//messagesReceived :=
+	//	p.messagesLog[sourceMessage.Author][sourceMessage.SeqNumber].receivedMessagesCnt
+	//
+	//p.logger.OnDeliver(sourceMessage, messagesReceived)
 }
 
 func (p *Process) maybeSendReadyFromSieve(
@@ -434,7 +434,7 @@ func (p *Process) Broadcast(context actor.SenderContext, value int64) {
 	msgState := p.initMessageState(context, sourceMessage)
 	p.broadcastGossip(context, msgState, sourceMessage)
 
-	p.logger.OnTransactionInit(sourceMessage)
+	//p.logger.OnTransactionInit(sourceMessage)
 
 	p.transactionCounter++
 }

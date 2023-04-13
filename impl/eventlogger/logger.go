@@ -19,15 +19,17 @@ func InitEventLogger(pid string, logger *log.Logger) *EventLogger {
 	return l
 }
 
-func (el *EventLogger) OnTransactionInit(sourceMessage *messages.SourceMessage) {
+func (el *EventLogger) OnTransactionInit(
+	broadcastInstance *messages.BroadcastInstance,
+) {
 	el.logger.Printf(
 		"Initialising transaction: %s, timestamp: %d\n",
-		sourceMessage.ToId(), utils.GetNow())
+		broadcastInstance.ToString(), utils.GetNow())
 }
 
 func (el *EventLogger) OnWitnessSetSelected(
 	wsType string,
-	sourceMessage *messages.SourceMessage,
+	broadcastInstance *messages.BroadcastInstance,
 	ws map[string]bool,
 ) {
 	pids := make([]string, len(ws))
@@ -39,42 +41,45 @@ func (el *EventLogger) OnWitnessSetSelected(
 
 	el.logger.Printf(
 		"Witness set selected; type: %s, transaction: %s, pids: %v\n",
-		wsType, sourceMessage.ToId(), pids)
+		wsType, broadcastInstance.ToString(), pids)
 }
 
-func (el *EventLogger) OnRecoveryProtocolSwitch(sourceMessage *messages.SourceMessage) {
+func (el *EventLogger) OnRecoveryProtocolSwitch(broadcastInstance *messages.BroadcastInstance) {
 	el.logger.Printf(
 		"Switching to the recovery protocol; transaction: %s, timestamp: %d\n",
-		sourceMessage.ToId(), utils.GetNow())
+		broadcastInstance.ToString(), utils.GetNow())
 }
 
 func (el *EventLogger) OnDeliver(
-	sourceMessage *messages.SourceMessage, messagesReceived int) {
+	broadcastInstance *messages.BroadcastInstance, value int64, messagesReceived int) {
 	el.logger.Printf(
 		"Delivered transaction: %s, value: %d, messages received: %d, timestamp: %d\n",
-		sourceMessage.ToId(),
-		sourceMessage.Value,
+		broadcastInstance.ToString(),
+		value,
 		messagesReceived,
 		utils.GetNow())
 }
 
 func (el *EventLogger) OnHistoryUsedInWitnessSetSelection(
-	sourceMessage *messages.SourceMessage,
+	broadcastInstance *messages.BroadcastInstance,
 	historyHash *hashing.HistoryHash,
 	deliveredMessagesHistory []string,
 ) {
 	el.logger.Printf(
 		"Witness set selection; transaction: %s, history hash: %s, history: %v\n",
-		sourceMessage.ToId(), historyHash.ToString(), deliveredMessagesHistory)
+		broadcastInstance.ToString(), historyHash.ToString(), deliveredMessagesHistory)
 }
 
 func (el *EventLogger) OnAttack(
-	sourceMessage *messages.SourceMessage, committedValue int64) {
+	broadcastInstance *messages.BroadcastInstance,
+	receivedValue int64,
+	committedValue int64,
+) {
 	el.logger.Printf(
 		"Detected a duplicated seq number attack; "+
 			"transaction: %s, received value: %d, committed value: %d, timestamp: %d\n",
-		sourceMessage.ToId(),
-		sourceMessage.Value,
+		broadcastInstance.ToString(),
+		receivedValue,
 		committedValue,
 		utils.GetNow())
 }

@@ -107,12 +107,12 @@ func (p *CorrectProcess) initMessageState(
 	msgState := newMessageState()
 	p.messagesLog[sourceMessage.Author][sourceMessage.SeqNumber] = msgState
 
-	p.logger.OnHistoryUsedInWitnessSetSelection(sourceMessage, p.historyHash, p.deliveredMessagesHistory)
+	//p.logger.OnHistoryUsedInWitnessSetSelection(sourceMessage, p.historyHash, p.deliveredMessagesHistory)
 
 	msgState.witnessSet, _ =
 		p.wSelector.GetWitnessSet(sourceMessage.Author, sourceMessage.SeqNumber, p.historyHash)
 
-	p.logger.OnWitnessSetSelected("own", sourceMessage, msgState.witnessSet)
+	//p.logger.OnWitnessSetSelected("own", sourceMessage, msgState.witnessSet)
 
 	return msgState
 }
@@ -144,11 +144,11 @@ func (p *CorrectProcess) deliver(sourceMessage *messages.SourceMessage) {
 	p.historyHash.Insert(
 		utils.TransactionToBytes(sourceMessage.Author, sourceMessage.SeqNumber))
 
-	messagesReceived :=
-		p.messagesLog[sourceMessage.Author][sourceMessage.SeqNumber].receivedMessagesCnt
+	//messagesReceived :=
+	//	p.messagesLog[sourceMessage.Author][sourceMessage.SeqNumber].receivedMessagesCnt
 
 	delete(p.messagesLog[sourceMessage.Author], sourceMessage.SeqNumber)
-	p.logger.OnDeliver(sourceMessage, messagesReceived)
+	//p.logger.OnDeliver(sourceMessage, messagesReceived)
 }
 
 func (p *CorrectProcess) verify(
@@ -162,7 +162,7 @@ func (p *CorrectProcess) verify(
 		p.deliveredMessages[sourceMessage.Author][sourceMessage.SeqNumber]
 	if delivered {
 		if deliveredValue != value {
-			p.logger.OnAttack(sourceMessage, int64(deliveredValue))
+			//p.logger.OnAttack(sourceMessage, int64(deliveredValue))
 			return false
 		}
 	} else if msgState != nil {
@@ -222,7 +222,7 @@ func (p *CorrectProcess) Broadcast(context actor.SenderContext, value int64) {
 	}
 	p.verify(context, p.pid, sourceMessage)
 
-	p.logger.OnTransactionInit(sourceMessage)
+	//p.logger.OnTransactionInit(sourceMessage)
 
 	p.transactionCounter++
 }

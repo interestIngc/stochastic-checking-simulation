@@ -153,7 +153,7 @@ func (p *Process) delivered(sourceMessage *messages.SourceMessage) bool {
 
 	value := protocols.ValueType(sourceMessage.Value)
 	if delivered && deliveredValue != value {
-		p.logger.OnAttack(sourceMessage, int64(deliveredValue))
+		//p.logger.OnAttack(sourceMessage, int64(deliveredValue))
 	}
 
 	return delivered
@@ -162,11 +162,11 @@ func (p *Process) delivered(sourceMessage *messages.SourceMessage) bool {
 func (p *Process) deliver(sourceMessage *messages.SourceMessage) {
 	p.deliveredMessages[sourceMessage.Author][sourceMessage.SeqNumber] =
 		protocols.ValueType(sourceMessage.Value)
-	messagesReceived :=
-		p.messagesLog[sourceMessage.Author][sourceMessage.SeqNumber].receivedMessagesCnt
+	//messagesReceived :=
+	//	p.messagesLog[sourceMessage.Author][sourceMessage.SeqNumber].receivedMessagesCnt
 
 	delete(p.messagesLog[sourceMessage.Author], sourceMessage.SeqNumber)
-	p.logger.OnDeliver(sourceMessage, messagesReceived)
+	//p.logger.OnDeliver(sourceMessage, messagesReceived)
 }
 
 func (p *Process) Receive(context actor.Context) {
@@ -243,7 +243,7 @@ func (p *Process) Broadcast(context actor.SenderContext, value int64) {
 	}
 	p.broadcast(context, message)
 
-	p.logger.OnTransactionInit(sourceMessage)
+	//p.logger.OnTransactionInit(sourceMessage)
 
 	p.transactionCounter++
 }
