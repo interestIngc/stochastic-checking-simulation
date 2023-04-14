@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
+import json
 
 SENT_MESSAGE = "Sent message"
 RECEIVED_MESSAGE = "Received message"
 TRANSACTION_INIT = "Initialising transaction"
 TRANSACTION_COMMIT = "Delivered transaction"
 WITNESS_SET_SELECTED = "Witness set selected"
-PROCESS_STARTED = "Process started"
 WITNESS_SET_SELECTION = "Witness set selection"
 
 RELIABLE_ACCOUNTABILITY = "reliable_accountability"
 CONSISTENT_ACCOUNTABILITY = "consistent_accountability"
 
 
-class TransactionInfo:
-    def __init__(self, received_messages_cnt, commit_timestamp):
+class TransactionCommitInfo:
+    def __init__(self, process_id, received_messages_cnt, commit_timestamp):
+        self.process_id = process_id
         self.received_messages_cnt = received_messages_cnt
         self.commit_timestamp = commit_timestamp
 
@@ -27,9 +28,6 @@ transaction_witness_sets = {
     "own": {},
     "pot": {}
 }
-protocol = ""
-
-n = int(input())
 
 
 def parse_data_from_logged_line(line, start_word):
@@ -39,14 +37,11 @@ def parse_data_from_logged_line(line, start_word):
     ))
 
 
-def process_file(file):
-    global protocol
-    f = open(file, "r")
+def process_file(process_id):
+    f = open(f"outputs/process{process_id}.txt", "r")
     for line in f:
         line = line.strip(" \n")
-        if PROCESS_STARTED in line:
-            _, protocol = parse_data_from_logged_line(line, PROCESS_STARTED)
-        elif SENT_MESSAGE in line:
+        if SENT_MESSAGE in line:
             data = parse_data_from_logged_line(line, SENT_MESSAGE)
             sent_messages[data[0]] = int(data[1])
         elif RECEIVED_MESSAGE in line:
@@ -62,7 +57,12 @@ def process_file(file):
             commit_timestamp = int(data[3])
             if transaction_commit_infos.get(transaction) is None:
                 transaction_commit_infos[transaction] = []
-            transaction_commit_infos[transaction].append(TransactionInfo(received_messages_cnt, commit_timestamp))
+            transaction_commit_infos[transaction].append(
+                TransactionCommitInfo(
+                    process_id=process_id,
+                    received_messages_cnt=received_messages_cnt,
+                    commit_timestamp=commit_timestamp)
+            )
         elif WITNESS_SET_SELECTION in line:
             data = parse_data_from_logged_line(line, WITNESS_SET_SELECTION)
             transaction = data[0]
@@ -117,18 +117,20 @@ def calc_transaction_stat():
     sum_messages_exchanged = 0
     transaction_cnt = 0
     for transaction, init_timestamp in transaction_inits.items():
-        commit_info = transaction_commit_infos.get(transaction)
-        if commit_info is None:
+        commit_infos = transaction_commit_infos.get(transaction)
+        if commit_infos is None:
             print(f"Transaction {transaction} was not committed")
             continue
 
-        if len(commit_info) != n:
-            print(f"Transaction {transaction} wasn't committed by all the processes")
+        if len(commit_infos) != n:
+            committed_pids = set(map(lambda commit_info: commit_info.process_id, commit_infos))
+            not_committed_pids = set(range(n)).difference(committed_pids)
+            print(f"Transaction {transaction} wasn't committed by processes {not_committed_pids}")
             continue
 
         transaction_cnt += 1
         max_commit_timestamp = -1
-        for transaction_info in commit_info:
+        for transaction_info in commit_infos:
             max_commit_timestamp = max(max_commit_timestamp, transaction_info.commit_timestamp)
             sum_messages_exchanged += transaction_info.received_messages_cnt
 
@@ -172,13 +174,13 @@ def get_histories_diff_metrics():
     return metrics
 
 
-files = []
+input_file = open("input.json")
+input_json = json.load(input_file)
+protocol = input_json["protocol"]
+n = input_json["parameters"]["n"]
 
 for i in range(n):
-    files.append(f"outputs/process{i}.txt")
-
-for file in files:
-    process_file(file)
+    process_file(i)
 
 min_message_latency, max_message_latency, avg_message_latency = calc_message_latencies()
 min_transaction_latency, max_transaction_latency, avg_transaction_latency, avg_messages_exchanged = \

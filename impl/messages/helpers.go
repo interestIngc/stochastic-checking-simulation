@@ -2,58 +2,66 @@ package messages
 
 import "fmt"
 
-func (s *SourceMessage) Copy() *SourceMessage {
-	return &SourceMessage{
-		Value:     s.Value,
-		Author:    s.Author,
-		SeqNumber: s.SeqNumber,
+func (b *BroadcastInstance) ToString() string {
+	return fmt.Sprintf("{%s;%d}", b.Author, b.SeqNumber)
+}
+
+func (b *BroadcastInstance) Copy() *BroadcastInstance {
+	if b == nil {
+		return nil
+	}
+	return &BroadcastInstance{
+		Author:    b.Author,
+		SeqNumber: b.SeqNumber,
 	}
 }
 
-func (s *SourceMessage) ToId() string {
-	return fmt.Sprintf("{%s;%d}", s.Author, s.SeqNumber)
-}
-
-func (s *SourceMessage) ToString() string {
-	return fmt.Sprintf("{%s;%d;%d}", s.Author, s.SeqNumber, s.Value)
-}
-
 func (m *BrachaProtocolMessage) Copy() *BrachaProtocolMessage {
+	if m == nil {
+		return nil
+	}
 	return &BrachaProtocolMessage{
-		Stage:         m.Stage,
-		SourceMessage: m.SourceMessage.Copy(),
-		Stamp:         m.Stamp,
+		Stage: m.Stage,
+		Value: m.Value,
 	}
 }
 
 func (m *ConsistentProtocolMessage) Copy() *ConsistentProtocolMessage {
+	if m == nil {
+		return nil
+	}
 	return &ConsistentProtocolMessage{
-		Stage:         m.Stage,
-		SourceMessage: m.SourceMessage.Copy(),
-		Stamp:         m.Stamp,
+		Stage: m.Stage,
+		Value: m.Value,
 	}
 }
 
 func (m *ReliableProtocolMessage) Copy() *ReliableProtocolMessage {
+	if m == nil {
+		return nil
+	}
 	return &ReliableProtocolMessage{
-		Stage:         m.Stage,
-		SourceMessage: m.SourceMessage.Copy(),
-		Stamp:         m.Stamp,
+		Stage: m.Stage,
+		Value: m.Value,
 	}
 }
 
 func (m *RecoveryProtocolMessage) Copy() *RecoveryProtocolMessage {
+	if m == nil {
+		return nil
+	}
 	return &RecoveryProtocolMessage{
-		RecoveryStage: m.RecoveryStage,
-		Message:       m.Message.Copy(),
-		Stamp:         m.Stamp,
+		Stage:                   m.Stage,
+		ReliableProtocolMessage: m.ReliableProtocolMessage.Copy(),
 	}
 }
 
 func (m *ScalableProtocolMessage) Copy() *ScalableProtocolMessage {
+	if m == nil {
+		return nil
+	}
 	return &ScalableProtocolMessage{
-		Stage:         m.Stage,
-		SourceMessage: m.SourceMessage.Copy(),
-		Stamp:         m.Stamp,
+		Stage: m.Stage,
+		Value: m.Value,
 	}
 }

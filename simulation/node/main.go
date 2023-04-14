@@ -70,7 +70,7 @@ func main() {
 	}
 
 	if input.Protocol == "" {
-		utils.ExitWithError(logger, "parameter protocol is mandatory")
+		utils.ExitWithError(logger, "Parameter protocol is mandatory")
 	}
 
 	processCount := input.Parameters.ProcessCount
@@ -83,7 +83,7 @@ func main() {
 			utils.ExitWithError(logger, fmt.Sprintf("Byte %d in base ip address is invalid", i))
 		}
 		if i >= Bytes {
-			utils.ExitWithError(logger, "base ip address must be ipv4")
+			utils.ExitWithError(logger, "Base ip address must be ipv4")
 		}
 	}
 
@@ -101,7 +101,7 @@ func main() {
 		if leftByteInd == -1 {
 			utils.ExitWithError(
 				logger,
-				"cannot assign ip addresses, number of processes in the system is too high")
+				"Cannot assign ip addresses, number of processes in the system is too high")
 		}
 		ipBytes[leftByteInd]++
 		for ind := leftByteInd + 1; ind < Bytes; ind++ {

@@ -11,10 +11,9 @@ message FaultyBroadcast {
   int64 value2 = 2;
 }
 
-message SourceMessage {
-  int64 value = 1;
+message BroadcastInstance {
+  string author = 1;
   int64 seqNumber = 2;
-  string author = 3;
 }
 
 message BrachaProtocolMessage {
@@ -25,8 +24,7 @@ message BrachaProtocolMessage {
   }
 
   Stage stage = 1;
-  SourceMessage sourceMessage = 2;
-  int64 stamp = 3;
+  int64 value = 2;
 }
 
 message ConsistentProtocolMessage {
@@ -36,8 +34,7 @@ message ConsistentProtocolMessage {
   }
 
   Stage stage = 1;
-  SourceMessage sourceMessage = 2;
-  int64 stamp = 3;
+  int64 value = 2;
 }
 
 message ReliableProtocolMessage {
@@ -51,8 +48,7 @@ message ReliableProtocolMessage {
   }
 
   Stage stage = 1;
-  SourceMessage sourceMessage = 2;
-  int64 stamp = 3;
+  int64 value = 2;
 }
 
 message RecoveryProtocolMessage {
@@ -63,9 +59,8 @@ message RecoveryProtocolMessage {
     READY = 3;
   }
 
-  Stage recoveryStage = 1;
-  ReliableProtocolMessage message = 2;
-  int64 stamp = 3;
+  Stage stage = 1;
+  ReliableProtocolMessage reliableProtocolMessage = 2;
 }
 
 message ScalableProtocolMessage {
@@ -79,6 +74,18 @@ message ScalableProtocolMessage {
   }
 
   Stage stage = 1;
-  SourceMessage sourceMessage = 2;
-  int64 stamp = 3;
+  int64 value = 2;
+}
+
+message BroadcastInstanceMessage {
+  BroadcastInstance broadcastInstance = 1;
+  int64 stamp = 2;
+
+  oneof message {
+    BrachaProtocolMessage brachaProtocolMessage = 3;
+    ConsistentProtocolMessage consistentProtocolMessage = 4;
+    ReliableProtocolMessage reliableProtocolMessage = 5;
+    RecoveryProtocolMessage recoveryProtocolMessage = 6;
+    ScalableProtocolMessage scalableProtocolMessage = 7;
+  }
 }
