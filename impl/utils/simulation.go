@@ -5,6 +5,7 @@ import (
 	"github.com/asynkron/protoactor-go/actor"
 	"log"
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -18,10 +19,17 @@ func ExitWithError(logger *log.Logger, errorMessage string) {
 }
 
 func OpenLogFile(logFile string) *os.File {
-	f, e := os.OpenFile(logFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
+	dir, _ := filepath.Split(logFile)
+	e := os.MkdirAll(dir, os.ModePerm)
 	if e != nil {
-		log.Printf("Could not open file %s to write logs into", logFile)
+		log.Printf("Could not create parent directories for %s, error: %e", logFile, e)
 	}
+
+	f, e := os.Create(logFile)
+	if e != nil {
+		log.Printf("Could not open file %s to write logs into, error: %e", logFile, e)
+	}
+
 	return f
 }
 
