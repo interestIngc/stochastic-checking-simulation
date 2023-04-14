@@ -16,13 +16,6 @@ message BroadcastInstance {
   int64 seqNumber = 2;
 }
 
-// Deprecated
-message SourceMessage {
-  int64 value = 1;
-  int64 seqNumber = 2;
-  string author = 3;
-}
-
 message BrachaProtocolMessage {
   enum Stage {
     INITIAL = 0;
@@ -31,8 +24,7 @@ message BrachaProtocolMessage {
   }
 
   Stage stage = 1;
-  SourceMessage sourceMessage = 2;
-  int64 stamp = 3;
+  int64 value = 2;
 }
 
 message ConsistentProtocolMessage {
@@ -42,8 +34,7 @@ message ConsistentProtocolMessage {
   }
 
   Stage stage = 1;
-  SourceMessage sourceMessage = 2;
-  int64 stamp = 3;
+  int64 value = 2;
 }
 
 message ReliableProtocolMessage {
@@ -72,16 +63,6 @@ message RecoveryProtocolMessage {
   ReliableProtocolMessage reliableProtocolMessage = 2;
 }
 
-message BroadcastInstanceMessage {
-  BroadcastInstance broadcastInstance = 1;
-  int64 stamp = 2;
-
-  oneof message {
-    ReliableProtocolMessage reliableProtocolMessage = 3;
-    RecoveryProtocolMessage recoveryProtocolMessage = 4;
-  }
-}
-
 message ScalableProtocolMessage {
   enum Stage {
     GOSSIP = 0;
@@ -93,6 +74,18 @@ message ScalableProtocolMessage {
   }
 
   Stage stage = 1;
-  SourceMessage sourceMessage = 2;
-  int64 stamp = 3;
+  int64 value = 2;
+}
+
+message BroadcastInstanceMessage {
+  BroadcastInstance broadcastInstance = 1;
+  int64 stamp = 2;
+
+  oneof message {
+    BrachaProtocolMessage brachaProtocolMessage = 3;
+    ConsistentProtocolMessage consistentProtocolMessage = 4;
+    ReliableProtocolMessage reliableProtocolMessage = 5;
+    RecoveryProtocolMessage recoveryProtocolMessage = 6;
+    ScalableProtocolMessage scalableProtocolMessage = 7;
+  }
 }

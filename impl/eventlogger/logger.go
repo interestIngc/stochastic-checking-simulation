@@ -95,3 +95,7 @@ func (el *EventLogger) OnMessageReceived(senderPid string, msgId int64) {
 		"Received message: {%s;%d}, timestamp: %d\n",
 		senderPid, msgId, utils.GetNow())
 }
+
+func (el *EventLogger) Fatal(message string) {
+	el.logger.Fatal(message)
+}

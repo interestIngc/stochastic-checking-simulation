@@ -1,6 +1,7 @@
 package consistent
 
 import (
+	"fmt"
 	"github.com/asynkron/protoactor-go/actor"
 	"log"
 	"math"
@@ -14,7 +15,7 @@ import (
 
 type messageState struct {
 	receivedEcho map[string]bool
-	echoCount    map[protocols.ValueType]int
+	echoCount    map[int64]int
 	witnessSet   map[string]bool
 
 	receivedMessagesCnt int
@@ -24,7 +25,7 @@ func newMessageState() *messageState {
 	ms := new(messageState)
 
 	ms.receivedEcho = make(map[string]bool)
-	ms.echoCount = make(map[protocols.ValueType]int)
+	ms.echoCount = make(map[int64]int)
 
 	ms.receivedMessagesCnt = 0
 
@@ -39,7 +40,7 @@ type CorrectProcess struct {
 	transactionCounter int64
 	messageCounter     int64
 
-	deliveredMessages        map[string]map[int64]protocols.ValueType
+	deliveredMessages        map[string]map[int64]int64
 	deliveredMessagesHistory []string
 	messagesLog              map[string]map[int64]*messageState
 
@@ -66,7 +67,7 @@ func (p *CorrectProcess) InitProcess(
 	p.transactionCounter = 0
 	p.messageCounter = 0
 
-	p.deliveredMessages = make(map[string]map[int64]protocols.ValueType)
+	p.deliveredMessages = make(map[string]map[int64]int64)
 	p.messagesLog = make(map[string]map[int64]*messageState)
 
 	p.witnessThreshold = parameters.WitnessThreshold
@@ -76,7 +77,7 @@ func (p *CorrectProcess) InitProcess(
 		pid := utils.MakeCustomPid(currActorPid)
 		pids[i] = pid
 		p.actorPids[pid] = currActorPid
-		p.deliveredMessages[pid] = make(map[int64]protocols.ValueType)
+		p.deliveredMessages[pid] = make(map[int64]int64)
 		p.messagesLog[pid] = make(map[int64]*messageState)
 	}
 
@@ -103,16 +104,21 @@ func (p *CorrectProcess) InitProcess(
 }
 
 func (p *CorrectProcess) initMessageState(
-	sourceMessage *messages.SourceMessage) *messageState {
+	bInstance *messages.BroadcastInstance,
+) *messageState {
 	msgState := newMessageState()
-	p.messagesLog[sourceMessage.Author][sourceMessage.SeqNumber] = msgState
+	p.messagesLog[bInstance.Author][bInstance.SeqNumber] = msgState
 
-	//p.logger.OnHistoryUsedInWitnessSetSelection(sourceMessage, p.historyHash, p.deliveredMessagesHistory)
+	p.logger.OnHistoryUsedInWitnessSetSelection(
+		bInstance,
+		p.historyHash,
+		p.deliveredMessagesHistory,
+	)
 
 	msgState.witnessSet, _ =
-		p.wSelector.GetWitnessSet(sourceMessage.Author, sourceMessage.SeqNumber, p.historyHash)
+		p.wSelector.GetWitnessSet(bInstance.Author, bInstance.SeqNumber, p.historyHash)
 
-	//p.logger.OnWitnessSetSelected("own", sourceMessage, msgState.witnessSet)
+	p.logger.OnWitnessSetSelected("own", bInstance, msgState.witnessSet)
 
 	return msgState
 }
@@ -120,10 +126,18 @@ func (p *CorrectProcess) initMessageState(
 func (p *CorrectProcess) sendMessage(
 	context actor.SenderContext,
 	to *actor.PID,
-	message *messages.ConsistentProtocolMessage) {
-	message.Stamp = p.messageCounter
+	bInstance *messages.BroadcastInstance,
+	message *messages.ConsistentProtocolMessage,
+) {
+	bMessage := &messages.BroadcastInstanceMessage{
+		BroadcastInstance: bInstance,
+		Message: &messages.BroadcastInstanceMessage_ConsistentProtocolMessage{
+			ConsistentProtocolMessage: message.Copy(),
+		},
+		Stamp: p.messageCounter,
+	}
 
-	context.RequestWithCustomSender(to, message.Copy(), p.actorPid)
+	context.RequestWithCustomSender(to, bMessage, p.actorPid)
 
 	p.logger.OnMessageSent(p.messageCounter)
 	p.messageCounter++
@@ -131,38 +145,39 @@ func (p *CorrectProcess) sendMessage(
 
 func (p *CorrectProcess) broadcast(
 	context actor.SenderContext,
+	bInstance *messages.BroadcastInstance,
 	message *messages.ConsistentProtocolMessage) {
 	for _, pid := range p.actorPids {
-		p.sendMessage(context, pid, message)
+		p.sendMessage(context, pid, bInstance, message)
 	}
 }
 
-func (p *CorrectProcess) deliver(sourceMessage *messages.SourceMessage) {
-	p.deliveredMessages[sourceMessage.Author][sourceMessage.SeqNumber] =
-		protocols.ValueType(sourceMessage.Value)
-	p.deliveredMessagesHistory = append(p.deliveredMessagesHistory, sourceMessage.ToString())
+func (p *CorrectProcess) deliver(bInstance *messages.BroadcastInstance, value int64) {
+	p.deliveredMessages[bInstance.Author][bInstance.SeqNumber] = value
+	p.deliveredMessagesHistory = append(p.deliveredMessagesHistory, bInstance.ToString())
 	p.historyHash.Insert(
-		utils.TransactionToBytes(sourceMessage.Author, sourceMessage.SeqNumber))
+		utils.TransactionToBytes(bInstance.Author, bInstance.SeqNumber))
 
-	//messagesReceived :=
-	//	p.messagesLog[sourceMessage.Author][sourceMessage.SeqNumber].receivedMessagesCnt
+	messagesReceived :=
+		p.messagesLog[bInstance.Author][bInstance.SeqNumber].receivedMessagesCnt
 
-	delete(p.messagesLog[sourceMessage.Author], sourceMessage.SeqNumber)
-	//p.logger.OnDeliver(sourceMessage, messagesReceived)
+	delete(p.messagesLog[bInstance.Author], bInstance.SeqNumber)
+	p.logger.OnDeliver(bInstance, value, messagesReceived)
 }
 
 func (p *CorrectProcess) verify(
 	context actor.SenderContext,
 	senderPid string,
-	sourceMessage *messages.SourceMessage) bool {
-	value := protocols.ValueType(sourceMessage.Value)
-	msgState := p.messagesLog[sourceMessage.Author][sourceMessage.SeqNumber]
+	bInstance *messages.BroadcastInstance,
+	value int64,
+) bool {
+	msgState := p.messagesLog[bInstance.Author][bInstance.SeqNumber]
 
 	deliveredValue, delivered :=
-		p.deliveredMessages[sourceMessage.Author][sourceMessage.SeqNumber]
+		p.deliveredMessages[bInstance.Author][bInstance.SeqNumber]
 	if delivered {
 		if deliveredValue != value {
-			//p.logger.OnAttack(sourceMessage, int64(deliveredValue))
+			p.logger.OnAttack(bInstance, value, deliveredValue)
 			return false
 		}
 	} else if msgState != nil {
@@ -171,58 +186,64 @@ func (p *CorrectProcess) verify(
 			msgState.receivedEcho[senderPid] = true
 			msgState.echoCount[value]++
 			if msgState.echoCount[value] >= p.witnessThreshold {
-				p.deliver(sourceMessage)
+				p.deliver(bInstance, value)
 			}
 		}
 	} else {
-		msgState = p.initMessageState(sourceMessage)
+		msgState = p.initMessageState(bInstance)
 		msgState.receivedMessagesCnt++
 
 		message := &messages.ConsistentProtocolMessage{
-			Stage:         messages.ConsistentProtocolMessage_VERIFY,
-			SourceMessage: sourceMessage,
+			Stage: messages.ConsistentProtocolMessage_VERIFY,
+			Value: value,
 		}
 		for pid := range msgState.witnessSet {
-			p.sendMessage(context, p.actorPids[pid], message)
+			p.sendMessage(context, p.actorPids[pid], bInstance, message)
 		}
 	}
 	return true
 }
 
 func (p *CorrectProcess) Receive(context actor.Context) {
-	message := context.Message()
-	switch message.(type) {
+	switch message := context.Message().(type) {
 	case *messages.Simulate:
 		p.transactionManager.Simulate(context, p)
-	case *messages.ConsistentProtocolMessage:
-		msg := message.(*messages.ConsistentProtocolMessage)
-		sourceMessage := msg.SourceMessage
+	case *messages.BroadcastInstanceMessage:
+		bInstance := message.BroadcastInstance
+
 		senderPid := utils.MakeCustomPid(context.Sender())
+		p.logger.OnMessageReceived(senderPid, message.Stamp)
 
-		p.logger.OnMessageReceived(senderPid, msg.Stamp)
+		switch protocolMessage := message.Message.(type) {
+		case *messages.BroadcastInstanceMessage_ConsistentProtocolMessage:
+			consistentMessage := protocolMessage.ConsistentProtocolMessage
 
-		doBroadcast := p.verify(context, senderPid, sourceMessage)
+			doBroadcast := p.verify(context, senderPid, bInstance, consistentMessage.Value)
 
-		if msg.Stage == messages.ConsistentProtocolMessage_VERIFY && doBroadcast {
-			p.broadcast(
-				context,
-				&messages.ConsistentProtocolMessage{
-					Stage:         messages.ConsistentProtocolMessage_ECHO,
-					SourceMessage: sourceMessage,
-				})
+			if consistentMessage.Stage == messages.ConsistentProtocolMessage_VERIFY && doBroadcast {
+				p.broadcast(
+					context,
+					bInstance,
+					&messages.ConsistentProtocolMessage{
+						Stage: messages.ConsistentProtocolMessage_ECHO,
+						Value: consistentMessage.Value,
+					})
+			}
+		default:
+			p.logger.Fatal(fmt.Sprintf("Invalid protocol message type %t", protocolMessage))
 		}
 	}
 }
 
 func (p *CorrectProcess) Broadcast(context actor.SenderContext, value int64) {
-	sourceMessage := &messages.SourceMessage{
+	broadcastInstance := &messages.BroadcastInstance{
 		Author:    p.pid,
 		SeqNumber: p.transactionCounter,
-		Value:     value,
 	}
-	p.verify(context, p.pid, sourceMessage)
 
-	//p.logger.OnTransactionInit(sourceMessage)
+	p.verify(context, p.pid, broadcastInstance, value)
+
+	p.logger.OnTransactionInit(broadcastInstance)
 
 	p.transactionCounter++
 }

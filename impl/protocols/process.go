@@ -35,5 +35,3 @@ type FaultyProcess interface {
 
 	FaultyBroadcast(context actor.SenderContext, value1 int64, value2 int64)
 }
-
-type ValueType int64

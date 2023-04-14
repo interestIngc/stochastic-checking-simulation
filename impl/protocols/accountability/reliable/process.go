@@ -1,6 +1,7 @@
 package reliable
 
 import (
+	"fmt"
 	"github.com/asynkron/protoactor-go/actor"
 	"log"
 	"math"
@@ -13,7 +14,7 @@ import (
 	"time"
 )
 
-type WitnessStage int32
+type WitnessStage int
 
 const (
 	InitialWitnessStage WitnessStage = iota
@@ -22,7 +23,7 @@ const (
 	SentValidate
 )
 
-type Stage int32
+type Stage int
 
 const (
 	InitialStage Stage = iota
@@ -30,7 +31,7 @@ const (
 	SentReadyFromProcess
 )
 
-type RecoveryStage int32
+type RecoveryStage int
 
 const (
 	InitialRecoveryStage RecoveryStage = iota
@@ -691,18 +692,16 @@ func (p *Process) processRecoveryProtocolMessage(
 }
 
 func (p *Process) Receive(context actor.Context) {
-	message := context.Message()
-	switch message.(type) {
+	switch message := context.Message().(type) {
 	case *messages.Simulate:
 		p.transactionManager.Simulate(context, p)
 	case *messages.BroadcastInstanceMessage:
-		msg := message.(*messages.BroadcastInstanceMessage)
-		bInstance := msg.BroadcastInstance
+		bInstance := message.BroadcastInstance
 
 		senderPid := utils.MakeCustomPid(context.Sender())
-		p.logger.OnMessageReceived(senderPid, msg.Stamp)
+		p.logger.OnMessageReceived(senderPid, message.Stamp)
 
-		switch protocolMessage := msg.Message.(type) {
+		switch protocolMessage := message.Message.(type) {
 		case *messages.BroadcastInstanceMessage_ReliableProtocolMessage:
 			p.processReliableProtocolMessage(
 				context,
@@ -717,6 +716,8 @@ func (p *Process) Receive(context actor.Context) {
 				bInstance,
 				protocolMessage.RecoveryProtocolMessage,
 			)
+		default:
+			p.logger.Fatal(fmt.Sprintf("Invalid protocol message type %t", protocolMessage))
 		}
 	}
 }

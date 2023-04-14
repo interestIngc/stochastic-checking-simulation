@@ -1,6 +1,7 @@
 package consistent
 
 import (
+	"fmt"
 	"github.com/asynkron/protoactor-go/actor"
 	"log"
 	"stochastic-checking-simulation/impl/messages"
@@ -25,40 +26,47 @@ func (p *FaultyProcess) InitProcess(
 }
 
 func (p *FaultyProcess) Receive(context actor.Context) {
-	message := context.Message()
-	switch message.(type) {
+	switch message := context.Message().(type) {
 	case *messages.FaultyBroadcast:
-		msg := message.(*messages.FaultyBroadcast)
-		p.FaultyBroadcast(context, msg.Value1, msg.Value2)
-	case *messages.ConsistentProtocolMessage:
-		msg := message.(*messages.ConsistentProtocolMessage)
-		sourceMessage := msg.SourceMessage
-		sender := context.Sender()
-		senderPid := utils.MakeCustomPid(sender)
+		p.FaultyBroadcast(context, message.Value1, message.Value2)
+	case *messages.BroadcastInstanceMessage:
+		bInstance := message.BroadcastInstance
 
-		p.process.logger.OnMessageReceived(senderPid, msg.Stamp)
+		switch protocolMessage := message.Message.(type) {
+		case *messages.BroadcastInstanceMessage_ConsistentProtocolMessage:
+			consistentMessage := protocolMessage.ConsistentProtocolMessage
+			value := consistentMessage.Value
 
-		switch msg.Stage {
-		case messages.ConsistentProtocolMessage_ECHO:
-			p.process.verify(context, senderPid, sourceMessage)
-		case messages.ConsistentProtocolMessage_VERIFY:
-			if sourceMessage.Author == p.process.pid {
-				p.process.sendMessage(
-					context,
-					sender,
-					&messages.ConsistentProtocolMessage{
-						Stage:         messages.ConsistentProtocolMessage_ECHO,
-						SourceMessage: sourceMessage,
-					},
-				)
-			} else if p.process.verify(context, senderPid, sourceMessage) {
-				p.process.broadcast(
-					context,
-					&messages.ConsistentProtocolMessage{
-						Stage:         messages.ConsistentProtocolMessage_ECHO,
-						SourceMessage: sourceMessage,
-					})
+			senderPid := utils.MakeCustomPid(context.Sender())
+
+			p.process.logger.OnMessageReceived(senderPid, message.Stamp)
+
+			switch consistentMessage.Stage {
+			case messages.ConsistentProtocolMessage_ECHO:
+				p.process.verify(context, senderPid, bInstance, value)
+			case messages.ConsistentProtocolMessage_VERIFY:
+				if bInstance.Author == p.process.pid {
+					p.process.sendMessage(
+						context,
+						p.process.actorPids[senderPid],
+						bInstance,
+						&messages.ConsistentProtocolMessage{
+							Stage: messages.ConsistentProtocolMessage_ECHO,
+							Value: value,
+						},
+					)
+				} else if p.process.verify(context, senderPid, bInstance, value) {
+					p.process.broadcast(
+						context,
+						bInstance,
+						&messages.ConsistentProtocolMessage{
+							Stage: messages.ConsistentProtocolMessage_ECHO,
+							Value: value,
+						})
+				}
 			}
+		default:
+			p.process.logger.Fatal(fmt.Sprintf("Invalid protocol message type %t", protocolMessage))
 		}
 	}
 }
@@ -68,12 +76,11 @@ func (p *FaultyProcess) Broadcast(context actor.SenderContext, value int64) {
 }
 
 func (p *FaultyProcess) FaultyBroadcast(context actor.SenderContext, value1 int64, value2 int64) {
-	msgState := p.process.initMessageState(
-		&messages.SourceMessage{
-			Author:    p.process.pid,
-			SeqNumber: p.process.transactionCounter,
-			Value:     value1,
-		})
+	broadcastInstance := &messages.BroadcastInstance{
+		Author:    p.process.pid,
+		SeqNumber: p.process.transactionCounter,
+	}
+	msgState := p.process.initMessageState(broadcastInstance)
 
 	i := 0
 	for witness := range msgState.witnessSet {
@@ -84,13 +91,10 @@ func (p *FaultyProcess) FaultyBroadcast(context actor.SenderContext, value1 int6
 		p.process.sendMessage(
 			context,
 			p.process.actorPids[witness],
+			broadcastInstance,
 			&messages.ConsistentProtocolMessage{
 				Stage: messages.ConsistentProtocolMessage_VERIFY,
-				SourceMessage: &messages.SourceMessage{
-					Author:    p.process.pid,
-					SeqNumber: p.process.transactionCounter,
-					Value:     currValue,
-				},
+				Value: currValue,
 			},
 		)
 		i++
