@@ -28,8 +28,12 @@ func (r *MultiRing) copy() *MultiRing {
 	return mr
 }
 
+func (r *MultiRing) fit(value int) int {
+	return ((value % int(r.modulo)) + int(r.modulo)) % int(r.modulo)
+}
+
 func (r *MultiRing) set(i uint64, value int) {
-	r.vector[i] = (value + int(r.modulo)) % int(r.modulo)
+	r.vector[i] = r.fit(value)
 }
 
 func (r *MultiRing) add(i uint64, value int) {
@@ -55,6 +59,23 @@ func multiRingDistance(r1 *MultiRing, r2 *MultiRing, norm float64) (float64, err
 	return math.Pow(sum, 1.0/norm), nil
 }
 
+func multiRingDistanceLInf(r1 *MultiRing, r2 *MultiRing) (float64, error) {
+	if r1.modulo != r2.modulo || r1.dimension != r2.dimension {
+		return 0.0,
+			errors.New("cannot calculate distance between two rings with different modulo or dimension")
+	}
+	
+	max := 0.0
+	for i := uint(0); i < r1.dimension; i++ {
+		diff := math.Min(
+			r1.subtract(r1.vector[i], r2.vector[i]),
+			r1.subtract(r2.vector[i], r1.vector[i]))
+		max = math.Max(max, diff)
+	}
+	return max, nil
+		
+}
+
 func multiRingFromBytes(modulo uint, dimension uint, bytes []byte) *MultiRing {
 	mr := NewMultiRing(modulo, dimension)
 	bytesPerDimension := uint(len(bytes) / int(dimension))
@@ -69,4 +90,11 @@ func multiRingFromBytes(modulo uint, dimension uint, bytes []byte) *MultiRing {
 		mr.set(uint64(i), int(utils.ToUint64(value)))
 	}
 	return mr
+}
+
+// Adds another multiRing to the current one, item-wise
+func (r *MultiRing) merge(rx *MultiRing) {
+	for i := 0; i < int(r.dimension); i++ {
+		r.add(uint64(i), rx.vector[i])
+	}
 }

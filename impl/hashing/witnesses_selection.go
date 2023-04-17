@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"sort"
 	"stochastic-checking-simulation/impl/utils"
+	"strconv"
 )
 
 type WitnessesSelector struct {
@@ -39,14 +40,15 @@ func (bd byDist) Less(i, j int) bool {
 func (ws *WitnessesSelector) GetWitnessSet(
 	author string, seqNumber int64, historyHash *HistoryHash,
 ) (map[string]bool, map[string]bool) {
-	transaction := utils.TransactionToBytes(author, seqNumber)
-	transactionRing := multiRingFromBytes(
-		256, historyHash.binNum, ws.Hasher.Hash(transaction))
+	//transaction := utils.TransactionToBytes(author, seqNumber)
+	//transactionRing := multiRingFromBytes(
+	//	256, historyHash.binNum, ws.Hasher.Hash(transaction))
 
 	distances := make([]dist, len(ws.NodeIds))
 	for i, pid := range ws.NodeIds {
 		historyHashRingCopy := historyHash.bins.copy()
-		pidHash := ws.Hasher.Hash([]byte(pid))
+		pidHash := ws.Hasher.Hash([]byte(pid + author + strconv.Itoa(int(seqNumber))))
+		idRing := multiRingFromBytes(historyHash.binCapacity, historyHash.binNum, pidHash)
 		rd := rand.New(rand.NewSource(int64(utils.ToUint64(pidHash))))
 		rd.Shuffle(
 			int(historyHashRingCopy.dimension),
@@ -55,7 +57,10 @@ func (ws *WitnessesSelector) GetWitnessSet(
 					historyHashRingCopy.vector[j], historyHashRingCopy.vector[i]
 			})
 
-		d, e := multiRingDistance(historyHashRingCopy, transactionRing, 1.0)
+		idRing.merge(historyHashRingCopy)
+		defaultRing := NewMultiRing(historyHash.binCapacity, historyHash.binNum)
+		d, e := multiRingDistance(defaultRing, idRing, 1.0)
+		//d, e := multiRingDistanceLInf(defaultRing, idRing)
 
 		if e != nil {
 			log.Printf("Error while generating a witness set happened: %s\n", e)
