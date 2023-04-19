@@ -81,10 +81,13 @@ def process_file(process_id):
             data = parse_data_from_logged_line(line, WITNESS_SET_SELECTED)
             ws_type = data[0]
             transaction = data[1]
-            pids_str = data[2]
 
-            assert pids_str[0] == '[' and pids_str[-1] == ']'
-            pids = set(pids_str[1:-1].split(' '))
+            assert data[2][0] == '[' and data[2][-1] == ']'
+
+            pids_str = data[2][1:-1]
+            pids = set()
+            if len(pids_str) != 0:
+                pids = set(pids_str.split(' '))
 
             if transaction_witness_sets[ws_type].get(transaction) is None:
                 transaction_witness_sets[ws_type][transaction] = []
@@ -146,12 +149,14 @@ def calc_transaction_stat():
 
 
 def get_distance_metrics(sets):
-    union_set = sets[0]
-    intersection_set = sets[0]
-    for i in range(1, len(sets)):
-        union_set = union_set.union(sets[i])
-        intersection_set = intersection_set.intersection(sets[i])
-    return len(union_set) - len(intersection_set)
+    max_diff = 0
+    for i in range(len(sets)):
+        for j in range(i + 1, len(sets)):
+            intersection_size = len(sets[i].intersection(sets[j]))
+            union_size = len(sets[i].union(sets[j]))
+            max_diff = max(max_diff, union_size - intersection_size)
+
+    return max_diff
 
 
 def get_witness_sets_diff_metrics(ws_type):
