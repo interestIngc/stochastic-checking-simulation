@@ -99,3 +99,11 @@ func (el *EventLogger) OnMessageReceived(senderPid string, msgId int64) {
 func (el *EventLogger) Fatal(message string) {
 	el.logger.Fatal(message)
 }
+
+func (el *EventLogger) OnStart() {
+	el.logger.Printf("Process started: %s\n", el.pid)
+}
+
+func (el *EventLogger) OnStop() {
+	el.logger.Printf("Process %s is terminating", el.pid)
+}

@@ -47,9 +47,10 @@ func newMessageState() *messageState {
 }
 
 type Process struct {
-	actorPid           *actor.PID
-	pid                string
-	actorPids          map[string]*actor.PID
+	actorPid  *actor.PID
+	pid       string
+	actorPids map[string]*actor.PID
+
 	transactionCounter int64
 	messageCounter     int64
 
@@ -62,6 +63,8 @@ type Process struct {
 
 	logger             *eventlogger.EventLogger
 	transactionManager *protocols.TransactionManager
+
+	mainServer *actor.PID
 }
 
 func (p *Process) InitProcess(
@@ -70,6 +73,7 @@ func (p *Process) InitProcess(
 	parameters *parameters.Parameters,
 	logger *log.Logger,
 	transactionManager *protocols.TransactionManager,
+	mainServer *actor.PID,
 ) {
 	p.actorPid = actorPid
 	p.pid = utils.MakeCustomPid(actorPid)
@@ -93,6 +97,7 @@ func (p *Process) InitProcess(
 
 	p.logger = eventlogger.InitEventLogger(p.pid, logger)
 	p.transactionManager = transactionManager
+	p.mainServer = mainServer
 }
 
 func (p *Process) initMessageState(bInstance *messages.BroadcastInstance) *messageState {
@@ -250,6 +255,11 @@ func (p *Process) processProtocolMessage(
 
 func (p *Process) Receive(context actor.Context) {
 	switch message := context.Message().(type) {
+	case *actor.Started:
+		p.logger.OnStart()
+		context.RequestWithCustomSender(p.mainServer, &messages.Started{}, p.actorPid)
+	case *actor.Stop:
+		p.logger.OnStop()
 	case *messages.Simulate:
 		p.transactionManager.Simulate(context, p)
 	case *messages.BroadcastInstanceMessage:

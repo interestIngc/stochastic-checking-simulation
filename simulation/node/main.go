@@ -4,13 +4,11 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	console "github.com/asynkron/goconsole"
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/remote"
 	"io"
 	"log"
 	"os"
-	"stochastic-checking-simulation/impl/messages"
 	"stochastic-checking-simulation/impl/parameters"
 	"stochastic-checking-simulation/impl/protocols"
 	"stochastic-checking-simulation/impl/protocols/accountability/consistent"
@@ -88,13 +86,9 @@ func main() {
 	}
 
 	var processIp string
-	//var processPort int
 	pids := make([]*actor.PID, processCount)
 
-	//currPort := *port
-
 	for i := 0; i < processCount; i++ {
-		//currPort++
 		leftByteInd := Bytes - 1
 		for ; leftByteInd >= 0 && ipBytes[leftByteInd] == 255; leftByteInd-- {
 		}
@@ -116,10 +110,8 @@ func main() {
 		currIp := strings.Join(ipBytesAsStr, ".")
 		if i == *processIndex {
 			processIp = currIp
-			//processPort = currPort
 		}
 		pids[i] = actor.NewPID(joinWithPort(currIp, *port), "main")
-		//pids[i] = actor.NewPID(joinWithPort(*baseIpAddress, currPort), "main")
 	}
 
 	mainServer := actor.NewPID(joinWithPort(*baseIpAddress, *port), "mainserver")
@@ -139,13 +131,21 @@ func main() {
 		utils.ExitWithError(logger, fmt.Sprintf("Invalid protocol: %s", input.Protocol))
 	}
 
+	process.InitProcess(
+		pids[*processIndex],
+		pids,
+		&input.Parameters,
+		logger,
+		protocols.NewTransactionManager(*transactions, *transactionInitTimeoutNs),
+		mainServer,
+	)
+
 	system := actor.NewActorSystem()
 	remoteConfig := remote.Configure(processIp, *port)
-	//remoteConfig := remote.Configure(*baseIpAddress, processPort)
 	remoter := remote.NewRemote(system, remoteConfig)
 	remoter.Start()
 
-	currPid, e :=
+	_, e =
 		system.Root.SpawnNamed(
 			actor.PropsFromProducer(
 				func() actor.Actor {
@@ -154,19 +154,10 @@ func main() {
 			"main",
 		)
 	if e != nil {
-		utils.ExitWithError(logger, fmt.Sprintf("Error while spawning the process happened: %s", e))
+		logger.Fatal(fmt.Sprintf("Error while spawning the process happened: %s", e))
 	}
 
-	process.InitProcess(
-		currPid,
-		pids,
-		&input.Parameters,
-		logger,
-		protocols.NewTransactionManager(*transactions, *transactionInitTimeoutNs),
-	)
-	logger.Printf("Process started: %s, running protocol: %s\n", utils.MakeCustomPid(currPid), input.Protocol)
+	logger.Printf("Running protocol: %s\n", input.Protocol)
 
-	system.Root.RequestWithCustomSender(mainServer, &messages.Started{}, currPid)
-
-	_, _ = console.ReadLine()
+	select {}
 }

@@ -15,6 +15,7 @@ type Process interface {
 		parameters *parameters.Parameters,
 		logger *log.Logger,
 		transactionManager *TransactionManager,
+		mainServer *actor.PID,
 	)
 
 	Broadcast(context actor.SenderContext, value int64)

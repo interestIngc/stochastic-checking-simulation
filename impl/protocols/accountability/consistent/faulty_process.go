@@ -20,9 +20,10 @@ func (p *FaultyProcess) InitProcess(
 	parameters *parameters.Parameters,
 	logger *log.Logger,
 	transactionManager *protocols.TransactionManager,
+	mainServer *actor.PID,
 ) {
 	p.process = &CorrectProcess{}
-	p.process.InitProcess(currPid, pids, parameters, logger, transactionManager)
+	p.process.InitProcess(currPid, pids, parameters, logger, transactionManager, mainServer)
 }
 
 func (p *FaultyProcess) Receive(context actor.Context) {

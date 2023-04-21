@@ -51,6 +51,8 @@ type CorrectProcess struct {
 
 	logger             *eventlogger.EventLogger
 	transactionManager *protocols.TransactionManager
+
+	mainServer *actor.PID
 }
 
 func (p *CorrectProcess) InitProcess(
@@ -59,6 +61,7 @@ func (p *CorrectProcess) InitProcess(
 	parameters *parameters.Parameters,
 	logger *log.Logger,
 	transactionManager *protocols.TransactionManager,
+	mainServer *actor.PID,
 ) {
 	p.actorPid = actorPid
 	p.pid = utils.MakeCustomPid(actorPid)
@@ -101,6 +104,8 @@ func (p *CorrectProcess) InitProcess(
 
 	p.logger = eventlogger.InitEventLogger(p.pid, logger)
 	p.transactionManager = transactionManager
+
+	p.mainServer = mainServer
 }
 
 func (p *CorrectProcess) initMessageState(
@@ -206,6 +211,11 @@ func (p *CorrectProcess) verify(
 
 func (p *CorrectProcess) Receive(context actor.Context) {
 	switch message := context.Message().(type) {
+	case *actor.Started:
+		p.logger.OnStart()
+		context.RequestWithCustomSender(p.mainServer, &messages.Started{}, p.actorPid)
+	case *actor.Stop:
+		p.logger.OnStop()
 	case *messages.Simulate:
 		p.transactionManager.Simulate(context, p)
 	case *messages.BroadcastInstanceMessage:
