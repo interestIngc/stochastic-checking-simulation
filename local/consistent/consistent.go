@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	console "github.com/asynkron/goconsole"
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/remote"
@@ -36,50 +37,51 @@ func main() {
 	correctProcesses := make([]*consistent.CorrectProcess, processCount-faultyProcessesCount)
 	faultyProcesses := make([]*consistent.FaultyProcess, faultyProcessesCount)
 
-	for i := 0; i < faultyProcessesCount; i++ {
-		process := &consistent.FaultyProcess{}
-		faultyProcesses[i] = process
-		processes[i] = process
-		pids[i] =
-			system.Root.Spawn(
-				actor.PropsFromProducer(
-					func() actor.Actor {
-						return process
-					}),
-			)
-	}
-
-	for i := 0; i < processCount-faultyProcessesCount; i++ {
-		process := &consistent.CorrectProcess{}
-		correctProcesses[i] = process
-		processes[i+faultyProcessesCount] = process
-		pids[i+faultyProcessesCount] =
-			system.Root.Spawn(
-				actor.PropsFromProducer(
-					func() actor.Actor {
-						return process
-					}),
-			)
-	}
-
 	logger := log.Default()
-	for i := 0; i < faultyProcessesCount; i++ {
-		faultyProcesses[i].InitProcess(
+
+	mainserver, e := system.Root.SpawnNamed(
+		actor.PropsFromFunc(func(c actor.Context) {}),
+		"mainserver",
+	)
+	if e != nil {
+		logger.Fatal("Could not spawn the mainserver")
+	}
+
+	for i := 0; i < processCount; i++ {
+		pids[i] = actor.NewPID("127.0.0.1:8080", fmt.Sprintf("process%d", i))
+	}
+
+	for i := 0; i < processCount; i++ {
+		if i < faultyProcessesCount {
+			process := &consistent.FaultyProcess{}
+			faultyProcesses[i] = process
+			processes[i] = process
+		} else {
+			process := &consistent.CorrectProcess{}
+			correctProcesses[i-faultyProcessesCount] = process
+			processes[i] = process
+		}
+
+		processes[i].InitProcess(
 			pids[i],
 			pids,
 			parameters,
 			logger,
 			protocols.NewTransactionManager(1, 1),
+			mainserver,
 		)
-	}
-	for i := 0; i < processCount-faultyProcessesCount; i++ {
-		correctProcesses[i].InitProcess(
-			pids[i+faultyProcessesCount],
-			pids,
-			parameters,
-			logger,
-			protocols.NewTransactionManager(1, 1),
-		)
+
+		_, e :=
+			system.Root.SpawnNamed(
+				actor.PropsFromProducer(
+					func() actor.Actor {
+						return processes[i]
+					}),
+				pids[i].Id,
+			)
+		if e != nil {
+			logger.Fatal(fmt.Sprintf("Could not spawn process %d: %e", i, e))
+		}
 	}
 
 	faultyProcesses[0].FaultyBroadcast(system.Root, 0, 5)

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	console "github.com/asynkron/goconsole"
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/remote"
@@ -25,26 +26,43 @@ func main() {
 	pids := make([]*actor.PID, processCount)
 	processes := make([]*bracha.Process, processCount)
 
-	for i := 0; i < processCount; i++ {
-		processes[i] = &bracha.Process{}
-		pids[i] =
-			system.Root.Spawn(
-				actor.PropsFromProducer(
-					func() actor.Actor {
-						return processes[i]
-					}),
-			)
+	logger := log.Default()
+
+	mainserver, e := system.Root.SpawnNamed(
+		actor.PropsFromFunc(func(c actor.Context) {}),
+		"mainserver",
+	)
+	if e != nil {
+		logger.Fatal("Could not spawn the mainserver")
 	}
 
-	logger := log.Default()
 	for i := 0; i < processCount; i++ {
-		processes[i].InitProcess(
+		pids[i] = actor.NewPID("127.0.0.1:8080", fmt.Sprintf("process%d", i))
+	}
+
+	for i := 0; i < processCount; i++ {
+		process := &bracha.Process{}
+		processes[i] = process
+		process.InitProcess(
 			pids[i],
 			pids,
 			parameters,
 			logger,
 			protocols.NewTransactionManager(1, 1),
+			mainserver,
 		)
+
+		_, e :=
+			system.Root.SpawnNamed(
+				actor.PropsFromProducer(
+					func() actor.Actor {
+						return process
+					}),
+				pids[i].Id,
+			)
+		if e != nil {
+			logger.Fatal(fmt.Sprintf("Could not spawn process %d: %e", i, e))
+		}
 	}
 
 	processes[0].Broadcast(system.Root, 5)
