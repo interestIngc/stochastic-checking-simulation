@@ -32,7 +32,9 @@ var (
 		"timeout the process should wait before initialising a new transaction")
 	baseIpAddress = flag.String("base_ip", "10.0.0.1",
 		"Address of the main server. Ip addresses for nodes are assigned by incrementing base_ip n times")
-	port = flag.Int("port", 5001, "Port on which the node should be started")
+	port     = flag.Int("port", 5001, "Port on which the node should be started")
+	localRun = flag.Bool("local_run", false,
+		"Defines whether to start the simulation locally, i.e. on a single machine, or in a distributed system")
 )
 
 type Input struct {
@@ -80,31 +82,44 @@ func main() {
 		}
 	}
 
-	var processIp string
+	processIp := *baseIpAddress
+	processPort := *port
+
 	pids := make([]*actor.PID, processCount)
 
 	for i := 0; i < processCount; i++ {
-		leftByteInd := Bytes - 1
-		for ; leftByteInd >= 0 && ipBytes[leftByteInd] == 255; leftByteInd-- {
-		}
-		if leftByteInd == -1 {
-			logger.Fatal("Cannot assign ip addresses, number of processes in the system is too high")
-		}
-		ipBytes[leftByteInd]++
-		for ind := leftByteInd + 1; ind < Bytes; ind++ {
-			ipBytes[ind] = 0
-		}
+		var address string
+		if *localRun {
+			currPort := *port + i + 1
+			if i == *processIndex {
+				processPort = currPort
+			}
+			address = utils.JoinIpAndPort(*baseIpAddress, currPort)
+		} else {
+			leftByteInd := Bytes - 1
+			for ; leftByteInd >= 0 && ipBytes[leftByteInd] == 255; leftByteInd-- {
+			}
+			if leftByteInd == -1 {
+				logger.Fatal("Cannot assign ip addresses, number of processes in the system is too high")
+			}
+			ipBytes[leftByteInd]++
+			for ind := leftByteInd + 1; ind < Bytes; ind++ {
+				ipBytes[ind] = 0
+			}
 
-		ipBytesAsStr := make([]string, Bytes)
-		for ind := 0; ind < Bytes; ind++ {
-			ipBytesAsStr[ind] = strconv.Itoa(ipBytes[ind])
-		}
+			ipBytesAsStr := make([]string, Bytes)
+			for ind := 0; ind < Bytes; ind++ {
+				ipBytesAsStr[ind] = strconv.Itoa(ipBytes[ind])
+			}
+			currIp := strings.Join(ipBytesAsStr, ".")
 
-		currIp := strings.Join(ipBytesAsStr, ".")
-		if i == *processIndex {
-			processIp = currIp
+			if i == *processIndex {
+				processIp = currIp
+			}
+
+			address = utils.JoinIpAndPort(currIp, *port)
 		}
-		pids[i] = actor.NewPID(utils.JoinIpAndPort(currIp, *port), "main")
+		pids[i] = actor.NewPID(address, "main")
 	}
 
 	mainServer := actor.NewPID(utils.JoinIpAndPort(*baseIpAddress, *port), "mainserver")
@@ -134,7 +149,7 @@ func main() {
 	)
 
 	system := actor.NewActorSystem()
-	remoteConfig := remote.Configure(processIp, *port)
+	remoteConfig := remote.Configure(processIp, processPort)
 	remoter := remote.NewRemote(system, remoteConfig)
 	remoter.Start()
 
