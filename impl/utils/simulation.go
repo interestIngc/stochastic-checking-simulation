@@ -13,9 +13,8 @@ func MakeCustomPid(pid *actor.PID) string {
 	return fmt.Sprintf("%s,%s", pid.Address, pid.Id)
 }
 
-func ExitWithError(logger *log.Logger, errorMessage string) {
-	logger.Println(errorMessage)
-	os.Exit(1)
+func JoinIpAndPort(ip string, port int) string {
+	return fmt.Sprintf("%s:%d", ip, port)
 }
 
 func OpenLogFile(logFile string) *os.File {

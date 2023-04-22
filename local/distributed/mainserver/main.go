@@ -34,7 +34,8 @@ func main() {
 	remoter := remote.NewRemote(system, remoteConfig)
 	remoter.Start()
 
-	pid := actor.NewPID(joinWithPort(*ipAddress, *port), "mainserver")
+	ipAndPort := joinWithPort(*ipAddress, *port)
+	pid := actor.NewPID(ipAndPort, "mainserver")
 	server := &MainServer{}
 	server.InitMainServer(pid, *processCount, logger)
 
@@ -49,7 +50,7 @@ func main() {
 		logger.Fatal(fmt.Sprintf("Could not start the main server: %s\n", e))
 	}
 
-	logger.Printf("Main server started at %s:%d\n", *ipAddress, *port)
+	logger.Printf("Main server started at %s\n", ipAndPort)
 
 	select {}
 }

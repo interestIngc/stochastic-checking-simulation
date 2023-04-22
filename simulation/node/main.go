@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"flag"
-	"fmt"
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/remote"
 	"io"
@@ -41,10 +40,6 @@ type Input struct {
 	Parameters parameters.Parameters `json:"parameters"`
 }
 
-func joinWithPort(ip string, port int) string {
-	return fmt.Sprintf("%s:%d", ip, port)
-}
-
 func main() {
 	flag.Parse()
 
@@ -53,22 +48,22 @@ func main() {
 
 	iFile, e := os.Open(*inputFile)
 	if e != nil {
-		utils.ExitWithError(logger, fmt.Sprintf("Can't read from file %s", *inputFile))
+		logger.Fatalf("Can't read from file %s", *inputFile)
 	}
 
 	byteArray, e := io.ReadAll(iFile)
 	if e != nil {
-		utils.ExitWithError(logger, fmt.Sprintf("Could not read bytes from the input file\n%e", e))
+		logger.Fatalf("Could not read bytes from the input file: %e", e)
 	}
 
 	var input Input
 	e = json.Unmarshal(byteArray, &input)
 	if e != nil {
-		utils.ExitWithError(logger, fmt.Sprintf("Could not parse json from the input file\n%e", e))
+		logger.Fatalf("Could not parse json from the input file\n%e", e)
 	}
 
 	if input.Protocol == "" {
-		utils.ExitWithError(logger, "Parameter protocol is mandatory")
+		logger.Fatal("Parameter protocol is mandatory")
 	}
 
 	processCount := input.Parameters.ProcessCount
@@ -78,10 +73,10 @@ func main() {
 	for i, currByte := range strings.Split(*baseIpAddress, ".") {
 		ipBytes[i], e = strconv.Atoi(currByte)
 		if e != nil {
-			utils.ExitWithError(logger, fmt.Sprintf("Byte %d in base ip address is invalid", i))
+			logger.Fatalf("Byte %d in base ip address is invalid", i)
 		}
 		if i >= Bytes {
-			utils.ExitWithError(logger, "Base ip address must be ipv4")
+			logger.Fatal("Base ip address must be ipv4")
 		}
 	}
 
@@ -93,9 +88,7 @@ func main() {
 		for ; leftByteInd >= 0 && ipBytes[leftByteInd] == 255; leftByteInd-- {
 		}
 		if leftByteInd == -1 {
-			utils.ExitWithError(
-				logger,
-				"Cannot assign ip addresses, number of processes in the system is too high")
+			logger.Fatal("Cannot assign ip addresses, number of processes in the system is too high")
 		}
 		ipBytes[leftByteInd]++
 		for ind := leftByteInd + 1; ind < Bytes; ind++ {
@@ -111,10 +104,10 @@ func main() {
 		if i == *processIndex {
 			processIp = currIp
 		}
-		pids[i] = actor.NewPID(joinWithPort(currIp, *port), "main")
+		pids[i] = actor.NewPID(utils.JoinIpAndPort(currIp, *port), "main")
 	}
 
-	mainServer := actor.NewPID(joinWithPort(*baseIpAddress, *port), "mainserver")
+	mainServer := actor.NewPID(utils.JoinIpAndPort(*baseIpAddress, *port), "mainserver")
 
 	var process protocols.Process
 
@@ -128,7 +121,7 @@ func main() {
 	case "scalable":
 		process = &scalable.Process{}
 	default:
-		utils.ExitWithError(logger, fmt.Sprintf("Invalid protocol: %s", input.Protocol))
+		logger.Fatalf("Invalid protocol: %s", input.Protocol)
 	}
 
 	process.InitProcess(
@@ -154,7 +147,7 @@ func main() {
 			"main",
 		)
 	if e != nil {
-		logger.Fatal(fmt.Sprintf("Error while spawning the process happened: %s", e))
+		logger.Fatalf("Error while spawning the process happened: %s", e)
 	}
 
 	logger.Printf("Running protocol: %s\n", input.Protocol)

@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/remote"
 	"log"
@@ -19,11 +18,6 @@ var (
 	port      = flag.Int("port", 5001, "Port on which the main server should be started")
 )
 
-// TODO(me) - put this into utils and reuse
-func joinWithPort(ip string, port int) string {
-	return fmt.Sprintf("%s:%d", ip, port)
-}
-
 func main() {
 	flag.Parse()
 
@@ -35,7 +29,8 @@ func main() {
 	remoter := remote.NewRemote(system, remoteConfig)
 	remoter.Start()
 
-	pid := actor.NewPID(joinWithPort(*ipAddress, *port), "mainserver")
+	ipAndPort := utils.JoinIpAndPort(*ipAddress, *port)
+	pid := actor.NewPID(ipAndPort, "mainserver")
 	server := &MainServer{}
 	server.InitMainServer(pid, *processCount, logger)
 
@@ -47,10 +42,10 @@ func main() {
 		"mainserver",
 	)
 	if e != nil {
-		logger.Fatal(fmt.Sprintf("Could not start the main server: %s\n", e))
+		logger.Fatalf("Could not start the main server: %s\n", e)
 	}
 
-	logger.Printf("Main server started at %s:%d\n", *ipAddress, *port)
+	logger.Printf("Main server started at %s\n", ipAndPort)
 
 	select {}
 }
