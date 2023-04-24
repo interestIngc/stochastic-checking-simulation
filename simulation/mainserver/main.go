@@ -14,8 +14,10 @@ var (
 		"log_file",
 		"",
 		"Path to the file where to save logs produced by the main server")
-	ipAddress = flag.String("ip", "10.0.0.1", "Ip address of the main server")
-	port      = flag.Int("port", 5001, "Port on which the main server should be started")
+	baseIpAddress = flag.String("ip", "10.0.0.1", "Ip address of the main server")
+	basePort      = flag.Int("port", 5001, "Port on which the main server should be started")
+	localRun      = flag.Bool("local_run", false,
+		"Defines whether to start the simulation locally, i.e. on a single machine, or in a distributed system")
 )
 
 func main() {
@@ -25,14 +27,19 @@ func main() {
 	logger := log.New(f, "", log.LstdFlags)
 
 	system := actor.NewActorSystem()
-	remoteConfig := remote.Configure(*ipAddress, *port)
+	remoteConfig := remote.Configure(*baseIpAddress, *basePort)
 	remoter := remote.NewRemote(system, remoteConfig)
 	remoter.Start()
 
-	ipAndPort := utils.JoinIpAndPort(*ipAddress, *port)
-	pid := actor.NewPID(ipAndPort, "mainserver")
+	var pids []*actor.PID
+	if *localRun {
+		pids = utils.GetLocalPids(*baseIpAddress, *basePort, *processCount)
+	} else {
+		pids = utils.GetRemotePids(*baseIpAddress, *basePort, *processCount, logger)
+	}
+
 	server := &MainServer{}
-	server.InitMainServer(pid, *processCount, logger)
+	server.InitMainServer(pids, logger)
 
 	_, e := system.Root.SpawnNamed(
 		actor.PropsFromProducer(
@@ -45,7 +52,10 @@ func main() {
 		logger.Fatalf("Could not start the main server: %s\n", e)
 	}
 
-	logger.Printf("Main server started at %s\n", ipAndPort)
+	logger.Printf(
+		"Main server started at %s\n",
+		utils.JoinIpAndPort(*baseIpAddress, *basePort),
+	)
 
 	select {}
 }

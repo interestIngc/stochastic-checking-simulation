@@ -8,34 +8,29 @@ import (
 )
 
 type MainServer struct {
-	currPid          *actor.PID
-	processCount     int
-	startedProcesses *actor.PIDSet
+	pids []*actor.PID
+	startedProcessesCount int
 
 	logger *log.Logger
 }
 
-func (ms *MainServer) InitMainServer(currPid *actor.PID, processCount int, logger *log.Logger) {
-	ms.currPid = currPid
-	ms.processCount = processCount
-	ms.startedProcesses = actor.NewPIDSet()
+func (ms *MainServer) InitMainServer(pids []*actor.PID, logger *log.Logger) {
+	ms.pids = pids
+	ms.startedProcessesCount = 0
 	ms.logger = logger
 }
 
 func (ms *MainServer) simulate(context actor.SenderContext) {
-	for _, pid := range ms.startedProcesses.Values() {
-		context.RequestWithCustomSender(
-			pid,
-			&messages.Simulate{},
-			ms.currPid)
+	for _, pid := range ms.pids {
+		context.Send(pid, &messages.Simulate{})
 	}
 }
 
 func (ms *MainServer) Receive(context actor.Context) {
 	switch context.Message().(type) {
 	case *messages.Started:
-		ms.startedProcesses.Add(context.Sender())
-		if ms.startedProcesses.Len() == ms.processCount {
+		ms.startedProcessesCount++
+		if ms.startedProcessesCount == len(ms.pids) {
 			ms.logger.Printf("Starting broadcast, timestamp: %d\n", utils.GetNow())
 			ms.simulate(context)
 		}

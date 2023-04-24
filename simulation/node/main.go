@@ -7,19 +7,14 @@ import (
 	"github.com/asynkron/protoactor-go/remote"
 	"io"
 	"log"
+	"net"
 	"os"
 	"stochastic-checking-simulation/impl/parameters"
 	"stochastic-checking-simulation/impl/protocols"
-	"stochastic-checking-simulation/impl/protocols/accountability/consistent"
-	"stochastic-checking-simulation/impl/protocols/accountability/reliable"
 	"stochastic-checking-simulation/impl/protocols/bracha"
-	"stochastic-checking-simulation/impl/protocols/scalable"
 	"stochastic-checking-simulation/impl/utils"
 	"strconv"
-	"strings"
 )
-
-const Bytes = 4
 
 var (
 	inputFile = flag.String("input_file", "", "Path to the input file in json format")
@@ -70,56 +65,11 @@ func main() {
 
 	processCount := input.Parameters.ProcessCount
 
-	ipBytes := make([]int, Bytes)
-
-	for i, currByte := range strings.Split(*baseIpAddress, ".") {
-		ipBytes[i], e = strconv.Atoi(currByte)
-		if e != nil {
-			logger.Fatalf("Byte %d in base ip address is invalid", i)
-		}
-		if i >= Bytes {
-			logger.Fatal("Base ip address must be ipv4")
-		}
-	}
-
-	processIp := *baseIpAddress
-	processPort := *port
-
-	pids := make([]*actor.PID, processCount)
-
-	for i := 0; i < processCount; i++ {
-		var address string
-		if *localRun {
-			currPort := *port + i + 1
-			if i == *processIndex {
-				processPort = currPort
-			}
-			address = utils.JoinIpAndPort(*baseIpAddress, currPort)
-		} else {
-			leftByteInd := Bytes - 1
-			for ; leftByteInd >= 0 && ipBytes[leftByteInd] == 255; leftByteInd-- {
-			}
-			if leftByteInd == -1 {
-				logger.Fatal("Cannot assign ip addresses, number of processes in the system is too high")
-			}
-			ipBytes[leftByteInd]++
-			for ind := leftByteInd + 1; ind < Bytes; ind++ {
-				ipBytes[ind] = 0
-			}
-
-			ipBytesAsStr := make([]string, Bytes)
-			for ind := 0; ind < Bytes; ind++ {
-				ipBytesAsStr[ind] = strconv.Itoa(ipBytes[ind])
-			}
-			currIp := strings.Join(ipBytesAsStr, ".")
-
-			if i == *processIndex {
-				processIp = currIp
-			}
-
-			address = utils.JoinIpAndPort(currIp, *port)
-		}
-		pids[i] = actor.NewPID(address, "main")
+	var pids []*actor.PID
+	if *localRun {
+		pids = utils.GetLocalPids(*baseIpAddress, *port, processCount)
+	} else {
+		pids = utils.GetRemotePids(*baseIpAddress, *port, processCount, logger)
 	}
 
 	mainServer := actor.NewPID(utils.JoinIpAndPort(*baseIpAddress, *port), "mainserver")
@@ -147,6 +97,9 @@ func main() {
 		protocols.NewTransactionManager(*transactions, *transactionInitTimeoutNs),
 		mainServer,
 	)
+
+	processIp, processPortStr, _ := net.SplitHostPort(pids[*processIndex].Address)
+	processPort, _ := strconv.Atoi(processPortStr)
 
 	system := actor.NewActorSystem()
 	remoteConfig := remote.Configure(processIp, processPort)
