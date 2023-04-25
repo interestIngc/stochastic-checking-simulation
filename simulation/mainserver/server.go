@@ -8,7 +8,7 @@ import (
 )
 
 type MainServer struct {
-	pids []*actor.PID
+	pids                  []*actor.PID
 	startedProcessesCount int
 
 	logger *log.Logger

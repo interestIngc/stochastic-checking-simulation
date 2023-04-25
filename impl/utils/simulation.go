@@ -66,7 +66,7 @@ func GetRemotePids(baseIp string, basePort int, processCount int, logger *log.Lo
 		}
 		currIp := strings.Join(ipBytesAsStr, ".")
 
-		pids[i] = actor.NewPID(JoinIpAndPort(currIp, basePort),"main")
+		pids[i] = actor.NewPID(JoinIpAndPort(currIp, basePort), "main")
 	}
 
 	return pids
