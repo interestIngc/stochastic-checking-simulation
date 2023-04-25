@@ -447,6 +447,7 @@ func (p *Process) Receive(context actor.Context) {
 	case *actor.Stop:
 		p.logger.OnStop()
 	case *messages.Simulate:
+		p.logger.OnSimulationStart()
 		p.transactionManager.Simulate(context, p)
 	case *messages.BroadcastInstanceMessage:
 		bInstance := message.BroadcastInstance

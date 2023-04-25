@@ -19,6 +19,12 @@ func InitEventLogger(pid int64, logger *log.Logger) *EventLogger {
 	return l
 }
 
+func (el *EventLogger) OnSimulationStart() {
+	el.logger.Printf(
+		"Simulation started: %d, timestamp: %d\n",
+		el.pid, utils.GetNow())
+}
+
 func (el *EventLogger) OnTransactionInit(
 	broadcastInstance *messages.BroadcastInstance,
 ) {
@@ -40,8 +46,8 @@ func (el *EventLogger) OnWitnessSetSelected(
 	}
 
 	el.logger.Printf(
-		"Witness set selected; type: %s, transaction: %s, pids: %v\n",
-		wsType, broadcastInstance.ToString(), pids)
+		"Witness set selected; type: %s, transaction: %s, pids: %v, timestamp: %d\n",
+		wsType, broadcastInstance.ToString(), pids, utils.GetNow())
 }
 
 func (el *EventLogger) OnRecoveryProtocolSwitch(broadcastInstance *messages.BroadcastInstance) {
@@ -66,8 +72,11 @@ func (el *EventLogger) OnHistoryUsedInWitnessSetSelection(
 	deliveredMessagesHistory []string,
 ) {
 	el.logger.Printf(
-		"Witness set selection; transaction: %s, history hash: %s, history: %v\n",
-		broadcastInstance.ToString(), historyHash.ToString(), deliveredMessagesHistory)
+		"Witness set selection; transaction: %s, history hash: %s, history: %v, timestamp: %d\n",
+		broadcastInstance.ToString(),
+		historyHash.ToString(),
+		deliveredMessagesHistory,
+		utils.GetNow())
 }
 
 func (el *EventLogger) OnAttack(
