@@ -5,11 +5,11 @@ import (
 	"math/rand"
 	"sort"
 	"stochastic-checking-simulation/impl/utils"
+	"strconv"
 )
 
 type WitnessesSelector struct {
-	NodeIds []string
-	Hasher  Hasher
+	Hasher Hasher
 
 	MinPotWitnessSetSize int
 	MinOwnWitnessSetSize int
@@ -37,16 +37,18 @@ func (bd byDist) Less(i, j int) bool {
 }
 
 func (ws *WitnessesSelector) GetWitnessSet(
-	author string, seqNumber int64, historyHash *HistoryHash,
+	nodeIds []string,
+	authorIndex int64, seqNumber int64, historyHash *HistoryHash,
 ) (map[string]bool, map[string]bool) {
-	transaction := utils.TransactionToBytes(author, seqNumber)
-	transactionRing := multiRingFromBytes(
-		256, historyHash.binNum, ws.Hasher.Hash(transaction))
+	//transaction := utils.TransactionToBytes(author, seqNumber)
+	//transactionRing := multiRingFromBytes(
+	//	256, historyHash.binNum, ws.Hasher.Hash(transaction))
 
-	distances := make([]dist, len(ws.NodeIds))
-	for i, pid := range ws.NodeIds {
+	distances := make([]dist, len(nodeIds))
+	for i, pid := range nodeIds {
 		historyHashRingCopy := historyHash.bins.copy()
-		pidHash := ws.Hasher.Hash([]byte(pid))
+		pidHash := ws.Hasher.Hash([]byte(pid + nodeIds[authorIndex] + strconv.Itoa(int(seqNumber))))
+		idRing := multiRingFromBytes(historyHash.binCapacity, historyHash.binNum, pidHash)
 		rd := rand.New(rand.NewSource(int64(utils.ToUint64(pidHash))))
 		rd.Shuffle(
 			int(historyHashRingCopy.dimension),
@@ -55,7 +57,10 @@ func (ws *WitnessesSelector) GetWitnessSet(
 					historyHashRingCopy.vector[j], historyHashRingCopy.vector[i]
 			})
 
-		d, e := multiRingDistance(historyHashRingCopy, transactionRing, 1.0)
+		idRing.merge(historyHashRingCopy)
+		defaultRing := NewMultiRing(historyHash.binCapacity, historyHash.binNum)
+		d, e := multiRingDistance(defaultRing, idRing, 1.0)
+		//d, e := multiRingDistanceLInf(defaultRing, idRing)
 
 		if e != nil {
 			log.Printf("Error while generating a witness set happened: %s\n", e)
@@ -70,9 +75,9 @@ func (ws *WitnessesSelector) GetWitnessSet(
 	potWitnessSet := make(map[string]bool)
 	ownWitnessSet := make(map[string]bool)
 
-	for i := 0; i < len(ws.NodeIds) &&
+	for i := 0; i < len(nodeIds) &&
 		(i < ws.MinPotWitnessSetSize || distances[i].d < ws.PotWitnessSetRadius); i++ {
-		id := ws.NodeIds[distances[i].ind]
+		id := nodeIds[distances[i].ind]
 		potWitnessSet[id] = true
 		if i < ws.MinOwnWitnessSetSize || distances[i].d < ws.OwnWitnessSetRadius {
 			ownWitnessSet[id] = true

@@ -8,11 +8,11 @@ import (
 )
 
 type EventLogger struct {
-	pid    string
+	pid    int64
 	logger *log.Logger
 }
 
-func InitEventLogger(pid string, logger *log.Logger) *EventLogger {
+func InitEventLogger(pid int64, logger *log.Logger) *EventLogger {
 	l := new(EventLogger)
 	l.pid = pid
 	l.logger = logger
@@ -86,13 +86,13 @@ func (el *EventLogger) OnAttack(
 
 func (el *EventLogger) OnMessageSent(msgId int64) {
 	el.logger.Printf(
-		"Sent message: {%s;%d}, timestamp: %d\n",
+		"Sent message: {%d;%d}, timestamp: %d\n",
 		el.pid, msgId, utils.GetNow())
 }
 
-func (el *EventLogger) OnMessageReceived(senderPid string, msgId int64) {
+func (el *EventLogger) OnMessageReceived(senderPid int64, msgId int64) {
 	el.logger.Printf(
-		"Received message: {%s;%d}, timestamp: %d\n",
+		"Received message: {%d;%d}, timestamp: %d\n",
 		senderPid, msgId, utils.GetNow())
 }
 
@@ -101,9 +101,9 @@ func (el *EventLogger) Fatal(message string) {
 }
 
 func (el *EventLogger) OnStart() {
-	el.logger.Printf("Process started: %s\n", el.pid)
+	el.logger.Printf("Process started: %d\n", el.pid)
 }
 
 func (el *EventLogger) OnStop() {
-	el.logger.Printf("Process %s is terminating", el.pid)
+	el.logger.Printf("Process %d is terminating\n", el.pid)
 }

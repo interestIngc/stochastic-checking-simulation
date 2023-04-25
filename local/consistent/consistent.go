@@ -63,7 +63,7 @@ func main() {
 		}
 
 		processes[i].InitProcess(
-			pids[i],
+			int64(i),
 			pids,
 			parameters,
 			logger,

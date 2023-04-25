@@ -10,7 +10,7 @@ type Process interface {
 	Receive(context actor.Context)
 
 	InitProcess(
-		currPid *actor.PID,
+		processIndex int64,
 		pids []*actor.PID,
 		parameters *parameters.Parameters,
 		logger *log.Logger,

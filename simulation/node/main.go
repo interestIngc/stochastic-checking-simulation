@@ -11,7 +11,10 @@ import (
 	"os"
 	"stochastic-checking-simulation/impl/parameters"
 	"stochastic-checking-simulation/impl/protocols"
+	"stochastic-checking-simulation/impl/protocols/accountability/consistent"
+	"stochastic-checking-simulation/impl/protocols/accountability/reliable"
 	"stochastic-checking-simulation/impl/protocols/bracha"
+	"stochastic-checking-simulation/impl/protocols/scalable"
 	"stochastic-checking-simulation/impl/utils"
 	"strconv"
 )
@@ -90,7 +93,7 @@ func main() {
 	}
 
 	process.InitProcess(
-		pids[*processIndex],
+		int64(*processIndex),
 		pids,
 		&input.Parameters,
 		logger,

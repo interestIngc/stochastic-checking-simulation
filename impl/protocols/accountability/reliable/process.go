@@ -14,6 +14,8 @@ import (
 	"time"
 )
 
+type ProcessId int64
+
 type WitnessStage int
 
 const (
@@ -41,10 +43,10 @@ const (
 )
 
 type messageState struct {
-	echoFromProcesses     map[string]bool
-	readyFromProcesses    map[string]bool
-	readyFromWitnesses    map[string]bool
-	validateFromWitnesses map[string]bool
+	echoFromProcesses     map[ProcessId]bool
+	readyFromProcesses    map[ProcessId]bool
+	readyFromWitnesses    map[ProcessId]bool
+	validateFromWitnesses map[ProcessId]bool
 
 	echoFromProcessesStat  map[int64]int
 	readyFromProcessesStat map[int64]int
@@ -63,10 +65,10 @@ type messageState struct {
 func newMessageState() *messageState {
 	ms := new(messageState)
 
-	ms.echoFromProcesses = make(map[string]bool)
-	ms.readyFromProcesses = make(map[string]bool)
-	ms.readyFromWitnesses = make(map[string]bool)
-	ms.validateFromWitnesses = make(map[string]bool)
+	ms.echoFromProcesses = make(map[ProcessId]bool)
+	ms.readyFromProcesses = make(map[ProcessId]bool)
+	ms.readyFromWitnesses = make(map[ProcessId]bool)
+	ms.validateFromWitnesses = make(map[ProcessId]bool)
 
 	ms.echoFromProcessesStat = make(map[int64]int)
 	ms.readyFromWitnessesStat = make(map[int64]int)
@@ -82,10 +84,10 @@ func newMessageState() *messageState {
 }
 
 type recoveryMessageState struct {
-	receivedRecover map[string]bool
-	receivedReply   map[string]bool
-	receivedEcho    map[string]bool
-	receivedReady   map[string]bool
+	receivedRecover map[ProcessId]bool
+	receivedReply   map[ProcessId]bool
+	receivedEcho    map[ProcessId]bool
+	receivedReady   map[ProcessId]bool
 
 	recoverValues map[int64]bool
 
@@ -102,12 +104,13 @@ type recoveryMessageState struct {
 func newRecoveryMessageState() *recoveryMessageState {
 	ms := new(recoveryMessageState)
 
-	ms.receivedRecover = make(map[string]bool)
-	ms.receivedReply = make(map[string]bool)
-	ms.receivedEcho = make(map[string]bool)
-	ms.receivedReady = make(map[string]bool)
+	ms.receivedRecover = make(map[ProcessId]bool)
+	ms.receivedReply = make(map[ProcessId]bool)
+	ms.receivedEcho = make(map[ProcessId]bool)
+	ms.receivedReady = make(map[ProcessId]bool)
 
 	ms.recoverValues = make(map[int64]bool)
+
 	ms.replyMessagesStat = make(map[int64]int)
 	ms.recoverReadyStat = make(map[int64]int)
 	ms.echoMessagesStat = make(map[int64]int)
@@ -121,18 +124,18 @@ func newRecoveryMessageState() *recoveryMessageState {
 }
 
 type Process struct {
-	actorPid  *actor.PID
-	pid       string
-	actorPids map[string]*actor.PID
+	processIndex int64
+	actorPids    map[string]*actor.PID
+	pids         []string
 
 	transactionCounter int64
 	messageCounter     int64
 
-	deliveredMessages        map[string]map[int64]int64
+	deliveredMessages        map[ProcessId]map[int64]int64
 	deliveredMessagesHistory []string
-	messagesLog              map[string]map[int64]*messageState
-	lastSentPMessages        map[string]map[int64]*messages.ReliableProtocolMessage
-	recoveryMessagesLog      map[string]map[int64]*recoveryMessageState
+	messagesLog              map[ProcessId]map[int64]*messageState
+	lastSentPMessages        map[ProcessId]map[int64]*messages.ReliableProtocolMessage
+	recoveryMessagesLog      map[ProcessId]map[int64]*recoveryMessageState
 
 	quorumThreshold         int
 	readyMessagesThreshold  int
@@ -149,16 +152,17 @@ type Process struct {
 }
 
 func (p *Process) InitProcess(
-	actorPid *actor.PID,
+	processIndex int64,
 	actorPids []*actor.PID,
 	parameters *parameters.Parameters,
 	logger *log.Logger,
 	transactionManager *protocols.TransactionManager,
 	mainServer *actor.PID,
 ) {
-	p.actorPid = actorPid
-	p.pid = utils.MakeCustomPid(actorPid)
+	p.processIndex = processIndex
 	p.actorPids = make(map[string]*actor.PID)
+	p.pids = make([]string, len(actorPids))
+
 	p.transactionCounter = 0
 	p.messageCounter = 0
 
@@ -167,20 +171,19 @@ func (p *Process) InitProcess(
 	p.recoverySwitchTimeoutNs = time.Duration(parameters.RecoverySwitchTimeoutNs)
 	p.witnessThreshold = parameters.WitnessThreshold
 
-	p.deliveredMessages = make(map[string]map[int64]int64)
-	p.messagesLog = make(map[string]map[int64]*messageState)
-	p.lastSentPMessages = make(map[string]map[int64]*messages.ReliableProtocolMessage)
-	p.recoveryMessagesLog = make(map[string]map[int64]*recoveryMessageState)
+	p.deliveredMessages = make(map[ProcessId]map[int64]int64)
+	p.messagesLog = make(map[ProcessId]map[int64]*messageState)
+	p.lastSentPMessages = make(map[ProcessId]map[int64]*messages.ReliableProtocolMessage)
+	p.recoveryMessagesLog = make(map[ProcessId]map[int64]*recoveryMessageState)
 
-	pids := make([]string, len(actorPids))
-	for i, currActorPid := range actorPids {
-		pid := utils.MakeCustomPid(currActorPid)
-		pids[i] = pid
-		p.actorPids[pid] = currActorPid
-		p.deliveredMessages[pid] = make(map[int64]int64)
-		p.messagesLog[pid] = make(map[int64]*messageState)
-		p.lastSentPMessages[pid] = make(map[int64]*messages.ReliableProtocolMessage)
-		p.recoveryMessagesLog[pid] = make(map[int64]*recoveryMessageState)
+	for i, actorPid := range actorPids {
+		pid := utils.MakeCustomPid(actorPid)
+		p.pids[i] = pid
+		p.actorPids[pid] = actorPid
+		p.deliveredMessages[ProcessId(i)] = make(map[int64]int64)
+		p.messagesLog[ProcessId(i)] = make(map[int64]*messageState)
+		p.lastSentPMessages[ProcessId(i)] = make(map[int64]*messages.ReliableProtocolMessage)
+		p.recoveryMessagesLog[ProcessId(i)] = make(map[int64]*recoveryMessageState)
 	}
 
 	var hasher hashing.Hasher
@@ -191,7 +194,6 @@ func (p *Process) InitProcess(
 	}
 
 	p.wSelector = &hashing.WitnessesSelector{
-		NodeIds:              pids,
 		Hasher:               hasher,
 		MinPotWitnessSetSize: parameters.MinPotWitnessSetSize,
 		MinOwnWitnessSetSize: parameters.MinOwnWitnessSetSize,
@@ -201,7 +203,7 @@ func (p *Process) InitProcess(
 	binCapacity := uint(math.Pow(2, float64(parameters.NodeIdSize/parameters.NumberOfBins)))
 	p.historyHash = hashing.NewHistoryHash(uint(parameters.NumberOfBins), binCapacity, hasher)
 
-	p.logger = eventlogger.InitEventLogger(p.pid, logger)
+	p.logger = eventlogger.InitEventLogger(p.processIndex, logger)
 	p.transactionManager = transactionManager
 
 	p.mainServer = mainServer
@@ -209,23 +211,23 @@ func (p *Process) InitProcess(
 
 func (p *Process) initMessageState(
 	context actor.SenderContext,
-	broadcastInstance *messages.BroadcastInstance,
+	bInstance *messages.BroadcastInstance,
 	value int64,
 ) *messageState {
 	msgState := newMessageState()
-	p.messagesLog[broadcastInstance.Author][broadcastInstance.SeqNumber] = msgState
+	p.messagesLog[ProcessId(bInstance.Author)][bInstance.SeqNumber] = msgState
 
 	p.logger.OnHistoryUsedInWitnessSetSelection(
-		broadcastInstance, p.historyHash, p.deliveredMessagesHistory)
+		bInstance, p.historyHash, p.deliveredMessagesHistory)
 	msgState.ownWitnessSet, msgState.potWitnessSet =
-		p.wSelector.GetWitnessSet(broadcastInstance.Author, broadcastInstance.SeqNumber, p.historyHash)
+		p.wSelector.GetWitnessSet(p.pids, bInstance.Author, bInstance.SeqNumber, p.historyHash)
 
-	p.logger.OnWitnessSetSelected("own", broadcastInstance, msgState.ownWitnessSet)
-	p.logger.OnWitnessSetSelected("pot", broadcastInstance, msgState.potWitnessSet)
+	p.logger.OnWitnessSetSelected("own", bInstance, msgState.ownWitnessSet)
+	p.logger.OnWitnessSetSelected("pot", bInstance, msgState.potWitnessSet)
 
 	p.broadcastToWitnesses(
 		context,
-		broadcastInstance,
+		bInstance,
 		&messages.ReliableProtocolMessage{
 			Stage: messages.ReliableProtocolMessage_NOTIFY,
 			Value: value,
@@ -240,7 +242,7 @@ func (p *Process) registerMessage(
 	bInstance *messages.BroadcastInstance,
 	value int64,
 ) *messageState {
-	msgState := p.messagesLog[bInstance.Author][bInstance.SeqNumber]
+	msgState := p.messagesLog[ProcessId(bInstance.Author)][bInstance.SeqNumber]
 	if msgState == nil {
 		msgState = p.initMessageState(context, bInstance, value)
 		context.ReenterAfter(
@@ -259,11 +261,12 @@ func (p *Process) registerMessage(
 func (p *Process) initRecoveryMessageState(
 	bInstance *messages.BroadcastInstance,
 ) *recoveryMessageState {
-	recoveryState := p.recoveryMessagesLog[bInstance.Author][bInstance.SeqNumber]
+	author := ProcessId(bInstance.Author)
+	recoveryState := p.recoveryMessagesLog[author][bInstance.SeqNumber]
 
 	if recoveryState == nil {
 		recoveryState = newRecoveryMessageState()
-		p.recoveryMessagesLog[bInstance.Author][bInstance.SeqNumber] = recoveryState
+		p.recoveryMessagesLog[author][bInstance.SeqNumber] = recoveryState
 	}
 
 	return recoveryState
@@ -277,13 +280,14 @@ func (p *Process) sendProtocolMessage(
 ) {
 	bMessage := &messages.BroadcastInstanceMessage{
 		BroadcastInstance: bInstance,
+		Sender:            p.processIndex,
 		Message: &messages.BroadcastInstanceMessage_ReliableProtocolMessage{
 			ReliableProtocolMessage: reliableMessage.Copy(),
 		},
 		Stamp: p.messageCounter,
 	}
 
-	context.RequestWithCustomSender(to, bMessage, p.actorPid)
+	context.Send(to, bMessage)
 	p.logger.OnMessageSent(p.messageCounter)
 
 	p.messageCounter++
@@ -297,13 +301,14 @@ func (p *Process) sendRecoveryMessage(
 ) {
 	bMessage := &messages.BroadcastInstanceMessage{
 		BroadcastInstance: bInstance,
+		Sender:            p.processIndex,
 		Message: &messages.BroadcastInstanceMessage_RecoveryProtocolMessage{
 			RecoveryProtocolMessage: recoveryMessage.Copy(),
 		},
 		Stamp: p.messageCounter,
 	}
 
-	context.RequestWithCustomSender(to, bMessage, p.actorPid)
+	context.Send(to, bMessage)
 	p.logger.OnMessageSent(p.messageCounter)
 
 	p.messageCounter++
@@ -339,7 +344,7 @@ func (p *Process) broadcastToWitnesses(
 		p.sendProtocolMessage(context, p.actorPids[pid], bInstance, message)
 	}
 
-	p.lastSentPMessages[bInstance.Author][bInstance.SeqNumber] = message
+	p.lastSentPMessages[ProcessId(bInstance.Author)][bInstance.SeqNumber] = message
 }
 
 func (p *Process) broadcastReadyFromWitness(
@@ -363,7 +368,7 @@ func (p *Process) broadcastRecover(
 	bInstance *messages.BroadcastInstance,
 	recoveryState *recoveryMessageState,
 ) {
-	lastProcessMessage := p.lastSentPMessages[bInstance.Author][bInstance.SeqNumber]
+	lastProcessMessage := p.lastSentPMessages[ProcessId(bInstance.Author)][bInstance.SeqNumber]
 
 	p.broadcastRecoveryMessage(
 		context,
@@ -411,7 +416,7 @@ func (p *Process) broadcastReady(
 }
 
 func (p *Process) isWitness(msgState *messageState) bool {
-	return msgState.potWitnessSet[p.pid]
+	return msgState.potWitnessSet[p.pids[p.processIndex]]
 }
 
 func (p *Process) delivered(
@@ -419,7 +424,7 @@ func (p *Process) delivered(
 	value int64,
 ) bool {
 	deliveredValue, delivered :=
-		p.deliveredMessages[bInstance.Author][bInstance.SeqNumber]
+		p.deliveredMessages[ProcessId(bInstance.Author)][bInstance.SeqNumber]
 
 	if delivered && deliveredValue != value {
 		p.logger.OnAttack(bInstance, value, deliveredValue)
@@ -432,21 +437,21 @@ func (p *Process) deliver(
 	bInstance *messages.BroadcastInstance,
 	value int64,
 ) {
-	p.deliveredMessages[bInstance.Author][bInstance.SeqNumber] = value
+	author := ProcessId(bInstance.Author)
+	p.deliveredMessages[author][bInstance.SeqNumber] = value
 	p.deliveredMessagesHistory = append(p.deliveredMessagesHistory, bInstance.ToString())
 	p.historyHash.Insert(
-		utils.TransactionToBytes(bInstance.Author, bInstance.SeqNumber))
+		utils.TransactionToBytes(p.pids[bInstance.Author], bInstance.SeqNumber))
 
 	messagesReceived := 0
 
-	msgState := p.messagesLog[bInstance.Author][bInstance.SeqNumber]
+	msgState := p.messagesLog[author][bInstance.SeqNumber]
 	if msgState != nil {
 		messagesReceived += msgState.receivedMessagesCnt
-		delete(p.messagesLog[bInstance.Author], bInstance.SeqNumber)
+		delete(p.messagesLog[author], bInstance.SeqNumber)
 	}
 
-	recoveryMsgState := p.recoveryMessagesLog[bInstance.Author][bInstance.SeqNumber]
-	// TODO(me) - does it make sense?
+	recoveryMsgState := p.recoveryMessagesLog[author][bInstance.SeqNumber]
 	if recoveryMsgState != nil {
 		messagesReceived += recoveryMsgState.receivedMessagesCnt
 	}
@@ -456,7 +461,7 @@ func (p *Process) deliver(
 
 func (p *Process) processReliableProtocolMessage(
 	context actor.Context,
-	senderPid string,
+	senderId ProcessId,
 	bInstance *messages.BroadcastInstance,
 	reliableMessage *messages.ReliableProtocolMessage,
 ) {
@@ -468,6 +473,8 @@ func (p *Process) processReliableProtocolMessage(
 
 	msgState := p.registerMessage(context, bInstance, value)
 	msgState.receivedMessagesCnt++
+
+	senderPid := p.pids[senderId]
 
 	switch reliableMessage.Stage {
 	case messages.ReliableProtocolMessage_NOTIFY:
@@ -498,11 +505,11 @@ func (p *Process) processReliableProtocolMessage(
 	case messages.ReliableProtocolMessage_ECHO_FROM_PROCESS:
 		if !p.isWitness(msgState) ||
 			msgState.witnessStage >= SentReadyFromWitness ||
-			msgState.echoFromProcesses[senderPid] {
+			msgState.echoFromProcesses[senderId] {
 			return
 		}
 
-		msgState.echoFromProcesses[senderPid] = true
+		msgState.echoFromProcesses[senderId] = true
 		msgState.echoFromProcessesStat[value]++
 
 		if msgState.echoFromProcessesStat[value] >= p.quorumThreshold {
@@ -511,11 +518,11 @@ func (p *Process) processReliableProtocolMessage(
 	case messages.ReliableProtocolMessage_READY_FROM_WITNESS:
 		if !msgState.ownWitnessSet[senderPid] ||
 			msgState.stage >= SentReadyFromProcess ||
-			msgState.readyFromWitnesses[senderPid] {
+			msgState.readyFromWitnesses[senderId] {
 			return
 		}
 
-		msgState.readyFromWitnesses[senderPid] = true
+		msgState.readyFromWitnesses[senderId] = true
 		msgState.readyFromWitnessesStat[value]++
 
 		if msgState.readyFromWitnessesStat[value] >= p.witnessThreshold {
@@ -530,11 +537,11 @@ func (p *Process) processReliableProtocolMessage(
 			msgState.stage = SentReadyFromProcess
 		}
 	case messages.ReliableProtocolMessage_READY_FROM_PROCESS:
-		if !p.isWitness(msgState) || msgState.readyFromProcesses[senderPid] {
+		if !p.isWitness(msgState) || msgState.readyFromProcesses[senderId] {
 			return
 		}
 
-		msgState.readyFromProcesses[senderPid] = true
+		msgState.readyFromProcesses[senderId] = true
 		msgState.readyFromProcessesStat[value]++
 
 		if msgState.witnessStage < SentReadyFromWitness &&
@@ -554,21 +561,21 @@ func (p *Process) processReliableProtocolMessage(
 			msgState.witnessStage = SentValidate
 		}
 	case messages.ReliableProtocolMessage_VALIDATE:
-		if !msgState.ownWitnessSet[senderPid] || msgState.validateFromWitnesses[senderPid] {
+		if !msgState.ownWitnessSet[senderPid] || msgState.validateFromWitnesses[senderId] {
 			return
 		}
 
-		msgState.validateFromWitnesses[senderPid] = true
+		msgState.validateFromWitnesses[senderId] = true
 		msgState.validatesStat[value]++
 
 		if msgState.validatesStat[value] >= p.witnessThreshold {
-			recoveryState := p.recoveryMessagesLog[bInstance.Author][bInstance.SeqNumber]
+			recoveryState := p.recoveryMessagesLog[ProcessId(bInstance.Author)][bInstance.SeqNumber]
 
 			if recoveryState != nil {
 				for pid := range recoveryState.receivedRecover {
 					p.sendRecoveryMessage(
 						context,
-						p.actorPids[pid],
+						p.actorPids[p.pids[pid]],
 						bInstance,
 						&messages.RecoveryProtocolMessage{
 							Stage:                   messages.RecoveryProtocolMessage_REPLY,
@@ -591,31 +598,31 @@ func makeReliableProtocolMessage(value int64) *messages.ReliableProtocolMessage 
 
 func (p *Process) processRecoveryProtocolMessage(
 	context actor.Context,
-	senderPid string,
+	senderId ProcessId,
 	bInstance *messages.BroadcastInstance,
 	recoveryMessage *messages.RecoveryProtocolMessage,
 ) {
 	reliableMessage := recoveryMessage.ReliableProtocolMessage
 
 	deliveredValue, delivered :=
-		p.deliveredMessages[bInstance.Author][bInstance.SeqNumber]
+		p.deliveredMessages[ProcessId(bInstance.Author)][bInstance.SeqNumber]
 
 	recoveryState := p.initRecoveryMessageState(bInstance)
 	recoveryState.receivedMessagesCnt++
 
 	switch recoveryMessage.Stage {
 	case messages.RecoveryProtocolMessage_RECOVER:
-		if recoveryState.receivedRecover[senderPid] {
+		if recoveryState.receivedRecover[senderId] {
 			return
 		}
 
-		recoveryState.receivedRecover[senderPid] = true
+		recoveryState.receivedRecover[senderId] = true
 		recoverMessagesCnt := len(recoveryState.receivedRecover)
 
 		if delivered {
 			p.sendRecoveryMessage(
 				context,
-				p.actorPids[senderPid],
+				p.actorPids[p.pids[senderId]],
 				bInstance,
 				&messages.RecoveryProtocolMessage{
 					Stage:                   messages.RecoveryProtocolMessage_REPLY,
@@ -653,11 +660,11 @@ func (p *Process) processRecoveryProtocolMessage(
 			}
 		}
 	case messages.RecoveryProtocolMessage_REPLY:
-		if recoveryState.receivedReply[senderPid] || reliableMessage == nil {
+		if recoveryState.receivedReply[senderId] || reliableMessage == nil {
 			return
 		}
 
-		recoveryState.receivedReply[senderPid] = true
+		recoveryState.receivedReply[senderId] = true
 		recoveryState.replyMessagesStat[reliableMessage.Value]++
 
 		if !delivered &&
@@ -665,11 +672,11 @@ func (p *Process) processRecoveryProtocolMessage(
 			p.deliver(bInstance, reliableMessage.Value)
 		}
 	case messages.RecoveryProtocolMessage_ECHO:
-		if recoveryState.receivedEcho[senderPid] || reliableMessage == nil {
+		if recoveryState.receivedEcho[senderId] || reliableMessage == nil {
 			return
 		}
 
-		recoveryState.receivedEcho[senderPid] = true
+		recoveryState.receivedEcho[senderId] = true
 		recoveryState.echoMessagesStat[reliableMessage.Value]++
 
 		if recoveryState.stage < SentReady &&
@@ -677,11 +684,11 @@ func (p *Process) processRecoveryProtocolMessage(
 			p.broadcastReady(context, bInstance, reliableMessage, recoveryState)
 		}
 	case messages.RecoveryProtocolMessage_READY:
-		if recoveryState.receivedReady[senderPid] || reliableMessage == nil {
+		if recoveryState.receivedReady[senderId] || reliableMessage == nil {
 			return
 		}
 
-		recoveryState.receivedReady[senderPid] = true
+		recoveryState.receivedReady[senderId] = true
 		recoveryState.readyMessagesStat[reliableMessage.Value]++
 
 		if recoveryState.stage < SentReady &&
@@ -700,7 +707,10 @@ func (p *Process) Receive(context actor.Context) {
 	switch message := context.Message().(type) {
 	case *actor.Started:
 		p.logger.OnStart()
-		context.RequestWithCustomSender(p.mainServer, &messages.Started{}, p.actorPid)
+		context.Send(
+			p.mainServer,
+			&messages.Started{Sender: p.processIndex},
+		)
 	case *actor.Stop:
 		p.logger.OnStop()
 	case *messages.Simulate:
@@ -708,21 +718,21 @@ func (p *Process) Receive(context actor.Context) {
 	case *messages.BroadcastInstanceMessage:
 		bInstance := message.BroadcastInstance
 
-		senderPid := utils.MakeCustomPid(context.Sender())
-		p.logger.OnMessageReceived(senderPid, message.Stamp)
+		p.logger.OnMessageReceived(message.Sender, message.Stamp)
+		senderId := ProcessId(message.Sender)
 
 		switch protocolMessage := message.Message.(type) {
 		case *messages.BroadcastInstanceMessage_ReliableProtocolMessage:
 			p.processReliableProtocolMessage(
 				context,
-				senderPid,
+				senderId,
 				bInstance,
 				protocolMessage.ReliableProtocolMessage,
 			)
 		case *messages.BroadcastInstanceMessage_RecoveryProtocolMessage:
 			p.processRecoveryProtocolMessage(
 				context,
-				senderPid,
+				senderId,
 				bInstance,
 				protocolMessage.RecoveryProtocolMessage,
 			)
@@ -734,13 +744,13 @@ func (p *Process) Receive(context actor.Context) {
 
 func (p *Process) Broadcast(context actor.SenderContext, value int64) {
 	broadcastInstance := &messages.BroadcastInstance{
-		Author:    p.pid,
+		Author:    p.processIndex,
 		SeqNumber: p.transactionCounter,
 	}
 
 	p.sendProtocolMessage(
 		context,
-		p.actorPid,
+		p.actorPids[p.pids[p.processIndex]],
 		broadcastInstance,
 		&messages.ReliableProtocolMessage{
 			Stage: messages.ReliableProtocolMessage_NOTIFY,

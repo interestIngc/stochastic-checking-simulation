@@ -11,13 +11,14 @@ import (
 	"stochastic-checking-simulation/impl/messages"
 	"stochastic-checking-simulation/impl/parameters"
 	"stochastic-checking-simulation/impl/protocols"
-	"stochastic-checking-simulation/impl/utils"
 	"time"
 )
 
+type ProcessId int64
+
 type messageState struct {
-	receivedEcho  map[string]bool
-	receivedReady map[string]map[int64]bool
+	receivedEcho  map[ProcessId]bool
+	receivedReady map[ProcessId]map[int64]bool
 
 	echoMessagesStat   map[int64]int
 	readySampleStat    map[int64]int
@@ -25,13 +26,13 @@ type messageState struct {
 
 	sentReadyMessages map[int64]bool
 
-	gossipSample   map[string]bool
-	echoSample     map[string]bool
-	readySample    map[string]bool
-	deliverySample map[string]bool
+	gossipSample   map[ProcessId]bool
+	echoSample     map[ProcessId]bool
+	readySample    map[ProcessId]bool
+	deliverySample map[ProcessId]bool
 
-	echoSubscriptionSet  map[string]bool
-	readySubscriptionSet map[string]bool
+	echoSubscriptionSet  map[ProcessId]bool
+	readySubscriptionSet map[ProcessId]bool
 
 	gossipMessage *messages.ScalableProtocolMessage
 	echoMessage   *messages.ScalableProtocolMessage
@@ -44,8 +45,8 @@ type messageState struct {
 func newMessageState() *messageState {
 	ms := new(messageState)
 
-	ms.receivedEcho = make(map[string]bool)
-	ms.receivedReady = make(map[string]map[int64]bool)
+	ms.receivedEcho = make(map[ProcessId]bool)
+	ms.receivedReady = make(map[ProcessId]map[int64]bool)
 
 	ms.echoMessagesStat = make(map[int64]int)
 	ms.readySampleStat = make(map[int64]int)
@@ -53,13 +54,13 @@ func newMessageState() *messageState {
 
 	ms.sentReadyMessages = make(map[int64]bool)
 
-	ms.gossipSample = make(map[string]bool)
-	ms.echoSample = make(map[string]bool)
-	ms.readySample = make(map[string]bool)
-	ms.deliverySample = make(map[string]bool)
+	ms.gossipSample = make(map[ProcessId]bool)
+	ms.echoSample = make(map[ProcessId]bool)
+	ms.readySample = make(map[ProcessId]bool)
+	ms.deliverySample = make(map[ProcessId]bool)
 
-	ms.echoSubscriptionSet = make(map[string]bool)
-	ms.readySubscriptionSet = make(map[string]bool)
+	ms.echoSubscriptionSet = make(map[ProcessId]bool)
+	ms.readySubscriptionSet = make(map[ProcessId]bool)
 
 	ms.receivedMessagesCnt = 0
 
@@ -67,16 +68,14 @@ func newMessageState() *messageState {
 }
 
 type Process struct {
-	actorPid  *actor.PID
-	pid       string
-	actorPids map[string]*actor.PID
-	pids      []string
+	processIndex int64
+	actorPids    []*actor.PID
 
 	transactionCounter int64
 	messageCounter     int64
 
-	deliveredMessages map[string]map[int64]int64
-	messagesLog       map[string]map[int64]*messageState
+	deliveredMessages map[ProcessId]map[int64]int64
+	messagesLog       map[ProcessId]map[int64]*messageState
 
 	gossipSampleSize   int
 	echoSampleSize     int
@@ -92,12 +91,12 @@ type Process struct {
 	mainServer *actor.PID
 }
 
-func (p *Process) getRandomPid(random *rand.Rand) string {
-	return p.pids[random.Int()%len(p.pids)]
+func (p *Process) getRandomPid(random *rand.Rand) ProcessId {
+	return ProcessId(random.Int() % len(p.actorPids))
 }
 
-func (p *Process) generateGossipSample() map[string]bool {
-	sample := make(map[string]bool)
+func (p *Process) generateGossipSample() map[ProcessId]bool {
+	sample := make(map[ProcessId]bool)
 
 	seed := time.Now().UnixNano()
 
@@ -107,8 +106,8 @@ func (p *Process) generateGossipSample() map[string]bool {
 	}
 
 	gSize := int(poisson.Rand())
-	if gSize > len(p.pids) {
-		gSize = len(p.pids)
+	if gSize > len(p.actorPids) {
+		gSize = len(p.actorPids)
 	}
 
 	uniform := rand.New(rand.NewSource(seed))
@@ -126,8 +125,8 @@ func (p *Process) sample(
 	bInstance *messages.BroadcastInstance,
 	value int64,
 	size int,
-) map[string]bool {
-	sample := make(map[string]bool)
+) map[ProcessId]bool {
+	sample := make(map[ProcessId]bool)
 	random := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	for i := 0; i < size; i++ {
@@ -147,30 +146,25 @@ func (p *Process) sample(
 }
 
 func (p *Process) InitProcess(
-	actorPid *actor.PID,
+	processIndex int64,
 	actorPids []*actor.PID,
 	parameters *parameters.Parameters,
 	logger *log.Logger,
 	transactionManager *protocols.TransactionManager,
 	mainServer *actor.PID,
 ) {
-	p.actorPid = actorPid
-	p.pid = utils.MakeCustomPid(actorPid)
-	p.pids = make([]string, len(actorPids))
-	p.actorPids = make(map[string]*actor.PID)
+	p.processIndex = processIndex
+	p.actorPids = actorPids
 
 	p.transactionCounter = 0
 	p.messageCounter = 0
 
-	p.deliveredMessages = make(map[string]map[int64]int64)
-	p.messagesLog = make(map[string]map[int64]*messageState)
+	p.deliveredMessages = make(map[ProcessId]map[int64]int64)
+	p.messagesLog = make(map[ProcessId]map[int64]*messageState)
 
-	for i, currActorPid := range actorPids {
-		pid := utils.MakeCustomPid(currActorPid)
-		p.pids[i] = pid
-		p.actorPids[pid] = currActorPid
-		p.deliveredMessages[pid] = make(map[int64]int64)
-		p.messagesLog[pid] = make(map[int64]*messageState)
+	for i := range actorPids {
+		p.deliveredMessages[ProcessId(i)] = make(map[int64]int64)
+		p.messagesLog[ProcessId(i)] = make(map[int64]*messageState)
 	}
 
 	p.gossipSampleSize = parameters.GossipSampleSize
@@ -181,7 +175,7 @@ func (p *Process) InitProcess(
 	p.deliverySampleSize = parameters.DeliverySampleSize
 	p.deliveryThreshold = parameters.DeliveryThreshold
 
-	p.logger = eventlogger.InitEventLogger(p.pid, logger)
+	p.logger = eventlogger.InitEventLogger(p.processIndex, logger)
 	p.transactionManager = transactionManager
 
 	p.mainServer = mainServer
@@ -192,13 +186,14 @@ func (p *Process) initMessageState(
 	bInstance *messages.BroadcastInstance,
 	value int64,
 ) *messageState {
-	msgState := p.messagesLog[bInstance.Author][bInstance.SeqNumber]
+	author := ProcessId(bInstance.Author)
+	msgState := p.messagesLog[author][bInstance.SeqNumber]
 
 	if msgState == nil {
 		msgState = newMessageState()
 
-		for _, pid := range p.pids {
-			msgState.receivedReady[pid] = make(map[int64]bool)
+		for i := 0; i < len(p.actorPids); i++ {
+			msgState.receivedReady[ProcessId(i)] = make(map[int64]bool)
 		}
 
 		msgState.gossipSample = p.generateGossipSample()
@@ -233,7 +228,7 @@ func (p *Process) initMessageState(
 				value,
 				p.deliverySampleSize)
 
-		p.messagesLog[bInstance.Author][bInstance.SeqNumber] = msgState
+		p.messagesLog[author][bInstance.SeqNumber] = msgState
 	}
 
 	return msgState
@@ -247,13 +242,14 @@ func (p *Process) sendMessage(
 ) {
 	bMessage := &messages.BroadcastInstanceMessage{
 		BroadcastInstance: bInstance,
+		Sender:            p.processIndex,
 		Message: &messages.BroadcastInstanceMessage_ScalableProtocolMessage{
 			ScalableProtocolMessage: message.Copy(),
 		},
 		Stamp: p.messageCounter,
 	}
 
-	context.RequestWithCustomSender(to, bMessage, p.actorPid)
+	context.Send(to, bMessage)
 
 	p.logger.OnMessageSent(p.messageCounter)
 	p.messageCounter++
@@ -261,7 +257,7 @@ func (p *Process) sendMessage(
 
 func (p *Process) broadcastToSet(
 	context actor.SenderContext,
-	set map[string]bool,
+	set map[ProcessId]bool,
 	bInstance *messages.BroadcastInstance,
 	msg *messages.ScalableProtocolMessage,
 ) {
@@ -308,7 +304,7 @@ func (p *Process) broadcastReady(
 
 func (p *Process) delivered(bInstance *messages.BroadcastInstance, value int64) bool {
 	deliveredValue, delivered :=
-		p.deliveredMessages[bInstance.Author][bInstance.SeqNumber]
+		p.deliveredMessages[ProcessId(bInstance.Author)][bInstance.SeqNumber]
 
 	if delivered && deliveredValue != value {
 		p.logger.OnAttack(bInstance, value, deliveredValue)
@@ -318,9 +314,9 @@ func (p *Process) delivered(bInstance *messages.BroadcastInstance, value int64) 
 }
 
 func (p *Process) deliver(bInstance *messages.BroadcastInstance, value int64) {
-	p.deliveredMessages[bInstance.Author][bInstance.SeqNumber] = value
-	messagesReceived :=
-		p.messagesLog[bInstance.Author][bInstance.SeqNumber].receivedMessagesCnt
+	author := ProcessId(bInstance.Author)
+	p.deliveredMessages[author][bInstance.SeqNumber] = value
+	messagesReceived := p.messagesLog[author][bInstance.SeqNumber].receivedMessagesCnt
 
 	p.logger.OnDeliver(bInstance, value, messagesReceived)
 }
@@ -342,7 +338,7 @@ func (p *Process) maybeSendReadyFromSieve(
 
 func (p *Process) processProtocolMessage(
 	context actor.Context,
-	senderPid string,
+	senderId ProcessId,
 	bInstance *messages.BroadcastInstance,
 	message *messages.ScalableProtocolMessage,
 ) {
@@ -353,13 +349,13 @@ func (p *Process) processProtocolMessage(
 
 	switch message.Stage {
 	case messages.ScalableProtocolMessage_GOSSIP_SUBSCRIBE:
-		if msgState.gossipSample[senderPid] {
+		if msgState.gossipSample[senderId] {
 			return
 		}
 
-		msgState.gossipSample[senderPid] = true
+		msgState.gossipSample[senderId] = true
 		if msgState.gossipMessage != nil {
-			p.sendMessage(context, p.actorPids[senderPid], bInstance, msgState.gossipMessage)
+			p.sendMessage(context, p.actorPids[senderId], bInstance, msgState.gossipMessage)
 		}
 	case messages.ScalableProtocolMessage_GOSSIP:
 		if msgState.gossipMessage == nil {
@@ -378,34 +374,34 @@ func (p *Process) processProtocolMessage(
 			p.maybeSendReadyFromSieve(context, msgState, bInstance, value)
 		}
 	case messages.ScalableProtocolMessage_ECHO_SUBSCRIBE:
-		if msgState.echoSubscriptionSet[senderPid] {
+		if msgState.echoSubscriptionSet[senderId] {
 			return
 		}
 
-		msgState.echoSubscriptionSet[senderPid] = true
+		msgState.echoSubscriptionSet[senderId] = true
 		if msgState.echoMessage != nil {
-			p.sendMessage(context, p.actorPids[senderPid], bInstance, msgState.echoMessage)
+			p.sendMessage(context, p.actorPids[senderId], bInstance, msgState.echoMessage)
 		}
 	case messages.ScalableProtocolMessage_ECHO:
-		if !msgState.echoSample[senderPid] || msgState.receivedEcho[senderPid] {
+		if !msgState.echoSample[senderId] || msgState.receivedEcho[senderId] {
 			return
 		}
 
-		msgState.receivedEcho[senderPid] = true
+		msgState.receivedEcho[senderId] = true
 		msgState.echoMessagesStat[value]++
 
 		p.maybeSendReadyFromSieve(context, msgState, bInstance, value)
 	case messages.ScalableProtocolMessage_READY_SUBSCRIBE:
-		if msgState.readySubscriptionSet[senderPid] {
+		if msgState.readySubscriptionSet[senderId] {
 			return
 		}
 
-		msgState.readySubscriptionSet[senderPid] = true
+		msgState.readySubscriptionSet[senderId] = true
 
 		for val := range msgState.sentReadyMessages {
 			p.sendMessage(
 				context,
-				p.actorPids[senderPid],
+				p.actorPids[senderId],
 				bInstance,
 				&messages.ScalableProtocolMessage{
 					Stage: messages.ScalableProtocolMessage_READY,
@@ -414,13 +410,13 @@ func (p *Process) processProtocolMessage(
 			)
 		}
 	case messages.ScalableProtocolMessage_READY:
-		if msgState.receivedReady[senderPid][value] {
+		if msgState.receivedReady[senderId][value] {
 			return
 		}
 
-		msgState.receivedReady[senderPid][value] = true
+		msgState.receivedReady[senderId][value] = true
 
-		if msgState.readySample[senderPid] {
+		if msgState.readySample[senderId] {
 			msgState.readySampleStat[value]++
 
 			if !msgState.sentReadyMessages[value] &&
@@ -429,7 +425,7 @@ func (p *Process) processProtocolMessage(
 			}
 		}
 
-		if msgState.deliverySample[senderPid] {
+		if msgState.deliverySample[senderId] {
 			msgState.deliverySampleStat[value]++
 
 			if !p.delivered(bInstance, value) &&
@@ -444,7 +440,10 @@ func (p *Process) Receive(context actor.Context) {
 	switch message := context.Message().(type) {
 	case *actor.Started:
 		p.logger.OnStart()
-		context.RequestWithCustomSender(p.mainServer, &messages.Started{}, p.actorPid)
+		context.Send(
+			p.mainServer,
+			&messages.Started{Sender: p.processIndex},
+		)
 	case *actor.Stop:
 		p.logger.OnStop()
 	case *messages.Simulate:
@@ -452,14 +451,13 @@ func (p *Process) Receive(context actor.Context) {
 	case *messages.BroadcastInstanceMessage:
 		bInstance := message.BroadcastInstance
 
-		senderPid := utils.MakeCustomPid(context.Sender())
-		p.logger.OnMessageReceived(senderPid, message.Stamp)
+		p.logger.OnMessageReceived(message.Sender, message.Stamp)
 
 		switch protocolMessage := message.Message.(type) {
 		case *messages.BroadcastInstanceMessage_ScalableProtocolMessage:
 			p.processProtocolMessage(
 				context,
-				senderPid,
+				ProcessId(message.Sender),
 				bInstance,
 				protocolMessage.ScalableProtocolMessage,
 			)
@@ -471,7 +469,7 @@ func (p *Process) Receive(context actor.Context) {
 
 func (p *Process) Broadcast(context actor.SenderContext, value int64) {
 	broadcastInstance := &messages.BroadcastInstance{
-		Author:    p.pid,
+		Author:    p.processIndex,
 		SeqNumber: p.transactionCounter,
 	}
 

@@ -44,7 +44,7 @@ func main() {
 		process := &bracha.Process{}
 		processes[i] = process
 		process.InitProcess(
-			pids[i],
+			int64(i),
 			pids,
 			parameters,
 			logger,

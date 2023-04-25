@@ -13,8 +13,10 @@ import (
 	"stochastic-checking-simulation/impl/utils"
 )
 
+type ProcessId int64
+
 type messageState struct {
-	receivedEcho map[string]bool
+	receivedEcho map[ProcessId]bool
 	echoCount    map[int64]int
 	witnessSet   map[string]bool
 
@@ -24,7 +26,7 @@ type messageState struct {
 func newMessageState() *messageState {
 	ms := new(messageState)
 
-	ms.receivedEcho = make(map[string]bool)
+	ms.receivedEcho = make(map[ProcessId]bool)
 	ms.echoCount = make(map[int64]int)
 
 	ms.receivedMessagesCnt = 0
@@ -33,16 +35,16 @@ func newMessageState() *messageState {
 }
 
 type CorrectProcess struct {
-	actorPid  *actor.PID
-	pid       string
-	actorPids map[string]*actor.PID
+	processIndex int64
+	actorPids    map[string]*actor.PID
+	pids         []string
 
 	transactionCounter int64
 	messageCounter     int64
 
-	deliveredMessages        map[string]map[int64]int64
+	deliveredMessages        map[ProcessId]map[int64]int64
 	deliveredMessagesHistory []string
-	messagesLog              map[string]map[int64]*messageState
+	messagesLog              map[ProcessId]map[int64]*messageState
 
 	witnessThreshold int
 
@@ -56,32 +58,31 @@ type CorrectProcess struct {
 }
 
 func (p *CorrectProcess) InitProcess(
-	actorPid *actor.PID,
+	processIndex int64,
 	actorPids []*actor.PID,
 	parameters *parameters.Parameters,
 	logger *log.Logger,
 	transactionManager *protocols.TransactionManager,
 	mainServer *actor.PID,
 ) {
-	p.actorPid = actorPid
-	p.pid = utils.MakeCustomPid(actorPid)
+	p.processIndex = processIndex
 	p.actorPids = make(map[string]*actor.PID)
+	p.pids = make([]string, len(actorPids))
 
 	p.transactionCounter = 0
 	p.messageCounter = 0
 
-	p.deliveredMessages = make(map[string]map[int64]int64)
-	p.messagesLog = make(map[string]map[int64]*messageState)
+	p.deliveredMessages = make(map[ProcessId]map[int64]int64)
+	p.messagesLog = make(map[ProcessId]map[int64]*messageState)
 
 	p.witnessThreshold = parameters.WitnessThreshold
 
-	pids := make([]string, len(actorPids))
-	for i, currActorPid := range actorPids {
-		pid := utils.MakeCustomPid(currActorPid)
-		pids[i] = pid
-		p.actorPids[pid] = currActorPid
-		p.deliveredMessages[pid] = make(map[int64]int64)
-		p.messagesLog[pid] = make(map[int64]*messageState)
+	for i, actorPid := range actorPids {
+		pid := utils.MakeCustomPid(actorPid)
+		p.pids[i] = pid
+		p.actorPids[pid] = actorPid
+		p.deliveredMessages[ProcessId(i)] = make(map[int64]int64)
+		p.messagesLog[ProcessId(i)] = make(map[int64]*messageState)
 	}
 
 	var hasher hashing.Hasher
@@ -92,7 +93,6 @@ func (p *CorrectProcess) InitProcess(
 	}
 
 	p.wSelector = &hashing.WitnessesSelector{
-		NodeIds:              pids,
 		Hasher:               hasher,
 		MinPotWitnessSetSize: parameters.MinPotWitnessSetSize,
 		MinOwnWitnessSetSize: parameters.MinOwnWitnessSetSize,
@@ -102,7 +102,7 @@ func (p *CorrectProcess) InitProcess(
 	binCapacity := uint(math.Pow(2, float64(parameters.NodeIdSize/parameters.NumberOfBins)))
 	p.historyHash = hashing.NewHistoryHash(uint(parameters.NumberOfBins), binCapacity, hasher)
 
-	p.logger = eventlogger.InitEventLogger(p.pid, logger)
+	p.logger = eventlogger.InitEventLogger(p.processIndex, logger)
 	p.transactionManager = transactionManager
 
 	p.mainServer = mainServer
@@ -112,7 +112,7 @@ func (p *CorrectProcess) initMessageState(
 	bInstance *messages.BroadcastInstance,
 ) *messageState {
 	msgState := newMessageState()
-	p.messagesLog[bInstance.Author][bInstance.SeqNumber] = msgState
+	p.messagesLog[ProcessId(bInstance.Author)][bInstance.SeqNumber] = msgState
 
 	p.logger.OnHistoryUsedInWitnessSetSelection(
 		bInstance,
@@ -121,7 +121,7 @@ func (p *CorrectProcess) initMessageState(
 	)
 
 	msgState.witnessSet, _ =
-		p.wSelector.GetWitnessSet(bInstance.Author, bInstance.SeqNumber, p.historyHash)
+		p.wSelector.GetWitnessSet(p.pids, bInstance.Author, bInstance.SeqNumber, p.historyHash)
 
 	p.logger.OnWitnessSetSelected("own", bInstance, msgState.witnessSet)
 
@@ -136,13 +136,14 @@ func (p *CorrectProcess) sendMessage(
 ) {
 	bMessage := &messages.BroadcastInstanceMessage{
 		BroadcastInstance: bInstance,
+		Sender:            p.processIndex,
 		Message: &messages.BroadcastInstanceMessage_ConsistentProtocolMessage{
 			ConsistentProtocolMessage: message.Copy(),
 		},
 		Stamp: p.messageCounter,
 	}
 
-	context.RequestWithCustomSender(to, bMessage, p.actorPid)
+	context.Send(to, bMessage)
 
 	p.logger.OnMessageSent(p.messageCounter)
 	p.messageCounter++
@@ -158,28 +159,31 @@ func (p *CorrectProcess) broadcast(
 }
 
 func (p *CorrectProcess) deliver(bInstance *messages.BroadcastInstance, value int64) {
-	p.deliveredMessages[bInstance.Author][bInstance.SeqNumber] = value
+	author := ProcessId(bInstance.Author)
+
+	p.deliveredMessages[author][bInstance.SeqNumber] = value
 	p.deliveredMessagesHistory = append(p.deliveredMessagesHistory, bInstance.ToString())
 	p.historyHash.Insert(
-		utils.TransactionToBytes(bInstance.Author, bInstance.SeqNumber))
+		utils.TransactionToBytes(p.pids[bInstance.Author], bInstance.SeqNumber))
 
 	messagesReceived :=
-		p.messagesLog[bInstance.Author][bInstance.SeqNumber].receivedMessagesCnt
+		p.messagesLog[author][bInstance.SeqNumber].receivedMessagesCnt
 
-	delete(p.messagesLog[bInstance.Author], bInstance.SeqNumber)
+	delete(p.messagesLog[author], bInstance.SeqNumber)
 	p.logger.OnDeliver(bInstance, value, messagesReceived)
 }
 
 func (p *CorrectProcess) verify(
 	context actor.SenderContext,
-	senderPid string,
+	senderId ProcessId,
 	bInstance *messages.BroadcastInstance,
 	value int64,
 ) bool {
-	msgState := p.messagesLog[bInstance.Author][bInstance.SeqNumber]
+	author := ProcessId(bInstance.Author)
+	msgState := p.messagesLog[author][bInstance.SeqNumber]
 
 	deliveredValue, delivered :=
-		p.deliveredMessages[bInstance.Author][bInstance.SeqNumber]
+		p.deliveredMessages[author][bInstance.SeqNumber]
 	if delivered {
 		if deliveredValue != value {
 			p.logger.OnAttack(bInstance, value, deliveredValue)
@@ -187,8 +191,8 @@ func (p *CorrectProcess) verify(
 		}
 	} else if msgState != nil {
 		msgState.receivedMessagesCnt++
-		if msgState.witnessSet[senderPid] && !msgState.receivedEcho[senderPid] {
-			msgState.receivedEcho[senderPid] = true
+		if msgState.witnessSet[p.pids[senderId]] && !msgState.receivedEcho[senderId] {
+			msgState.receivedEcho[senderId] = true
 			msgState.echoCount[value]++
 			if msgState.echoCount[value] >= p.witnessThreshold {
 				p.deliver(bInstance, value)
@@ -213,7 +217,10 @@ func (p *CorrectProcess) Receive(context actor.Context) {
 	switch message := context.Message().(type) {
 	case *actor.Started:
 		p.logger.OnStart()
-		context.RequestWithCustomSender(p.mainServer, &messages.Started{}, p.actorPid)
+		context.Send(
+			p.mainServer,
+			&messages.Started{Sender: p.processIndex},
+		)
 	case *actor.Stop:
 		p.logger.OnStop()
 	case *messages.Simulate:
@@ -221,14 +228,13 @@ func (p *CorrectProcess) Receive(context actor.Context) {
 	case *messages.BroadcastInstanceMessage:
 		bInstance := message.BroadcastInstance
 
-		senderPid := utils.MakeCustomPid(context.Sender())
-		p.logger.OnMessageReceived(senderPid, message.Stamp)
+		p.logger.OnMessageReceived(message.Sender, message.Stamp)
 
 		switch protocolMessage := message.Message.(type) {
 		case *messages.BroadcastInstanceMessage_ConsistentProtocolMessage:
 			consistentMessage := protocolMessage.ConsistentProtocolMessage
 
-			doBroadcast := p.verify(context, senderPid, bInstance, consistentMessage.Value)
+			doBroadcast := p.verify(context, ProcessId(message.Sender), bInstance, consistentMessage.Value)
 
 			if consistentMessage.Stage == messages.ConsistentProtocolMessage_VERIFY && doBroadcast {
 				p.broadcast(
@@ -247,11 +253,11 @@ func (p *CorrectProcess) Receive(context actor.Context) {
 
 func (p *CorrectProcess) Broadcast(context actor.SenderContext, value int64) {
 	broadcastInstance := &messages.BroadcastInstance{
-		Author:    p.pid,
+		Author:    p.processIndex,
 		SeqNumber: p.transactionCounter,
 	}
 
-	p.verify(context, p.pid, broadcastInstance, value)
+	p.verify(context, ProcessId(p.processIndex), broadcastInstance, value)
 
 	p.logger.OnTransactionInit(broadcastInstance)
 

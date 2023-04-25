@@ -52,7 +52,7 @@ func main() {
 		process := &reliable.Process{}
 		processes[i] = process
 		process.InitProcess(
-			pids[i],
+			int64(i),
 			pids,
 			parameters,
 			logger,

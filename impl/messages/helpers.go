@@ -3,7 +3,7 @@ package messages
 import "fmt"
 
 func (b *BroadcastInstance) ToString() string {
-	return fmt.Sprintf("{%s;%d}", b.Author, b.SeqNumber)
+	return fmt.Sprintf("{%d;%d}", b.Author, b.SeqNumber)
 }
 
 func (b *BroadcastInstance) Copy() *BroadcastInstance {

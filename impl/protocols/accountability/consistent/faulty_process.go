@@ -7,7 +7,6 @@ import (
 	"stochastic-checking-simulation/impl/messages"
 	"stochastic-checking-simulation/impl/parameters"
 	"stochastic-checking-simulation/impl/protocols"
-	"stochastic-checking-simulation/impl/utils"
 )
 
 type FaultyProcess struct {
@@ -15,7 +14,7 @@ type FaultyProcess struct {
 }
 
 func (p *FaultyProcess) InitProcess(
-	currPid *actor.PID,
+	processIndex int64,
 	pids []*actor.PID,
 	parameters *parameters.Parameters,
 	logger *log.Logger,
@@ -23,7 +22,7 @@ func (p *FaultyProcess) InitProcess(
 	mainServer *actor.PID,
 ) {
 	p.process = &CorrectProcess{}
-	p.process.InitProcess(currPid, pids, parameters, logger, transactionManager, mainServer)
+	p.process.InitProcess(processIndex, pids, parameters, logger, transactionManager, mainServer)
 }
 
 func (p *FaultyProcess) Receive(context actor.Context) {
@@ -38,25 +37,24 @@ func (p *FaultyProcess) Receive(context actor.Context) {
 			consistentMessage := protocolMessage.ConsistentProtocolMessage
 			value := consistentMessage.Value
 
-			senderPid := utils.MakeCustomPid(context.Sender())
-
-			p.process.logger.OnMessageReceived(senderPid, message.Stamp)
+			p.process.logger.OnMessageReceived(message.Sender, message.Stamp)
+			senderId := ProcessId(message.Sender)
 
 			switch consistentMessage.Stage {
 			case messages.ConsistentProtocolMessage_ECHO:
-				p.process.verify(context, senderPid, bInstance, value)
+				p.process.verify(context, senderId, bInstance, value)
 			case messages.ConsistentProtocolMessage_VERIFY:
-				if bInstance.Author == p.process.pid {
+				if bInstance.Author == p.process.processIndex {
 					p.process.sendMessage(
 						context,
-						p.process.actorPids[senderPid],
+						p.process.actorPids[p.process.pids[senderId]],
 						bInstance,
 						&messages.ConsistentProtocolMessage{
 							Stage: messages.ConsistentProtocolMessage_ECHO,
 							Value: value,
 						},
 					)
-				} else if p.process.verify(context, senderPid, bInstance, value) {
+				} else if p.process.verify(context, senderId, bInstance, value) {
 					p.process.broadcast(
 						context,
 						bInstance,
@@ -78,7 +76,7 @@ func (p *FaultyProcess) Broadcast(context actor.SenderContext, value int64) {
 
 func (p *FaultyProcess) FaultyBroadcast(context actor.SenderContext, value1 int64, value2 int64) {
 	broadcastInstance := &messages.BroadcastInstance{
-		Author:    p.process.pid,
+		Author:    p.process.processIndex,
 		SeqNumber: p.process.transactionCounter,
 	}
 	msgState := p.process.initMessageState(broadcastInstance)
