@@ -36,19 +36,6 @@ class TransactionCommitInfo:
         self.commit_timestamp = commit_timestamp
 
 
-sent_messages = {}
-received_messages = {}
-transaction_inits = {}
-transaction_commit_infos = {}
-transaction_histories = {}
-transaction_witness_sets = {
-    "own": {},
-    "pot": {}
-}
-simulation_start = None
-simulation_end = None
-
-
 def drop_date(line):
     start = 0
     while start < len(line):
@@ -74,10 +61,21 @@ def get_log_line_prefix(line):
     return prefix
 
 
-def process_files(n):
-    global simulation_start, simulation_end
+def parse_data_from_files(directory, n):
+    sent_messages = {}
+    received_messages = {}
+    transaction_inits = {}
+    transaction_commit_infos = {}
+    transaction_histories = {}
+    transaction_witness_sets = {
+        "own": {},
+        "pot": {}
+    }
+    simulation_start = None
+    simulation_end = None
+
     for process_id in range(n):
-        f = open(f"outputs/process{process_id}.txt", "r")
+        f = open(f"{directory}/process{process_id}.txt", "r")
         for line in f:
             line = drop_date(line.strip(" \n"))
             prefix = get_log_line_prefix(line)
@@ -138,9 +136,19 @@ def process_files(n):
                 if transaction_witness_sets[ws_type].get(transaction) is None:
                     transaction_witness_sets[ws_type][transaction] = []
                 transaction_witness_sets[ws_type][transaction].append(pids)
+    return {
+        "sent_messages": sent_messages,
+        "received_messages": received_messages,
+        "transaction_inits": transaction_inits,
+        "transaction_commit_infos": transaction_commit_infos,
+        "transaction_histories": transaction_histories,
+        "transaction_witness_sets": transaction_witness_sets,
+        "simulation_start": simulation_start,
+        "simulation_end": simulation_end
+    }
 
 
-def calc_message_latencies():
+def calc_message_latencies(sent_messages, received_messages):
     latencies = []
     for message, send_timestamp in sent_messages.items():
         receive_timestamp = received_messages.get(message)
@@ -159,7 +167,7 @@ def calc_message_latencies():
     return min_latency, max_latency, sum_latency / len(latencies)
 
 
-def calc_transaction_stat():
+def calc_transaction_stat(n, transaction_inits, transaction_commit_infos, simulation_start, simulation_end):
     sum_latency = 0
     min_latency = None
     max_latency = None
@@ -216,7 +224,7 @@ def get_distance_metrics(sets):
     return max_diff
 
 
-def get_witness_sets_diff_metrics(ws_type):
+def get_witness_sets_diff_metrics(transaction_witness_sets, n, ws_type):
     metrics = []
     for transaction, witness_sets in transaction_witness_sets[ws_type].items():
         if len(witness_sets) != n:
@@ -226,7 +234,7 @@ def get_witness_sets_diff_metrics(ws_type):
     return metrics
 
 
-def get_histories_diff_metrics():
+def get_histories_diff_metrics(transaction_histories, n):
     metrics = []
     for transaction, histories in transaction_histories.items():
         if len(histories) != n:
@@ -236,48 +244,103 @@ def get_histories_diff_metrics():
     return metrics
 
 
-input_file = open("input.json")
-input_json = json.load(input_file)
-protocol = input_json["protocol"]
-n = input_json["parameters"]["n"]
+def calculate_stat(protocol, directory, n):
+    data = parse_data_from_files(directory, n)
 
-process_files(n)
+    min_message_latency, max_message_latency, avg_message_latency = \
+        calc_message_latencies(
+            sent_messages=data["sent_messages"],
+            received_messages=data["received_messages"]
+        )
+    min_transaction_latency, max_transaction_latency, avg_transaction_latency, avg_messages_exchanged, throughput = \
+        calc_transaction_stat(
+            n=n,
+            transaction_inits=data["transaction_inits"],
+            transaction_commit_infos=data["transaction_commit_infos"],
+            simulation_start=data["simulation_start"],
+            simulation_end=data["simulation_end"]
+        )
 
-print(f"Protocol: {protocol}, {n} processes")
-print()
+    results = {
+        "min_message_latency": min_message_latency / 1e9,
+        "max_message_latency": max_message_latency / 1e9,
+        "avg_message_latency": avg_message_latency / 1e9,
+        "min_transaction_latency": min_transaction_latency / 1e9,
+        "max_transaction_latency": max_transaction_latency / 1e9,
+        "avg_transaction_latency": avg_transaction_latency / 1e9,
+        "avg_messages_exchanged": avg_messages_exchanged,
+        "throughput": throughput,
+    }
 
-min_message_latency, max_message_latency, avg_message_latency = calc_message_latencies()
-min_transaction_latency, max_transaction_latency, avg_transaction_latency, avg_messages_exchanged, throughput = \
-    calc_transaction_stat()
+    if protocol in {CONSISTENT_ACCOUNTABILITY, RELIABLE_ACCOUNTABILITY}:
+        results["own_witness_sets_diff_metrics"] = \
+            get_witness_sets_diff_metrics(
+                transaction_witness_sets=data["transaction_witness_sets"],
+                n=n,
+                ws_type="own"
+            )
+        if protocol == RELIABLE_ACCOUNTABILITY:
+            results["pot_witness_sets_diff_metrics"] = \
+                get_witness_sets_diff_metrics(
+                    transaction_witness_sets=data["transaction_witness_sets"],
+                    n=n,
+                    ws_type="pot"
+                )
+        results["histories_diff_metrics"] = \
+            get_histories_diff_metrics(
+                transaction_histories=data["transaction_histories"],
+                n=n
+            )
 
-print("Message latencies:")
-print(f"\tMinimal: {min_message_latency / 1e9}")
-print(f"\tMaximal: {max_message_latency / 1e9}")
-print(f"\tAverage: {avg_message_latency / 1e9}")
-print()
+    return results
 
-print("Transaction latency statistics:")
-print(f"\tMinimal: {min_transaction_latency / 1e9}")
-print(f"\tMaximal: {max_transaction_latency / 1e9}")
-print(f"\tAverage: {avg_transaction_latency / 1e9}")
-print()
 
-print(f"Average number of exchanged messages per one transaction: {avg_messages_exchanged}")
-print()
+if __name__ == "__main__":
+    input_file = open("input.json")
+    input_json = json.load(input_file)
+    protocol = input_json["protocol"]
+    process_cnt = input_json["parameters"]["n"]
 
-print(f"Throughput per second: {throughput}")
-print()
-
-if protocol in {CONSISTENT_ACCOUNTABILITY, RELIABLE_ACCOUNTABILITY}:
-    own_witness_sets_diff_metrics = get_witness_sets_diff_metrics(ws_type="own")
-    print(f"Difference metrics for own witness sets: {own_witness_sets_diff_metrics}")
+    print(f"Protocol: {protocol}, {process_cnt} processes")
     print()
 
-    if protocol == RELIABLE_ACCOUNTABILITY:
-        pot_witness_sets_diff_metrics = get_witness_sets_diff_metrics(ws_type="pot")
+    stat = calculate_stat(protocol=protocol, directory="outputs", n=process_cnt)
+
+    min_message_latency, max_message_latency, avg_message_latency = \
+        stat["min_message_latency"], stat["max_message_latency"], stat["avg_message_latency"]
+    min_transaction_latency, max_transaction_latency, avg_transaction_latency, avg_messages_exchanged, throughput = \
+        stat["min_transaction_latency"], stat["max_transaction_latency"], \
+        stat["avg_transaction_latency"], stat["avg_messages_exchanged"], stat["throughput"]
+
+    print("Message latencies:")
+    print(f"\tMinimal: {min_message_latency}")
+    print(f"\tMaximal: {max_message_latency}")
+    print(f"\tAverage: {avg_message_latency}")
+    print()
+
+    print("Transaction latency statistics:")
+    print(f"\tMinimal: {min_transaction_latency}")
+    print(f"\tMaximal: {max_transaction_latency}")
+    print(f"\tAverage: {avg_transaction_latency}")
+    print()
+
+    print(f"Average number of exchanged messages per one transaction: {avg_messages_exchanged}")
+    print()
+
+    print(f"Throughput per second: {throughput}")
+    print()
+
+    if stat.get("own_witness_sets_diff_metrics") is not None:
+        own_witness_sets_diff_metrics = stat["own_witness_sets_diff_metrics"]
+        print(f"Difference metrics for own witness sets: {own_witness_sets_diff_metrics}")
+        print()
+
+    if stat.get("pot_witness_sets_diff_metrics") is not None:
+        pot_witness_sets_diff_metrics = stat["pot_witness_sets_diff_metrics"]
         print(f"Difference metrics for pot witness sets: {pot_witness_sets_diff_metrics}")
         print()
 
-    histories_diff_metrics = get_histories_diff_metrics()
-    print(f"Difference metrics of histories: {histories_diff_metrics}")
-    print()
+    if stat.get("histories_diff_metrics") is not None:
+        histories_diff_metrics = stat["histories_diff_metrics"]
+        print(f"Difference metrics of histories: {histories_diff_metrics}")
+        print()
