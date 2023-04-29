@@ -26,13 +26,13 @@ type messageState struct {
 
 	sentReadyMessages map[int64]bool
 
-	gossipSample   map[ProcessId]bool
-	echoSample     map[ProcessId]bool
-	readySample    map[ProcessId]bool
-	deliverySample map[ProcessId]bool
+	gossipSample   map[ProcessId]int
+	echoSample     map[ProcessId]int
+	readySample    map[ProcessId]int
+	deliverySample map[ProcessId]int
 
-	echoSubscriptionSet  map[ProcessId]bool
-	readySubscriptionSet map[ProcessId]bool
+	echoSubscriptionSet  map[ProcessId]int
+	readySubscriptionSet map[ProcessId]int
 
 	gossipMessage *messages.ScalableProtocolMessage
 	echoMessage   *messages.ScalableProtocolMessage
@@ -54,13 +54,13 @@ func newMessageState() *messageState {
 
 	ms.sentReadyMessages = make(map[int64]bool)
 
-	ms.gossipSample = make(map[ProcessId]bool)
-	ms.echoSample = make(map[ProcessId]bool)
-	ms.readySample = make(map[ProcessId]bool)
-	ms.deliverySample = make(map[ProcessId]bool)
+	ms.gossipSample = make(map[ProcessId]int)
+	ms.echoSample = make(map[ProcessId]int)
+	ms.readySample = make(map[ProcessId]int)
+	ms.deliverySample = make(map[ProcessId]int)
 
-	ms.echoSubscriptionSet = make(map[ProcessId]bool)
-	ms.readySubscriptionSet = make(map[ProcessId]bool)
+	ms.echoSubscriptionSet = make(map[ProcessId]int)
+	ms.readySubscriptionSet = make(map[ProcessId]int)
 
 	ms.receivedMessagesCnt = 0
 
@@ -95,8 +95,8 @@ func (p *Process) getRandomPid(random *rand.Rand) ProcessId {
 	return ProcessId(random.Int() % len(p.actorPids))
 }
 
-func (p *Process) generateGossipSample() map[ProcessId]bool {
-	sample := make(map[ProcessId]bool)
+func (p *Process) generateGossipSample() map[ProcessId]int {
+	sample := make(map[ProcessId]int)
 
 	seed := time.Now().UnixNano()
 
@@ -113,7 +113,7 @@ func (p *Process) generateGossipSample() map[ProcessId]bool {
 	uniform := rand.New(rand.NewSource(seed))
 
 	for len(sample) < gSize {
-		sample[p.getRandomPid(uniform)] = true
+		sample[p.getRandomPid(uniform)]++
 	}
 
 	return sample
@@ -125,12 +125,12 @@ func (p *Process) sample(
 	bInstance *messages.BroadcastInstance,
 	value int64,
 	size int,
-) map[ProcessId]bool {
-	sample := make(map[ProcessId]bool)
+) map[ProcessId]int {
+	sample := make(map[ProcessId]int)
 	random := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	for i := 0; i < size; i++ {
-		sample[p.getRandomPid(random)] = true
+		sample[p.getRandomPid(random)]++
 	}
 
 	p.broadcastToSet(
@@ -181,6 +181,14 @@ func (p *Process) InitProcess(
 	p.mainServer = mainServer
 }
 
+func getKeys(mp map[ProcessId]int) []ProcessId {
+	res := make([]ProcessId, 0)
+	for key := range mp {
+		res = append(res, key)
+	}
+	return res
+}
+
 func (p *Process) initMessageState(
 	context actor.SenderContext,
 	bInstance *messages.BroadcastInstance,
@@ -220,6 +228,8 @@ func (p *Process) initMessageState(
 				bInstance,
 				value,
 				p.readySampleSize)
+		fmt.Printf("%d: Ready sample: %v\n", p.processIndex, getKeys(msgState.readySample))
+
 		msgState.deliverySample =
 			p.sample(
 				context,
@@ -227,6 +237,7 @@ func (p *Process) initMessageState(
 				bInstance,
 				value,
 				p.deliverySampleSize)
+		fmt.Printf("%d: Delivery sample: %v\n", p.processIndex, getKeys(msgState.deliverySample))
 
 		p.messagesLog[author][bInstance.SeqNumber] = msgState
 	}
@@ -257,7 +268,7 @@ func (p *Process) sendMessage(
 
 func (p *Process) broadcastToSet(
 	context actor.SenderContext,
-	set map[ProcessId]bool,
+	set map[ProcessId]int,
 	bInstance *messages.BroadcastInstance,
 	msg *messages.ScalableProtocolMessage,
 ) {
@@ -325,14 +336,13 @@ func (p *Process) maybeSendReadyFromSieve(
 	context actor.SenderContext,
 	msgState *messageState,
 	bInstance *messages.BroadcastInstance,
-	value int64,
 ) {
-	if !msgState.sentReadyFromSieve &&
-		msgState.echoMessage != nil &&
-		value == msgState.echoMessage.Value &&
-		msgState.echoMessagesStat[value] >= p.echoThreshold {
-		p.broadcastReady(context, msgState, bInstance, value)
-		msgState.sentReadyFromSieve = true
+	if !msgState.sentReadyFromSieve && msgState.echoMessage != nil {
+		echoValue := msgState.echoMessage.Value
+		if msgState.echoMessagesStat[echoValue] >= p.echoThreshold {
+			p.broadcastReady(context, msgState, bInstance, echoValue)
+			msgState.sentReadyFromSieve = true
+		}
 	}
 }
 
@@ -349,15 +359,13 @@ func (p *Process) processProtocolMessage(
 
 	switch message.Stage {
 	case messages.ScalableProtocolMessage_GOSSIP_SUBSCRIBE:
-		if msgState.gossipSample[senderId] {
-			return
-		}
-
-		msgState.gossipSample[senderId] = true
+		msgState.gossipSample[senderId] = 1
 		if msgState.gossipMessage != nil {
 			p.sendMessage(context, p.actorPids[senderId], bInstance, msgState.gossipMessage)
 		}
 	case messages.ScalableProtocolMessage_GOSSIP:
+		fmt.Printf("%d: received gossip with value: %d from %d\n", p.processIndex, value, senderId)
+
 		if msgState.gossipMessage == nil {
 			p.broadcastGossip(context, msgState, bInstance, value)
 		}
@@ -371,32 +379,32 @@ func (p *Process) processProtocolMessage(
 				msgState.echoSubscriptionSet,
 				bInstance,
 				msgState.echoMessage)
-			p.maybeSendReadyFromSieve(context, msgState, bInstance, value)
+			p.maybeSendReadyFromSieve(context, msgState, bInstance)
 		}
 	case messages.ScalableProtocolMessage_ECHO_SUBSCRIBE:
-		if msgState.echoSubscriptionSet[senderId] {
+		if msgState.echoSubscriptionSet[senderId] > 0 {
 			return
 		}
 
-		msgState.echoSubscriptionSet[senderId] = true
+		msgState.echoSubscriptionSet[senderId] = 1
 		if msgState.echoMessage != nil {
 			p.sendMessage(context, p.actorPids[senderId], bInstance, msgState.echoMessage)
 		}
 	case messages.ScalableProtocolMessage_ECHO:
-		if !msgState.echoSample[senderId] || msgState.receivedEcho[senderId] {
+		if msgState.echoSample[senderId] == 0 || msgState.receivedEcho[senderId] {
 			return
 		}
 
 		msgState.receivedEcho[senderId] = true
-		msgState.echoMessagesStat[value]++
+		msgState.echoMessagesStat[value] += msgState.echoSample[senderId]
 
-		p.maybeSendReadyFromSieve(context, msgState, bInstance, value)
+		p.maybeSendReadyFromSieve(context, msgState, bInstance)
 	case messages.ScalableProtocolMessage_READY_SUBSCRIBE:
-		if msgState.readySubscriptionSet[senderId] {
+		if msgState.readySubscriptionSet[senderId] > 0 {
 			return
 		}
 
-		msgState.readySubscriptionSet[senderId] = true
+		msgState.readySubscriptionSet[senderId] = 1
 
 		for val := range msgState.sentReadyMessages {
 			p.sendMessage(
@@ -410,14 +418,9 @@ func (p *Process) processProtocolMessage(
 			)
 		}
 	case messages.ScalableProtocolMessage_READY:
-		if msgState.receivedReady[senderId][value] {
-			return
-		}
-
-		msgState.receivedReady[senderId][value] = true
-
-		if msgState.readySample[senderId] {
-			msgState.readySampleStat[value]++
+		fmt.Printf("%d: received ready with value: %d from %d\n", p.processIndex, value, senderId)
+		if msgState.readySample[senderId] > 0 {
+			msgState.readySampleStat[value] += msgState.readySample[senderId]
 
 			if !msgState.sentReadyMessages[value] &&
 				msgState.readySampleStat[value] >= p.readyThreshold {
@@ -425,8 +428,8 @@ func (p *Process) processProtocolMessage(
 			}
 		}
 
-		if msgState.deliverySample[senderId] {
-			msgState.deliverySampleStat[value]++
+		if msgState.deliverySample[senderId] > 0 {
+			msgState.deliverySampleStat[value] += msgState.deliverySample[senderId]
 
 			if !p.delivered(bInstance, value) &&
 				msgState.deliverySampleStat[value] >= p.deliveryThreshold {
