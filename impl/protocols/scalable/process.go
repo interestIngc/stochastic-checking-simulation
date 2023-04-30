@@ -181,14 +181,6 @@ func (p *Process) InitProcess(
 	p.mainServer = mainServer
 }
 
-func getKeys(mp map[ProcessId]int) []ProcessId {
-	res := make([]ProcessId, 0)
-	for key := range mp {
-		res = append(res, key)
-	}
-	return res
-}
-
 func (p *Process) initMessageState(
 	context actor.SenderContext,
 	bInstance *messages.BroadcastInstance,
@@ -228,8 +220,6 @@ func (p *Process) initMessageState(
 				bInstance,
 				value,
 				p.readySampleSize)
-		fmt.Printf("%d: Ready sample: %v\n", p.processIndex, getKeys(msgState.readySample))
-
 		msgState.deliverySample =
 			p.sample(
 				context,
@@ -237,7 +227,6 @@ func (p *Process) initMessageState(
 				bInstance,
 				value,
 				p.deliverySampleSize)
-		fmt.Printf("%d: Delivery sample: %v\n", p.processIndex, getKeys(msgState.deliverySample))
 
 		p.messagesLog[author][bInstance.SeqNumber] = msgState
 	}
@@ -364,8 +353,6 @@ func (p *Process) processProtocolMessage(
 			p.sendMessage(context, p.actorPids[senderId], bInstance, msgState.gossipMessage)
 		}
 	case messages.ScalableProtocolMessage_GOSSIP:
-		fmt.Printf("%d: received gossip with value: %d from %d\n", p.processIndex, value, senderId)
-
 		if msgState.gossipMessage == nil {
 			p.broadcastGossip(context, msgState, bInstance, value)
 		}
@@ -418,7 +405,6 @@ func (p *Process) processProtocolMessage(
 			)
 		}
 	case messages.ScalableProtocolMessage_READY:
-		fmt.Printf("%d: received ready with value: %d from %d\n", p.processIndex, value, senderId)
 		if msgState.readySample[senderId] > 0 {
 			msgState.readySampleStat[value] += msgState.readySample[senderId]
 
