@@ -28,4 +28,6 @@ type Parameters struct {
 
 	DeliverySampleSize int `json:"d_size"`
 	DeliveryThreshold  int `json:"d_threshold"`
+
+	CleanUpTimeout int `json:"clean_up_timeout"`
 }

@@ -84,6 +84,7 @@ type Process struct {
 	readyThreshold     int
 	deliverySampleSize int
 	deliveryThreshold  int
+	cleanUpTimeout     time.Duration
 
 	logger             *eventlogger.EventLogger
 	transactionManager *protocols.TransactionManager
@@ -174,6 +175,7 @@ func (p *Process) InitProcess(
 	p.readyThreshold = parameters.ReadyThreshold
 	p.deliverySampleSize = parameters.DeliverySampleSize
 	p.deliveryThreshold = parameters.DeliveryThreshold
+	p.cleanUpTimeout = time.Duration(parameters.CleanUpTimeout)
 
 	p.logger = eventlogger.InitEventLogger(p.processIndex, logger)
 	p.transactionManager = transactionManager
@@ -187,49 +189,45 @@ func (p *Process) initMessageState(
 	value int64,
 ) *messageState {
 	author := ProcessId(bInstance.Author)
-	msgState := p.messagesLog[author][bInstance.SeqNumber]
+	msgState := newMessageState()
 
-	if msgState == nil {
-		msgState = newMessageState()
-
-		for i := 0; i < len(p.actorPids); i++ {
-			msgState.receivedReady[ProcessId(i)] = make(map[int64]bool)
-		}
-
-		msgState.gossipSample = p.generateGossipSample()
-		p.broadcastToSet(
-			context,
-			msgState.gossipSample,
-			bInstance,
-			&messages.ScalableProtocolMessage{
-				Stage: messages.ScalableProtocolMessage_GOSSIP_SUBSCRIBE,
-				Value: value,
-			})
-
-		msgState.echoSample =
-			p.sample(
-				context,
-				messages.ScalableProtocolMessage_ECHO_SUBSCRIBE,
-				bInstance,
-				value,
-				p.echoSampleSize)
-		msgState.readySample =
-			p.sample(
-				context,
-				messages.ScalableProtocolMessage_READY_SUBSCRIBE,
-				bInstance,
-				value,
-				p.readySampleSize)
-		msgState.deliverySample =
-			p.sample(
-				context,
-				messages.ScalableProtocolMessage_READY_SUBSCRIBE,
-				bInstance,
-				value,
-				p.deliverySampleSize)
-
-		p.messagesLog[author][bInstance.SeqNumber] = msgState
+	for i := 0; i < len(p.actorPids); i++ {
+		msgState.receivedReady[ProcessId(i)] = make(map[int64]bool)
 	}
+
+	msgState.gossipSample = p.generateGossipSample()
+	p.broadcastToSet(
+		context,
+		msgState.gossipSample,
+		bInstance,
+		&messages.ScalableProtocolMessage{
+			Stage: messages.ScalableProtocolMessage_GOSSIP_SUBSCRIBE,
+			Value: value,
+		})
+
+	msgState.echoSample =
+		p.sample(
+			context,
+			messages.ScalableProtocolMessage_ECHO_SUBSCRIBE,
+			bInstance,
+			value,
+			p.echoSampleSize)
+	msgState.readySample =
+		p.sample(
+			context,
+			messages.ScalableProtocolMessage_READY_SUBSCRIBE,
+			bInstance,
+			value,
+			p.readySampleSize)
+	msgState.deliverySample =
+		p.sample(
+			context,
+			messages.ScalableProtocolMessage_READY_SUBSCRIBE,
+			bInstance,
+			value,
+			p.deliverySampleSize)
+
+	p.messagesLog[author][bInstance.SeqNumber] = msgState
 
 	return msgState
 }
@@ -313,12 +311,23 @@ func (p *Process) delivered(bInstance *messages.BroadcastInstance, value int64) 
 	return delivered
 }
 
-func (p *Process) deliver(bInstance *messages.BroadcastInstance, value int64) {
+func (p *Process) deliver(
+	context actor.Context,
+	bInstance *messages.BroadcastInstance,
+	value int64,
+) {
 	author := ProcessId(bInstance.Author)
 	p.deliveredMessages[author][bInstance.SeqNumber] = value
 	messagesReceived := p.messagesLog[author][bInstance.SeqNumber].receivedMessagesCnt
 
 	p.logger.OnDeliver(bInstance, value, messagesReceived)
+
+	context.ReenterAfter(
+		actor.NewFuture(context.ActorSystem(), p.cleanUpTimeout),
+		func(res interface{}, err error) {
+			delete(p.messagesLog[author], bInstance.SeqNumber)
+		},
+	)
 }
 
 func (p *Process) maybeSendReadyFromSieve(
@@ -342,8 +351,16 @@ func (p *Process) processProtocolMessage(
 	message *messages.ScalableProtocolMessage,
 ) {
 	value := message.Value
+	msgState := p.messagesLog[ProcessId(bInstance.Author)][bInstance.SeqNumber]
 
-	msgState := p.initMessageState(context, bInstance, value)
+	if msgState == nil {
+		if p.delivered(bInstance, value) {
+			return
+		} else {
+			msgState = p.initMessageState(context, bInstance, value)
+		}
+	}
+
 	msgState.receivedMessagesCnt++
 
 	switch message.Stage {
@@ -419,7 +436,7 @@ func (p *Process) processProtocolMessage(
 
 			if !p.delivered(bInstance, value) &&
 				msgState.deliverySampleStat[value] >= p.deliveryThreshold {
-				p.deliver(bInstance, value)
+				p.deliver(context, bInstance, value)
 			}
 		}
 	}

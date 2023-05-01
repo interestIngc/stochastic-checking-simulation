@@ -12,16 +12,17 @@ import (
 )
 
 func main() {
-	processCount := 256
+	processCount := 16
 	parameters := &parameters.Parameters{
 		ProcessCount:       processCount,
-		GossipSampleSize:   20,
+		GossipSampleSize:   16,
 		EchoSampleSize:     16,
-		EchoThreshold:      10,
-		ReadySampleSize:    20,
-		ReadyThreshold:     10,
-		DeliverySampleSize: 20,
-		DeliveryThreshold:  15,
+		EchoThreshold:      14,
+		ReadySampleSize:    16,
+		ReadyThreshold:     14,
+		DeliverySampleSize: 16,
+		DeliveryThreshold:  14,
+		CleanUpTimeout:     20000000000,
 	}
 
 	system := actor.NewActorSystem()

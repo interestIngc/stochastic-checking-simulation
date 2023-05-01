@@ -157,6 +157,9 @@ def calc_message_latencies(sent_messages, received_messages):
         latency = receive_timestamp - send_timestamp
         latencies.append(latency)
 
+    if len(latencies) == 0:
+        return 0, 0, 0
+
     min_latency, max_latency, sum_latency = latencies[0], latencies[0], 0
 
     for latency in latencies:
