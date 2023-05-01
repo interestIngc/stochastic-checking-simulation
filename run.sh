@@ -1,8 +1,8 @@
 #!/bin/zsh
 
-n=70
+n=2
 
-go run simulation/mainserver/*.go --log_file outputs/mainserver.txt --ip 127.0.0.1 --port 8080 --n "$n" &
+go run simulation/mainserver/*.go --log_file outputs/mainserver.txt --ip 127.0.0.1 --port 8080 --n "$n" --local_run true &
 
 for (( i = 0; i < $n; i++ ))
 do
