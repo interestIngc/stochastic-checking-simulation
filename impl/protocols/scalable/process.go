@@ -446,9 +446,11 @@ func (p *Process) Receive(context actor.Context) {
 	switch message := context.Message().(type) {
 	case *actor.Started:
 		p.logger.OnStart()
+		msg := &messages.Started{Sender: p.processIndex}
+		p.logger.Println(fmt.Sprintf("Sent message to mainserver: %s", msg.ToString()))
 		context.Send(
 			p.mainServer,
-			&messages.Started{Sender: p.processIndex},
+			msg,
 		)
 	case *actor.Stop:
 		p.logger.OnStop()

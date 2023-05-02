@@ -6,6 +6,10 @@ func (b *BroadcastInstance) ToString() string {
 	return fmt.Sprintf("{%d;%d}", b.Author, b.SeqNumber)
 }
 
+func (m *Started) ToString() string {
+	return fmt.Sprintf("Started{Sender: %d}", m.Sender)
+}
+
 func (b *BroadcastInstance) Copy() *BroadcastInstance {
 	if b == nil {
 		return nil

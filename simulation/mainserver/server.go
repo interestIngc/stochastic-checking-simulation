@@ -8,16 +8,16 @@ import (
 )
 
 type MainServer struct {
-	pids                  []*actor.PID
-	startedProcessesCount int
+	pids             []*actor.PID
+	startedProcesses map[int64]bool
 
 	logger *log.Logger
 }
 
 func (ms *MainServer) InitMainServer(pids []*actor.PID, logger *log.Logger) {
 	ms.pids = pids
-	ms.startedProcessesCount = 0
 	ms.logger = logger
+	ms.startedProcesses = make(map[int64]bool)
 }
 
 func (ms *MainServer) simulate(context actor.SenderContext) {
@@ -27,10 +27,11 @@ func (ms *MainServer) simulate(context actor.SenderContext) {
 }
 
 func (ms *MainServer) Receive(context actor.Context) {
-	switch context.Message().(type) {
+	switch message := context.Message().(type) {
 	case *messages.Started:
-		ms.startedProcessesCount++
-		if ms.startedProcessesCount == len(ms.pids) {
+		ms.logger.Printf("Received message: %s\n", message.ToString())
+		ms.startedProcesses[message.Sender] = true
+		if len(ms.startedProcesses) == len(ms.pids) {
 			ms.logger.Printf("Starting broadcast, timestamp: %d\n", utils.GetNow())
 			ms.simulate(context)
 		}
