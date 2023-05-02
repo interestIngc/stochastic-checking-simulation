@@ -27,6 +27,17 @@ func main() {
 	logger := log.New(f, "", log.LstdFlags)
 
 	system := actor.NewActorSystem()
+	system.EventStream.Subscribe(
+		func(event interface{}) {
+			deadLetter, ok := event.(*actor.DeadLetterEvent)
+			if ok {
+				logger.Printf(
+					"Dead letter detected. To: %s\n",
+					deadLetter.PID.String())
+			}
+		},
+	)
+
 	remoteConfig := remote.Configure(*baseIpAddress, *basePort)
 	remoter := remote.NewRemote(system, remoteConfig)
 	remoter.Start()

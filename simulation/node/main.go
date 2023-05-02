@@ -105,9 +105,21 @@ func main() {
 	processPort, _ := strconv.Atoi(processPortStr)
 
 	system := actor.NewActorSystem()
+	system.EventStream.Subscribe(
+		func(event interface{}) {
+			deadLetter, ok := event.(*actor.DeadLetterEvent)
+			if ok {
+				logger.Printf(
+					"Dead letter detected. To: %s\n",
+					deadLetter.PID.String())
+			}
+		},
+	)
+
 	remoteConfig := remote.Configure(processIp, processPort)
 	remoter := remote.NewRemote(system, remoteConfig)
 	remoter.Start()
+	actor.Unbounded()
 
 	_, e =
 		system.Root.SpawnNamed(
