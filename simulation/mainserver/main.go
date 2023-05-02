@@ -49,6 +49,10 @@ func main() {
 		pids = utils.GetRemotePids(*baseIpAddress, *basePort, *processCount, logger)
 	}
 
+	for _, pid := range pids {
+		logger.Println(pid.String())
+	}
+
 	server := &MainServer{}
 	server.InitMainServer(pids, logger)
 

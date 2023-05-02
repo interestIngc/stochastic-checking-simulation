@@ -77,6 +77,11 @@ func main() {
 
 	mainServer := actor.NewPID(utils.JoinIpAndPort(*baseIpAddress, *port), "mainserver")
 
+	logger.Printf("Mainserver: %s\n", mainServer.String())
+	for _, pid := range pids {
+		logger.Println(pid.String())
+	}
+
 	var process protocols.Process
 
 	switch input.Protocol {
