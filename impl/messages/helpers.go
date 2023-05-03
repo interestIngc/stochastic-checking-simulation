@@ -7,7 +7,7 @@ func (b *BroadcastInstance) ToString() string {
 }
 
 func (m *Started) ToString() string {
-	return fmt.Sprintf("Started{Sender: %d}", m.Sender)
+	return fmt.Sprintf("Started{}")
 }
 
 func (b *BroadcastInstance) Copy() *BroadcastInstance {

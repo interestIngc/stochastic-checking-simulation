@@ -2,37 +2,25 @@ package protocols
 
 import (
 	"github.com/asynkron/protoactor-go/actor"
-	"log"
+	"stochastic-checking-simulation/context"
+	"stochastic-checking-simulation/impl/eventlogger"
+	"stochastic-checking-simulation/impl/messages"
 	"stochastic-checking-simulation/impl/parameters"
 )
 
 type Process interface {
-	Receive(context actor.Context)
+	HandleMessage(
+		actorContext actor.Context,
+		context *context.ReliableContext,
+		sender int64,
+		message *messages.BroadcastInstanceMessage)
 
 	InitProcess(
 		processIndex int64,
-		pids []*actor.PID,
+		actorPids []*actor.PID,
 		parameters *parameters.Parameters,
-		logger *log.Logger,
-		transactionManager *TransactionManager,
-		mainServer *actor.PID,
+		logger *eventlogger.EventLogger,
 	)
 
-	Broadcast(context actor.SenderContext, value int64)
-}
-
-type FaultyProcess interface {
-	Receive(context actor.Context)
-
-	InitProcess(
-		currPid *actor.PID,
-		pids []*actor.PID,
-		parameters *parameters.Parameters,
-		logger *log.Logger,
-		transactionManager *TransactionManager,
-	)
-
-	Broadcast(context actor.SenderContext, value int64)
-
-	FaultyBroadcast(context actor.SenderContext, value1 int64, value2 int64)
+	Broadcast(context actor.Context, reliableContext *context.ReliableContext, value int64)
 }

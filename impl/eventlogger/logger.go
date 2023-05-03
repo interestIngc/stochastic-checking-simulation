@@ -109,6 +109,10 @@ func (el *EventLogger) OnMessageReceived(senderPid int64, msgId int64) {
 		senderPid, msgId, utils.GetNow())
 }
 
+func (el *EventLogger) OnAckReceived(msgId int64) {
+	el.logger.Printf("Received ack: %d\n", msgId)
+}
+
 func (el *EventLogger) Fatal(message string) {
 	el.logger.Fatal(message)
 }

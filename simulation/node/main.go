@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"stochastic-checking-simulation/impl/handler"
 	"stochastic-checking-simulation/impl/parameters"
 	"stochastic-checking-simulation/impl/protocols"
 	"stochastic-checking-simulation/impl/protocols/accountability/consistent"
@@ -97,13 +98,16 @@ func main() {
 		logger.Fatalf("Invalid protocol: %s", input.Protocol)
 	}
 
-	process.InitProcess(
+	a := &handler.Actor{}
+	a.InitActor(
 		int64(*processIndex),
 		pids,
 		&input.Parameters,
 		logger,
-		protocols.NewTransactionManager(*transactions, *transactionInitTimeoutNs),
 		mainServer,
+		*transactions,
+		*transactionInitTimeoutNs,
+		process,
 	)
 
 	processIp, processPortStr, _ := net.SplitHostPort(pids[*processIndex].Address)
@@ -130,7 +134,7 @@ func main() {
 		system.Root.SpawnNamed(
 			actor.PropsFromProducer(
 				func() actor.Actor {
-					return process
+					return a
 				}),
 			"main",
 		)

@@ -2,15 +2,13 @@ syntax = "proto3";
 package messages;
 option go_package = "stochastic-checking-simulation/impl/messages";
 
-message Started {
-  int64 sender = 1;
-}
+message Started {}
 
 message Simulate {}
 
-message FaultyBroadcast {
-  int64 value1 = 1;
-  int64 value2 = 2;
+message Ack {
+  int64 sender = 1;
+  int64 stamp = 2;
 }
 
 message BroadcastInstance {
@@ -81,8 +79,6 @@ message ScalableProtocolMessage {
 
 message BroadcastInstanceMessage {
   BroadcastInstance broadcastInstance = 1;
-  int64 stamp = 2;
-  int64 sender = 3;
 
   oneof message {
     BrachaProtocolMessage brachaProtocolMessage = 4;
@@ -90,5 +86,16 @@ message BroadcastInstanceMessage {
     ReliableProtocolMessage reliableProtocolMessage = 6;
     RecoveryProtocolMessage recoveryProtocolMessage = 7;
     ScalableProtocolMessage scalableProtocolMessage = 8;
+  }
+}
+
+message Message {
+  int64 sender = 1;
+  int64 stamp = 2;
+
+  oneof content {
+    Started started = 3;
+    Simulate simulate = 4;
+    BroadcastInstanceMessage broadcastInstanceMessage = 5;
   }
 }
