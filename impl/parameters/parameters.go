@@ -30,4 +30,6 @@ type Parameters struct {
 	DeliveryThreshold  int `json:"d_threshold"`
 
 	CleanUpTimeout int `json:"clean_up_timeout"`
+
+	RetransmissionTimeoutNs int `json:"retransmission_timeout_ns"`
 }

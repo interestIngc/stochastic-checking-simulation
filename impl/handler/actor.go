@@ -51,7 +51,7 @@ func (a *Actor) InitActor(
 	a.transactionInitTimeoutNs = transactionInitTimeoutNs
 
 	a.context = &context.ReliableContext{}
-	a.context.InitContext(processIndex, n+1, logger)
+	a.context.InitContext(processIndex, n+1, logger, parameters.RetransmissionTimeoutNs)
 
 	a.process = process
 	a.process.InitProcess(processIndex, actorPids, parameters, a.context.Logger)

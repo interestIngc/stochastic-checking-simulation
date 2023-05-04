@@ -19,6 +19,7 @@ type MainServer struct {
 func (ms *MainServer) InitMainServer(
 	actorPids []*actor.PID,
 	logger *log.Logger,
+	retransmissionTimeoutNs int,
 ) {
 	n := len(actorPids)
 	ms.actorPids = actorPids
@@ -27,7 +28,7 @@ func (ms *MainServer) InitMainServer(
 	ms.startedProcesses = make(map[int64]bool)
 
 	ms.reliableContext = &context.ReliableContext{}
-	ms.reliableContext.InitContext(int64(n), n+1, logger)
+	ms.reliableContext.InitContext(int64(n), n+1, logger, retransmissionTimeoutNs)
 }
 
 func (ms *MainServer) simulate(context actor.Context) {

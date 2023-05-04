@@ -12,18 +12,23 @@ type ReliableContext struct {
 	ProcessIndex int64
 	Logger       *eventlogger.EventLogger
 
-	retransmissionTimeoutMs int64
+	retransmissionTimeoutNs int
 	messageCounter          int64
 
 	receivedMessages map[int64]map[int64]bool
 	receivedAck      map[int64]bool
 }
 
-func (c *ReliableContext) InitContext(processIndex int64, n int, logger *log.Logger) {
+func (c *ReliableContext) InitContext(
+	processIndex int64,
+	n int,
+	logger *log.Logger,
+	retransmissionTimeoutNs int,
+) {
 	c.ProcessIndex = processIndex
 	c.Logger = eventlogger.InitEventLogger(processIndex, logger)
 
-	c.retransmissionTimeoutMs = 5000000000
+	c.retransmissionTimeoutNs = retransmissionTimeoutNs
 	c.messageCounter = 0
 
 	c.receivedMessages = make(map[int64]map[int64]bool)
@@ -48,7 +53,7 @@ func (c *ReliableContext) Send(context actor.Context, to *actor.PID, msg *messag
 	c.Logger.OnMessageSent(msg.Stamp)
 
 	context.ReenterAfter(
-		actor.NewFuture(context.ActorSystem(), time.Duration(c.retransmissionTimeoutMs)),
+		actor.NewFuture(context.ActorSystem(), time.Duration(c.retransmissionTimeoutNs)),
 		func(res interface{}, err error) {
 			if !c.receivedAck[msg.Stamp] {
 				c.Send(context, to, msg)

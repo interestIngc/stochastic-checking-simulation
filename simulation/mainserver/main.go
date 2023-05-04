@@ -18,6 +18,10 @@ var (
 	basePort      = flag.Int("port", 5001, "Port on which the main server should be started")
 	localRun      = flag.Bool("local_run", false,
 		"Defines whether to start the simulation locally, i.e. on a single machine, or in a distributed system")
+	retransmissionTimeoutNs = flag.Int(
+		"retransmission_timeout_ns",
+		5000000000,
+		"retransmission timeout in ns")
 )
 
 func main() {
@@ -54,7 +58,7 @@ func main() {
 	}
 
 	server := &MainServer{}
-	server.InitMainServer(pids, logger)
+	server.InitMainServer(pids, logger, *retransmissionTimeoutNs)
 
 	_, e := system.Root.SpawnNamed(
 		actor.PropsFromProducer(
