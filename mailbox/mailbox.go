@@ -3,6 +3,7 @@ package mailbox
 import (
 	"log"
 	"net"
+	"time"
 )
 
 type Mailbox struct {
@@ -116,6 +117,7 @@ func (pC *Mailbox) doConnect(to int64) net.Conn {
 
 	if err != nil {
 		log.Printf("%s: Failed to establish a connection to %s, retrying. %e\n", pC.addresses[pC.id], addr, err)
+		time.Sleep(2 * time.Second)
 		return pC.doConnect(to)
 	}
 
