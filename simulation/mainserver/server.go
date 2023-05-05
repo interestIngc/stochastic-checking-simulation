@@ -68,16 +68,16 @@ func (ms *MainServer) receiveMessages() {
 
 		log.Printf("Received message: %s from sender: %d\n", msg.String(), msg.Sender)
 
-		switch content := msg.Content.(type) {
-		case *messages.Message_Ack:
-			ms.reliableContext.OnAck(content.Ack)
+		switch msg.Content.(type) {
+		//case *messages.Message_Ack:
+		//	ms.reliableContext.OnAck(content.Ack)
 		case *messages.Message_Started:
 			sender := msg.Sender
 			stamp := msg.Stamp
 
 			ms.reliableContext.Logger.OnMessageReceived(sender, stamp)
 
-			ms.reliableContext.SendAck(sender, stamp)
+			//ms.reliableContext.SendAck(sender, stamp)
 
 			if ms.receivedMessages[sender] {
 				return

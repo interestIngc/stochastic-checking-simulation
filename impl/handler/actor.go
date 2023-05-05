@@ -86,26 +86,24 @@ func (a *Actor) receiveMessages() {
 			continue
 		}
 
-		//log.Printf("Received message: %s\n", msg.String())
-
 		content := msg.Content
-		ack, ok := content.(*messages.Message_Ack)
-		if ok {
-			a.context.OnAck(ack.Ack)
-			continue
-		}
+		//ack, ok := content.(*messages.Message_Ack)
+		//if ok {
+		//	a.context.OnAck(ack.Ack)
+		//	continue
+		//}
 
 		sender := msg.Sender
 		stamp := msg.Stamp
 
 		a.context.Logger.OnMessageReceived(sender, stamp)
 
-		a.context.SendAck(sender, stamp)
-
-		if a.receivedMessages[sender][stamp] {
-			return
-		}
-		a.receivedMessages[sender][stamp] = true
+		//a.context.SendAck(sender, stamp)
+		//
+		//if a.receivedMessages[sender][stamp] {
+		//	return
+		//}
+		//a.receivedMessages[sender][stamp] = true
 
 		switch c := content.(type) {
 		case *messages.Message_Broadcast:
