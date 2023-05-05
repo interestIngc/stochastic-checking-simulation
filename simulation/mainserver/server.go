@@ -1,68 +1,92 @@
 package main
 
 import (
-	"github.com/asynkron/protoactor-go/actor"
 	"log"
 	"stochastic-checking-simulation/context"
 	"stochastic-checking-simulation/impl/messages"
 	"stochastic-checking-simulation/impl/utils"
+	"stochastic-checking-simulation/mailbox"
 )
 
 type MainServer struct {
-	actorPids        []*actor.PID
-	startedProcesses map[int64]bool
+	n int
 
 	logger          *log.Logger
 	reliableContext *context.ReliableContext
+
+	receivedMessages map[int64]bool
+
+	mailbox *mailbox.Mailbox
+	readChan  chan []byte
 }
 
 func (ms *MainServer) InitMainServer(
-	actorPids []*actor.PID,
+	actorPids []string,
 	logger *log.Logger,
 	retransmissionTimeoutNs int,
 ) {
-	n := len(actorPids)
-	ms.actorPids = actorPids
+	ms.n = len(actorPids) - 1
 	ms.logger = logger
 
-	ms.startedProcesses = make(map[int64]bool)
+	ms.readChan = make(chan []byte, 500)
+
+	ms.receivedMessages = make(map[int64]bool)
+
+	writeChanMap := make(map[int64]chan []byte)
+	for i := 0; i <= ms.n; i++ {
+		writeChanMap[int64(i)] = make(chan []byte, 500)
+	}
+
+	id := int64(ms.n)
+	ms.mailbox = mailbox.NewMailbox(id, actorPids, writeChanMap, ms.readChan)
+	ms.mailbox.SetUp()
 
 	ms.reliableContext = &context.ReliableContext{}
-	ms.reliableContext.InitContext(int64(n), n+1, logger, retransmissionTimeoutNs)
+	ms.reliableContext.InitContext(id, logger, writeChanMap, retransmissionTimeoutNs)
+
+	ms.receiveMessages()
 }
 
-func (ms *MainServer) simulate(context actor.Context) {
-	for _, pid := range ms.actorPids {
+func (ms *MainServer) simulate() {
+	for pid := 0; pid < ms.n; pid++ {
 		msg := ms.reliableContext.MakeNewMessage()
 		msg.Content = &messages.Message_Simulate{
 			Simulate: &messages.Simulate{},
 		}
-		ms.reliableContext.Send(context, pid, msg)
+		ms.reliableContext.Send(int64(pid), msg)
 	}
 }
 
-func (ms *MainServer) Receive(context actor.Context) {
-	switch message := context.Message().(type) {
-	case *messages.Ack:
-		ms.reliableContext.OnAck(message.Stamp)
-	case *messages.Message:
-		sender := message.Sender
-		stamp := message.Stamp
+func (ms *MainServer) receiveMessages() {
+	for data := range ms.readChan {
+		msg := &messages.Message{}
 
-		ms.reliableContext.SendAck(context, ms.actorPids[sender], sender, stamp)
-
-		if ms.reliableContext.ReceivedMessage(sender, stamp) {
-			return
+		err := utils.Unmarshal(data, msg)
+		if err != nil {
+			continue
 		}
 
-		switch content := message.Content.(type) {
+		log.Printf("Received message: %s from sender: %d\n", msg.String(), msg.Sender)
+
+		switch content := msg.Content.(type) {
+		case *messages.Message_Ack:
+			ms.reliableContext.OnAck(content.Ack)
 		case *messages.Message_Started:
-			startedMsg := content.Started
-			ms.logger.Printf("Received message: %s\n", startedMsg.ToString())
-			ms.startedProcesses[sender] = true
-			if len(ms.startedProcesses) == len(ms.actorPids) {
+			sender := msg.Sender
+			stamp := msg.Stamp
+
+			ms.reliableContext.Logger.OnMessageReceived(sender, stamp)
+
+			ms.reliableContext.SendAck(sender, stamp)
+
+			if ms.receivedMessages[sender] {
+				return
+			}
+			ms.receivedMessages[sender] = true
+
+			if len(ms.receivedMessages) == ms.n {
 				ms.logger.Printf("Starting broadcast, timestamp: %d\n", utils.GetNow())
-				ms.simulate(context)
+				ms.simulate()
 			}
 		}
 	}

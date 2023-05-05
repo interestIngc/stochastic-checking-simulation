@@ -2,8 +2,6 @@ package main
 
 import (
 	"flag"
-	"github.com/asynkron/protoactor-go/actor"
-	"github.com/asynkron/protoactor-go/remote"
 	"log"
 	"stochastic-checking-simulation/impl/utils"
 )
@@ -30,51 +28,16 @@ func main() {
 	f := utils.OpenLogFile(*logFile)
 	logger := log.New(f, "", log.LstdFlags)
 
-	system := actor.NewActorSystem()
-	system.EventStream.Subscribe(
-		func(event interface{}) {
-			deadLetter, ok := event.(*actor.DeadLetterEvent)
-			if ok {
-				logger.Printf(
-					"Dead letter detected. To: %s\n",
-					deadLetter.PID.String())
-			}
-		},
-	)
-
-	remoteConfig := remote.Configure(*baseIpAddress, *basePort)
-	remoter := remote.NewRemote(system, remoteConfig)
-	remoter.Start()
-
-	var pids []*actor.PID
+	var pids []string
 	if *localRun {
 		pids = utils.GetLocalPids(*baseIpAddress, *basePort, *processCount)
 	} else {
 		pids = utils.GetRemotePids(*baseIpAddress, *basePort, *processCount, logger)
 	}
 
-	for _, pid := range pids {
-		logger.Println(pid.String())
-	}
+	ownId := utils.JoinIpAndPort(*baseIpAddress, *basePort)
+	pids = append(pids, ownId)
 
 	server := &MainServer{}
 	server.InitMainServer(pids, logger, *retransmissionTimeoutNs)
-
-	_, e := system.Root.SpawnNamed(
-		actor.PropsFromProducer(
-			func() actor.Actor {
-				return server
-			}),
-		"mainserver",
-	)
-	if e != nil {
-		logger.Fatalf("Could not start the main server: %s\n", e)
-	}
-
-	logger.Printf(
-		"Main server started at %s\n",
-		utils.JoinIpAndPort(*baseIpAddress, *basePort),
-	)
-
-	select {}
 }

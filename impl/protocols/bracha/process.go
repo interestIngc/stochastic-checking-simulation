@@ -2,7 +2,6 @@ package bracha
 
 import (
 	"fmt"
-	"github.com/asynkron/protoactor-go/actor"
 	"math"
 	"stochastic-checking-simulation/context"
 	"stochastic-checking-simulation/impl/eventlogger"
@@ -48,13 +47,13 @@ func newMessageState() *messageState {
 
 type Process struct {
 	processIndex int64
-	actorPids    []*actor.PID
 
 	transactionCounter int64
 
 	deliveredTransactions map[ProcessId]map[int64]int64
 	transactionsLog       map[ProcessId]map[int64]*messageState
 
+	n int
 	messagesForEcho     int
 	messagesForReady    int
 	messagesForDelivery int
@@ -64,25 +63,23 @@ type Process struct {
 
 func (p *Process) InitProcess(
 	processIndex int64,
-	actorPids []*actor.PID,
+	actorPids []string,
 	parameters *parameters.Parameters,
 	logger *eventlogger.EventLogger,
 ) {
 	p.processIndex = processIndex
-	n := len(actorPids)
+	p.n = len(actorPids)
 	f := parameters.FaultyProcesses
-
-	p.actorPids = actorPids
 
 	p.transactionCounter = 0
 
-	p.messagesForEcho = int(math.Ceil(float64(n+f+1) / float64(2)))
+	p.messagesForEcho = int(math.Ceil(float64(p.n+f+1) / float64(2)))
 	p.messagesForReady = f + 1
 	p.messagesForDelivery = 2*f + 1
 
 	p.deliveredTransactions = make(map[ProcessId]map[int64]int64)
 	p.transactionsLog = make(map[ProcessId]map[int64]*messageState)
-	for index := range p.actorPids {
+	for index := 0; index < p.n; index++ {
 		p.deliveredTransactions[ProcessId(index)] = make(map[int64]int64)
 		p.transactionsLog[ProcessId(index)] = make(map[int64]*messageState)
 	}
@@ -101,9 +98,8 @@ func (p *Process) initMessageState(bInstance *messages.BroadcastInstance) *messa
 }
 
 func (p *Process) sendProtocolMessage(
-	actorContext actor.Context,
 	reliableContext *context.ReliableContext,
-	to *actor.PID,
+	to ProcessId,
 	bInstance *messages.BroadcastInstance,
 	message *messages.BrachaProtocolMessage,
 ) {
@@ -119,29 +115,26 @@ func (p *Process) sendProtocolMessage(
 		BroadcastInstanceMessage: bMessage,
 	}
 
-	reliableContext.Send(actorContext, to, msg)
+	reliableContext.Send(int64(to), msg)
 }
 
 func (p *Process) broadcast(
-	actorContext actor.Context,
 	reliableContext *context.ReliableContext,
 	bInstance *messages.BroadcastInstance,
 	message *messages.BrachaProtocolMessage,
 ) {
-	for _, pid := range p.actorPids {
-		p.sendProtocolMessage(actorContext, reliableContext, pid, bInstance, message)
+	for i := 0; i < p.n; i++ {
+		p.sendProtocolMessage(reliableContext, ProcessId(i), bInstance, message)
 	}
 }
 
 func (p *Process) broadcastEcho(
-	actorContext actor.Context,
 	reliableContext *context.ReliableContext,
 	bInstance *messages.BroadcastInstance,
 	value int64,
 	msgState *messageState,
 ) {
 	p.broadcast(
-		actorContext,
 		reliableContext,
 		bInstance,
 		&messages.BrachaProtocolMessage{
@@ -152,14 +145,12 @@ func (p *Process) broadcastEcho(
 }
 
 func (p *Process) broadcastReady(
-	actorContext actor.Context,
 	reliableContext *context.ReliableContext,
 	bInstance *messages.BroadcastInstance,
 	value int64,
 	msgState *messageState,
 ) {
 	p.broadcast(
-		actorContext,
 		reliableContext,
 		bInstance,
 		&messages.BrachaProtocolMessage{
@@ -197,7 +188,6 @@ func (p *Process) deliver(
 }
 
 func (p *Process) processProtocolMessage(
-	actorContext actor.Context,
 	reliableContext *context.ReliableContext,
 	senderPid ProcessId,
 	bInstance *messages.BroadcastInstance,
@@ -215,7 +205,7 @@ func (p *Process) processProtocolMessage(
 	switch message.Stage {
 	case messages.BrachaProtocolMessage_INITIAL:
 		if msgState.stage == Init {
-			p.broadcastEcho(actorContext, reliableContext, bInstance, value, msgState)
+			p.broadcastEcho(reliableContext, bInstance, value, msgState)
 		}
 	case messages.BrachaProtocolMessage_ECHO:
 		if msgState.stage == SentReady || msgState.receivedEcho[senderPid] {
@@ -226,10 +216,10 @@ func (p *Process) processProtocolMessage(
 
 		if msgState.echoCount[value] >= p.messagesForEcho {
 			if msgState.stage == Init {
-				p.broadcastEcho(actorContext, reliableContext, bInstance, value, msgState)
+				p.broadcastEcho(reliableContext, bInstance, value, msgState)
 			}
 			if msgState.stage == SentEcho {
-				p.broadcastReady(actorContext, reliableContext, bInstance, value, msgState)
+				p.broadcastReady(reliableContext, bInstance, value, msgState)
 			}
 		}
 	case messages.BrachaProtocolMessage_READY:
@@ -241,10 +231,10 @@ func (p *Process) processProtocolMessage(
 
 		if msgState.readyCount[value] >= p.messagesForReady {
 			if msgState.stage == Init {
-				p.broadcastEcho(actorContext, reliableContext, bInstance, value, msgState)
+				p.broadcastEcho(reliableContext, bInstance, value, msgState)
 			}
 			if msgState.stage == SentEcho {
-				p.broadcastReady(actorContext, reliableContext, bInstance, value, msgState)
+				p.broadcastReady(reliableContext, bInstance, value, msgState)
 			}
 		}
 		if msgState.readyCount[value] >= p.messagesForDelivery {
@@ -254,7 +244,6 @@ func (p *Process) processProtocolMessage(
 }
 
 func (p *Process) HandleMessage(
-	actorContext actor.Context,
 	reliableContext *context.ReliableContext,
 	sender int64,
 	broadcastInstanceMessage *messages.BroadcastInstanceMessage,
@@ -264,7 +253,6 @@ func (p *Process) HandleMessage(
 	switch protocolMessage := broadcastInstanceMessage.Message.(type) {
 	case *messages.BroadcastInstanceMessage_BrachaProtocolMessage:
 		p.processProtocolMessage(
-			actorContext,
 			reliableContext,
 			ProcessId(sender),
 			bInstance,
@@ -276,7 +264,6 @@ func (p *Process) HandleMessage(
 }
 
 func (p *Process) Broadcast(
-	actorContext actor.Context,
 	reliableContext *context.ReliableContext,
 	value int64,
 ) {
@@ -286,7 +273,6 @@ func (p *Process) Broadcast(
 	}
 
 	p.broadcast(
-		actorContext,
 		reliableContext,
 		broadcastInstance,
 		&messages.BrachaProtocolMessage{

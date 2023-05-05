@@ -1,14 +1,14 @@
 package handler
 
 import (
-	"fmt"
-	"github.com/asynkron/protoactor-go/actor"
 	"log"
 	"math/rand"
 	"stochastic-checking-simulation/context"
 	"stochastic-checking-simulation/impl/messages"
 	"stochastic-checking-simulation/impl/parameters"
 	"stochastic-checking-simulation/impl/protocols"
+	"stochastic-checking-simulation/impl/utils"
+	"stochastic-checking-simulation/mailbox"
 	"time"
 )
 
@@ -17,21 +17,22 @@ type Actor struct {
 
 	context *context.ReliableContext
 
-	actorPids  []*actor.PID
-	mainServer *actor.PID
+	receivedMessages map[int64]map[int64]bool
 
 	transactionsToSendOut    int
 	transactionInitTimeoutNs int
 
 	process protocols.Process
+	mailbox *mailbox.Mailbox
+	readChan  chan []byte
 }
 
 func (a *Actor) InitActor(
 	processIndex int64,
-	actorPids []*actor.PID,
+	actorPids []string,
 	parameters *parameters.Parameters,
 	logger *log.Logger,
-	mainServer *actor.PID,
+	mainServerAddr string,
 	transactionsToSendOut int,
 	transactionInitTimeoutNs int,
 	process protocols.Process,
@@ -40,70 +41,93 @@ func (a *Actor) InitActor(
 
 	a.processIndex = processIndex
 
-	a.actorPids = make([]*actor.PID, n+1)
+	pids := make([]string, n+1)
 	for i := 0; i < n; i++ {
-		a.actorPids[i] = actorPids[i]
+		pids[i] = actorPids[i]
 	}
-	a.actorPids[n] = mainServer
-	a.mainServer = mainServer
+	pids[n] = mainServerAddr
 
 	a.transactionsToSendOut = transactionsToSendOut
 	a.transactionInitTimeoutNs = transactionInitTimeoutNs
 
+	a.receivedMessages = make(map[int64]map[int64]bool)
+	writeChanMap := make(map[int64]chan []byte)
+	for i := 0; i <= n; i++ {
+		writeChanMap[int64(i)] = make(chan []byte, 500)
+		a.receivedMessages[int64(i)] = make(map[int64]bool)
+	}
+
+	a.readChan = make(chan []byte, 500)
+
+	a.mailbox = mailbox.NewMailbox(processIndex, pids, writeChanMap, a.readChan)
+	a.mailbox.SetUp()
+
 	a.context = &context.ReliableContext{}
-	a.context.InitContext(processIndex, n+1, logger, parameters.RetransmissionTimeoutNs)
+	a.context.InitContext(processIndex, logger, writeChanMap, parameters.RetransmissionTimeoutNs)
 
 	a.process = process
 	a.process.InitProcess(processIndex, actorPids, parameters, a.context.Logger)
+
+	startedMessage := a.context.MakeNewMessage()
+	startedMessage.Content = &messages.Message_Started{
+		Started: &messages.Started{},
+	}
+	a.context.Send(int64(n), startedMessage)
+
+	a.receiveMessages()
 }
 
-func (a *Actor) Receive(context actor.Context) {
-	switch message := context.Message().(type) {
-	case *actor.Started:
-		a.context.Logger.OnStart()
-		msg := &messages.Started{}
-		a.context.Logger.Println(fmt.Sprintf("Sent message to mainserver: %s", msg.ToString()))
+func (a *Actor) receiveMessages() {
+	for data := range a.readChan {
+		msg := &messages.Message{}
 
-		startedMessage := a.context.MakeNewMessage()
-		startedMessage.Content = &messages.Message_Started{
-			Started: msg,
+		err := utils.Unmarshal(data, msg)
+		if err != nil {
+			continue
 		}
-		a.context.Send(context, a.mainServer, startedMessage)
-	case *actor.Stop:
-		a.context.Logger.OnStop()
-	case *messages.Ack:
-		a.context.OnAck(message.Stamp)
-	case *messages.Message:
-		sender := message.Sender
-		stamp := message.Stamp
 
-		a.context.Logger.OnMessageReceived(message.Sender, stamp)
+		//log.Printf("Received message: %s\n", msg.String())
 
-		a.context.SendAck(context, a.actorPids[sender], sender, stamp)
+		content := msg.Content
+		ack, ok := content.(*messages.Message_Ack)
+		if ok {
+			a.context.OnAck(ack.Ack)
+			continue
+		}
 
-		if a.context.ReceivedMessage(sender, stamp) {
+		sender := msg.Sender
+		stamp := msg.Stamp
+
+		a.context.Logger.OnMessageReceived(sender, stamp)
+
+		a.context.SendAck(sender, stamp)
+
+		if a.receivedMessages[sender][stamp] {
 			return
 		}
+		a.receivedMessages[sender][stamp] = true
 
-		switch content := message.Content.(type) {
+		switch c := content.(type) {
+		case *messages.Message_Broadcast:
+			a.process.Broadcast(a.context, c.Broadcast.Value)
 		case *messages.Message_Simulate:
 			a.context.Logger.OnSimulationStart()
-			a.Simulate(context)
+			go a.Simulate()
 		case *messages.Message_BroadcastInstanceMessage:
-			a.process.HandleMessage(context, a.context, sender, content.BroadcastInstanceMessage)
+			a.process.HandleMessage(a.context, sender, c.BroadcastInstanceMessage)
 		}
 	}
 }
 
-func (a *Actor) Simulate(actorContext actor.Context) {
-	if a.transactionsToSendOut > 0 {
-		a.process.Broadcast(actorContext, a.context, int64(rand.Int()))
-		a.transactionsToSendOut--
-
-		actorContext.ReenterAfter(
-			actor.NewFuture(actorContext.ActorSystem(), time.Duration(a.transactionInitTimeoutNs)),
-			func(res interface{}, err error) {
-				a.Simulate(actorContext)
-			})
+func (a *Actor) Simulate() {
+	for i := 0; i < a.transactionsToSendOut; i++ {
+		msg := a.context.MakeNewMessage()
+		msg.Content = &messages.Message_Broadcast{
+			Broadcast: &messages.Broadcast{
+				Value: int64(rand.Int()),
+			},
+		}
+		a.context.Send(a.processIndex, msg)
+		time.Sleep(time.Duration(a.transactionInitTimeoutNs))
 	}
 }

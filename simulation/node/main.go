@@ -3,11 +3,8 @@ package main
 import (
 	"encoding/json"
 	"flag"
-	"github.com/asynkron/protoactor-go/actor"
-	"github.com/asynkron/protoactor-go/remote"
 	"io"
 	"log"
-	"net"
 	"os"
 	"stochastic-checking-simulation/impl/handler"
 	"stochastic-checking-simulation/impl/parameters"
@@ -17,7 +14,6 @@ import (
 	"stochastic-checking-simulation/impl/protocols/bracha"
 	"stochastic-checking-simulation/impl/protocols/scalable"
 	"stochastic-checking-simulation/impl/utils"
-	"strconv"
 )
 
 var (
@@ -69,19 +65,14 @@ func main() {
 
 	processCount := input.Parameters.ProcessCount
 
-	var pids []*actor.PID
+	var pids []string
 	if *localRun {
 		pids = utils.GetLocalPids(*baseIpAddress, *port, processCount)
 	} else {
 		pids = utils.GetRemotePids(*baseIpAddress, *port, processCount, logger)
 	}
 
-	mainServer := actor.NewPID(utils.JoinIpAndPort(*baseIpAddress, *port), "mainserver")
-
-	logger.Printf("Mainserver: %s\n", mainServer.String())
-	for _, pid := range pids {
-		logger.Println(pid.String())
-	}
+	mainServer := utils.JoinIpAndPort(*baseIpAddress, *port)
 
 	var process protocols.Process
 
@@ -98,6 +89,8 @@ func main() {
 		logger.Fatalf("Invalid protocol: %s", input.Protocol)
 	}
 
+	logger.Printf("Running protocol: %s\n", input.Protocol)
+
 	a := &handler.Actor{}
 	a.InitActor(
 		int64(*processIndex),
@@ -109,40 +102,4 @@ func main() {
 		*transactionInitTimeoutNs,
 		process,
 	)
-
-	processIp, processPortStr, _ := net.SplitHostPort(pids[*processIndex].Address)
-	processPort, _ := strconv.Atoi(processPortStr)
-
-	system := actor.NewActorSystem()
-	system.EventStream.Subscribe(
-		func(event interface{}) {
-			deadLetter, ok := event.(*actor.DeadLetterEvent)
-			if ok {
-				logger.Printf(
-					"Dead letter detected. To: %s\n",
-					deadLetter.PID.String())
-			}
-		},
-	)
-
-	remoteConfig := remote.Configure(processIp, processPort)
-	remoter := remote.NewRemote(system, remoteConfig)
-	remoter.Start()
-	actor.Unbounded()
-
-	_, e =
-		system.Root.SpawnNamed(
-			actor.PropsFromProducer(
-				func() actor.Actor {
-					return a
-				}),
-			"main",
-		)
-	if e != nil {
-		logger.Fatalf("Error while spawning the process happened: %s", e)
-	}
-
-	logger.Printf("Running protocol: %s\n", input.Protocol)
-
-	select {}
 }

@@ -2,7 +2,6 @@ package consistent
 
 import (
 	"fmt"
-	"github.com/asynkron/protoactor-go/actor"
 	"math"
 	"stochastic-checking-simulation/context"
 	"stochastic-checking-simulation/impl/eventlogger"
@@ -35,7 +34,7 @@ func newMessageState() *messageState {
 
 type CorrectProcess struct {
 	processIndex int64
-	actorPids    map[string]*actor.PID
+	actorPids    map[string]ProcessId
 	pids         []string
 
 	transactionCounter int64
@@ -53,25 +52,23 @@ type CorrectProcess struct {
 
 func (p *CorrectProcess) InitProcess(
 	processIndex int64,
-	actorPids []*actor.PID,
+	actorPids []string,
 	parameters *parameters.Parameters,
 	logger *eventlogger.EventLogger,
 ) {
 	p.processIndex = processIndex
-	p.actorPids = make(map[string]*actor.PID)
-	p.pids = make([]string, len(actorPids))
+	p.pids = actorPids
 
 	p.transactionCounter = 0
 
+	p.actorPids = make(map[string]ProcessId)
 	p.deliveredMessages = make(map[ProcessId]map[int64]int64)
 	p.messagesLog = make(map[ProcessId]map[int64]*messageState)
 
 	p.witnessThreshold = parameters.WitnessThreshold
 
-	for i, actorPid := range actorPids {
-		pid := utils.MakeCustomPid(actorPid)
-		p.pids[i] = pid
-		p.actorPids[pid] = actorPid
+	for i, pid := range actorPids {
+		p.actorPids[pid] = ProcessId(i)
 		p.deliveredMessages[ProcessId(i)] = make(map[int64]int64)
 		p.messagesLog[ProcessId(i)] = make(map[int64]*messageState)
 	}
@@ -117,9 +114,8 @@ func (p *CorrectProcess) initMessageState(
 }
 
 func (p *CorrectProcess) sendMessage(
-	actorContext actor.Context,
 	reliableContext *context.ReliableContext,
-	to *actor.PID,
+	to ProcessId,
 	bInstance *messages.BroadcastInstance,
 	message *messages.ConsistentProtocolMessage,
 ) {
@@ -135,16 +131,16 @@ func (p *CorrectProcess) sendMessage(
 		BroadcastInstanceMessage: bMessage,
 	}
 
-	reliableContext.Send(actorContext, to, msg)
+	reliableContext.Send(int64(to), msg)
 }
 
 func (p *CorrectProcess) broadcast(
-	actorContext actor.Context,
 	reliableContext *context.ReliableContext,
 	bInstance *messages.BroadcastInstance,
-	message *messages.ConsistentProtocolMessage) {
+	message *messages.ConsistentProtocolMessage,
+) {
 	for _, pid := range p.actorPids {
-		p.sendMessage(actorContext, reliableContext, pid, bInstance, message)
+		p.sendMessage(reliableContext, pid, bInstance, message)
 	}
 }
 
@@ -163,7 +159,6 @@ func (p *CorrectProcess) deliver(bInstance *messages.BroadcastInstance, value in
 }
 
 func (p *CorrectProcess) verify(
-	actorContext actor.Context,
 	reliableContext *context.ReliableContext,
 	senderId ProcessId,
 	bInstance *messages.BroadcastInstance,
@@ -197,14 +192,13 @@ func (p *CorrectProcess) verify(
 			Value: value,
 		}
 		for pid := range msgState.witnessSet {
-			p.sendMessage(actorContext, reliableContext, p.actorPids[pid], bInstance, message)
+			p.sendMessage(reliableContext, p.actorPids[pid], bInstance, message)
 		}
 	}
 	return true
 }
 
 func (p *CorrectProcess) HandleMessage(
-	actorContext actor.Context,
 	reliableContext *context.ReliableContext,
 	sender int64,
 	broadcastInstanceMessage *messages.BroadcastInstanceMessage,
@@ -216,7 +210,6 @@ func (p *CorrectProcess) HandleMessage(
 		consistentMessage := protocolMessage.ConsistentProtocolMessage
 
 		doBroadcast := p.verify(
-			actorContext,
 			reliableContext,
 			ProcessId(sender),
 			bInstance,
@@ -224,7 +217,6 @@ func (p *CorrectProcess) HandleMessage(
 
 		if consistentMessage.Stage == messages.ConsistentProtocolMessage_VERIFY && doBroadcast {
 			p.broadcast(
-				actorContext,
 				reliableContext,
 				bInstance,
 				&messages.ConsistentProtocolMessage{
@@ -238,7 +230,6 @@ func (p *CorrectProcess) HandleMessage(
 }
 
 func (p *CorrectProcess) Broadcast(
-	actorContext actor.Context,
 	reliableContext *context.ReliableContext,
 	value int64,
 ) {
@@ -247,7 +238,7 @@ func (p *CorrectProcess) Broadcast(
 		SeqNumber: p.transactionCounter,
 	}
 
-	p.verify(actorContext, reliableContext, ProcessId(p.processIndex), broadcastInstance, value)
+	p.verify(reliableContext, ProcessId(p.processIndex), broadcastInstance, value)
 
 	p.logger.OnTransactionInit(broadcastInstance)
 

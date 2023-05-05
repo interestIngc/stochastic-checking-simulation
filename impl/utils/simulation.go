@@ -2,35 +2,32 @@ package utils
 
 import (
 	"fmt"
-	"github.com/asynkron/protoactor-go/actor"
+	"google.golang.org/protobuf/proto"
 	"log"
 	"os"
 	"path/filepath"
+	"stochastic-checking-simulation/impl/messages"
 	"strconv"
 	"strings"
 	"time"
 )
 
-func MakeCustomPid(pid *actor.PID) string {
-	return fmt.Sprintf("%s,%s", pid.Address, pid.Id)
-}
-
 func JoinIpAndPort(ip string, port int) string {
 	return fmt.Sprintf("%s:%d", ip, port)
 }
 
-func GetLocalPids(baseIp string, basePort int, processCount int) []*actor.PID {
-	pids := make([]*actor.PID, processCount)
+func GetLocalPids(baseIp string, basePort int, processCount int) []string {
+	pids := make([]string, processCount)
 
 	for i := 0; i < processCount; i++ {
 		currPort := basePort + i + 1
-		pids[i] = actor.NewPID(JoinIpAndPort(baseIp, currPort), "main")
+		pids[i] = JoinIpAndPort(baseIp, currPort)
 	}
 
 	return pids
 }
 
-func GetRemotePids(baseIp string, basePort int, processCount int, logger *log.Logger) []*actor.PID {
+func GetRemotePids(baseIp string, basePort int, processCount int, logger *log.Logger) []string {
 	const Bytes = 4
 
 	ipBytes := make([]int, Bytes)
@@ -46,7 +43,7 @@ func GetRemotePids(baseIp string, basePort int, processCount int, logger *log.Lo
 		}
 	}
 
-	pids := make([]*actor.PID, processCount)
+	pids := make([]string, processCount)
 
 	for i := 0; i < processCount; i++ {
 		leftByteInd := Bytes - 1
@@ -66,7 +63,7 @@ func GetRemotePids(baseIp string, basePort int, processCount int, logger *log.Lo
 		}
 		currIp := strings.Join(ipBytesAsStr, ".")
 
-		pids[i] = actor.NewPID(JoinIpAndPort(currIp, basePort), "main")
+		pids[i] = JoinIpAndPort(currIp, basePort)
 	}
 
 	return pids
@@ -89,4 +86,13 @@ func OpenLogFile(logFile string) *os.File {
 
 func GetNow() int64 {
 	return time.Now().UnixNano()
+}
+
+func Unmarshal(data []byte, message *messages.Message) error {
+	err := proto.Unmarshal(data, message)
+	if err != nil {
+		log.Printf("Could not unmarshal message: %v", data)
+		return err
+	}
+	return nil
 }
