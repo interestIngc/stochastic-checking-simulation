@@ -97,13 +97,13 @@ func (el *EventLogger) OnAttack(
 		utils.GetNow())
 }
 
-func (el *EventLogger) OnMessageSent(msgId int64) {
+func (el *EventLogger) OnMessageSent(msgId int32) {
 	el.logger.Printf(
 		"Sent message: {%d;%d}, timestamp: %d\n",
 		el.pid, msgId, utils.GetNow())
 }
 
-func (el *EventLogger) OnMessageReceived(senderPid int64, msgId int64) {
+func (el *EventLogger) OnMessageReceived(senderPid int32, msgId int32) {
 	el.logger.Printf(
 		"Received message: {%d;%d}, timestamp: %d\n",
 		senderPid, msgId, utils.GetNow())
