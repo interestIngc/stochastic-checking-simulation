@@ -9,6 +9,7 @@ import (
 	"stochastic-checking-simulation/impl/eventlogger"
 	"stochastic-checking-simulation/impl/messages"
 	"stochastic-checking-simulation/impl/parameters"
+	"sync"
 	"time"
 )
 
@@ -73,6 +74,7 @@ type Process struct {
 
 	deliveredMessages map[ProcessId]map[int64]int64
 	messagesLog       map[ProcessId]map[int64]*messageState
+	logMutex map[ProcessId]*sync.RWMutex
 
 	gossipSampleSize   int
 	echoSampleSize     int
@@ -153,10 +155,12 @@ func (p *Process) InitProcess(
 
 	p.deliveredMessages = make(map[ProcessId]map[int64]int64)
 	p.messagesLog = make(map[ProcessId]map[int64]*messageState)
+	p.logMutex = make(map[ProcessId]*sync.RWMutex)
 
 	for i := range actorPids {
 		p.deliveredMessages[ProcessId(i)] = make(map[int64]int64)
 		p.messagesLog[ProcessId(i)] = make(map[int64]*messageState)
+		p.logMutex[ProcessId(i)] = &sync.RWMutex{}
 	}
 
 	p.gossipSampleSize = parameters.GossipSampleSize
@@ -309,13 +313,13 @@ func (p *Process) deliver(
 
 	p.logger.OnDeliver(bInstance, value, messagesReceived)
 
-	// TODO: fix this
-	//context.ReenterAfter(
-	//	actor.NewFuture(context.ActorSystem(), p.cleanUpTimeout),
-	//	func(res interface{}, err error) {
-	//		delete(p.messagesLog[author], bInstance.SeqNumber)
-	//	},
-	//)
+	go func() {
+		time.Sleep(p.cleanUpTimeout)
+
+		p.logMutex[author].Lock()
+		delete(p.messagesLog[author], bInstance.SeqNumber)
+		p.logMutex[author].Unlock()
+	}()
 }
 
 func (p *Process) maybeSendReadyFromSieve(
@@ -339,7 +343,12 @@ func (p *Process) processProtocolMessage(
 	message *messages.ScalableProtocolMessage,
 ) {
 	value := message.Value
-	msgState := p.messagesLog[ProcessId(bInstance.Author)][bInstance.SeqNumber]
+	author := ProcessId(bInstance.Author)
+
+	p.logMutex[author].Lock()
+	defer p.logMutex[author].Unlock()
+
+	msgState := p.messagesLog[author][bInstance.SeqNumber]
 
 	if msgState == nil {
 		if p.delivered(bInstance, value) {
@@ -458,8 +467,12 @@ func (p *Process) Broadcast(
 	reliableContext *context.ReliableContext,
 	value int64,
 ) {
+	author := p.processIndex
+	p.logMutex[ProcessId(author)].Lock()
+	defer p.logMutex[ProcessId(author)].Unlock()
+
 	broadcastInstance := &messages.BroadcastInstance{
-		Author:    p.processIndex,
+		Author:    author,
 		SeqNumber: p.transactionCounter,
 	}
 

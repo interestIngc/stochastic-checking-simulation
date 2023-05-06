@@ -20,7 +20,7 @@ type ReliableContext struct {
 	writeChanMap map[int64]chan []byte
 
 	receivedAck map[int64]bool
-	mutex       sync.RWMutex
+	mutex       *sync.RWMutex
 }
 
 func (c *ReliableContext) InitContext(
@@ -38,7 +38,7 @@ func (c *ReliableContext) InitContext(
 	c.writeChanMap = writeChanMap
 
 	c.receivedAck = make(map[int64]bool)
-	c.mutex = sync.RWMutex{}
+	c.mutex = &sync.RWMutex{}
 }
 
 func (c *ReliableContext) MakeNewMessage() *messages.Message {
