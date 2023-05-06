@@ -107,12 +107,13 @@ message BroadcastInstanceMessage {
 message Message {
   int64 sender = 1;
   int64 stamp = 2;
+  int64 retransmissionStamp = 3;
 
   oneof content {
-    Started started = 3;
-    Simulate simulate = 4;
-    BroadcastInstanceMessage broadcastInstanceMessage = 5;
-    Ack ack = 6;
-    Broadcast broadcast = 7;
+    Started started = 4;
+    Simulate simulate = 5;
+    BroadcastInstanceMessage broadcastInstanceMessage = 6;
+    Ack ack = 7;
+    Broadcast broadcast = 8;
   }
 }

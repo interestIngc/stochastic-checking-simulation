@@ -76,25 +76,19 @@ func (c *ReliableContext) Send(to int64, msg *messages.Message) {
 
 	go func() {
 		t := time.NewTicker(time.Duration(c.retransmissionTimeoutNs))
-		select {
-		case <- t.C:
-			c.retransmit(to, msg)
-		case <- ackChan:
-			c.mutex.Lock()
-			delete(c.receivedAcks, stamp)
-			c.mutex.Unlock()
-			return
+		for {
+			select {
+			case <-t.C:
+				msg.RetransmissionStamp = msg.RetransmissionStamp + 1
+				c.send(to, msg)
+			case <-ackChan:
+				c.mutex.Lock()
+				delete(c.receivedAcks, stamp)
+				c.mutex.Unlock()
+				return
+			}
 		}
 	}()
-}
-
-func (c *ReliableContext) retransmit(to int64, msg *messages.Message) {
-	c.counterMutex.Lock()
-	defer c.counterMutex.Unlock()
-
-	msg.Stamp = c.messageCounter
-	c.messageCounter++
-	c.send(to, msg)
 }
 
 func (c *ReliableContext) SendAck(sender int64, stamp int64) {
