@@ -16,6 +16,7 @@ type ReliableContext struct {
 	retransmissionTimeoutNs int
 
 	messageCounter int64
+	counterMutex       *sync.RWMutex
 
 	writeChanMap map[int64]chan []byte
 
@@ -39,9 +40,13 @@ func (c *ReliableContext) InitContext(
 
 	c.receivedAcks = make(map[int64]chan bool)
 	c.mutex = &sync.RWMutex{}
+	c.counterMutex = &sync.RWMutex{}
 }
 
 func (c *ReliableContext) MakeNewMessage() *messages.Message {
+	c.counterMutex.Lock()
+	defer c.counterMutex.Unlock()
+
 	msg := &messages.Message{
 		Sender: c.ProcessIndex,
 		Stamp:  c.messageCounter,
@@ -50,19 +55,19 @@ func (c *ReliableContext) MakeNewMessage() *messages.Message {
 	return msg
 }
 
-func (c *ReliableContext) send(to int64, data []byte, stamp int64) {
-	c.writeChanMap[to] <- data
-	c.Logger.OnMessageSent(stamp)
-}
-
-func (c *ReliableContext) Send(to int64, msg *messages.Message) {
+func (c *ReliableContext) send(to int64, msg *messages.Message) {
 	data, e := utils.Marshal(msg)
 	if e != nil {
 		return
 	}
-	stamp := msg.Stamp
+	c.writeChanMap[to] <- data
+	c.Logger.OnMessageSent(msg.Stamp)
+}
 
-	c.send(to, data, stamp)
+func (c *ReliableContext) Send(to int64, msg *messages.Message) {
+	c.send(to, msg)
+
+	stamp := msg.Stamp
 	ackChan := make(chan bool)
 
 	c.mutex.Lock()
@@ -70,18 +75,26 @@ func (c *ReliableContext) Send(to int64, msg *messages.Message) {
 	c.mutex.Unlock()
 
 	go func() {
-		for {
-			select {
-			case <-ackChan:
-				c.mutex.Lock()
-				delete(c.receivedAcks, stamp)
-				c.mutex.Unlock()
-				return
-			case <-time.After(time.Duration(c.retransmissionTimeoutNs)):
-				c.send(to, data, stamp)
-			}
+		t := time.NewTicker(time.Duration(c.retransmissionTimeoutNs))
+		select {
+		case <- t.C:
+			c.retransmit(to, msg)
+		case <- ackChan:
+			c.mutex.Lock()
+			delete(c.receivedAcks, stamp)
+			c.mutex.Unlock()
+			return
 		}
 	}()
+}
+
+func (c *ReliableContext) retransmit(to int64, msg *messages.Message) {
+	c.counterMutex.Lock()
+	defer c.counterMutex.Unlock()
+
+	msg.Stamp = c.messageCounter
+	c.messageCounter++
+	c.send(to, msg)
 }
 
 func (c *ReliableContext) SendAck(sender int64, stamp int64) {
@@ -93,12 +106,7 @@ func (c *ReliableContext) SendAck(sender int64, stamp int64) {
 		},
 	}
 
-	data, e := utils.Marshal(msg)
-	if e != nil {
-		return
-	}
-
-	c.send(sender, data, msg.Stamp)
+	c.send(sender, msg)
 }
 
 func (c *ReliableContext) OnAck(ack *messages.Ack) {
