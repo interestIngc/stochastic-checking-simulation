@@ -1,11 +1,10 @@
 package context
 
 import (
-	"google.golang.org/protobuf/proto"
 	"log"
 	"stochastic-checking-simulation/impl/eventlogger"
 	"stochastic-checking-simulation/impl/messages"
-	"sync"
+	"stochastic-checking-simulation/impl/utils"
 	"time"
 )
 
@@ -19,8 +18,7 @@ type ReliableContext struct {
 
 	writeChanMap map[int64]chan []byte
 
-	receivedAck map[int64]bool
-	mutex       *sync.RWMutex
+	receivedAcks map[int64]chan bool
 }
 
 func (c *ReliableContext) InitContext(
@@ -37,8 +35,7 @@ func (c *ReliableContext) InitContext(
 
 	c.writeChanMap = writeChanMap
 
-	c.receivedAck = make(map[int64]bool)
-	c.mutex = &sync.RWMutex{}
+	c.receivedAcks = make(map[int64]chan bool)
 }
 
 func (c *ReliableContext) MakeNewMessage() *messages.Message {
@@ -50,32 +47,30 @@ func (c *ReliableContext) MakeNewMessage() *messages.Message {
 	return msg
 }
 
-func (c *ReliableContext) send(to int64, msg *messages.Message) {
-	data, e := proto.Marshal(msg)
-	if e != nil {
-		log.Printf("Could not marshal message, %e", e)
-		return
-	}
+func (c *ReliableContext) send(to int64, data []byte, stamp int64) {
 	c.writeChanMap[to] <- data
-
-	c.Logger.OnMessageSent(msg.Stamp)
+	c.Logger.OnMessageSent(stamp)
 }
 
 func (c *ReliableContext) Send(to int64, msg *messages.Message) {
-	c.send(to, msg)
+	data, e := utils.Marshal(msg)
+	if e != nil {
+		return
+	}
+	stamp := msg.Stamp
+
+	c.send(to, data, stamp)
+	ackChan := make(chan bool)
+	c.receivedAcks[stamp] = ackChan
+
 	go func() {
 		for {
-			time.Sleep(time.Duration(c.retransmissionTimeoutNs))
-
-			c.mutex.RLock()
-			received := c.receivedAck[msg.Stamp]
-			c.mutex.RUnlock()
-
-			if received {
+			select {
+			case <-ackChan:
 				return
+			case <-time.After(time.Duration(c.retransmissionTimeoutNs)):
+				c.send(to, data, stamp)
 			}
-
-			c.send(to, msg)
 		}
 	}()
 }
@@ -88,13 +83,16 @@ func (c *ReliableContext) SendAck(sender int64, stamp int64) {
 			Stamp:  stamp,
 		},
 	}
-	c.send(sender, msg)
+
+	data, e := utils.Marshal(msg)
+	if e != nil {
+		return
+	}
+
+	c.send(sender, data, msg.Stamp)
 }
 
 func (c *ReliableContext) OnAck(ack *messages.Ack) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-
-	c.receivedAck[ack.Stamp] = true
+	c.receivedAcks[ack.Stamp] <- true
 	c.Logger.OnAckReceived(ack.Stamp)
 }

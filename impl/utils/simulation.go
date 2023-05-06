@@ -96,3 +96,12 @@ func Unmarshal(data []byte, message *messages.Message) error {
 	}
 	return nil
 }
+
+func Marshal(message *messages.Message) ([]byte, error) {
+	data, e := proto.Marshal(message)
+	if e != nil {
+		log.Printf("Could not marshal message, %e", e)
+	}
+	return data, e
+}
+

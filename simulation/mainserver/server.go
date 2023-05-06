@@ -66,7 +66,7 @@ func (ms *MainServer) receiveMessages() {
 			continue
 		}
 
-		log.Printf("Received message: %s from sender: %d\n", msg.String(), msg.Sender)
+		//log.Printf("Received message: %s from sender: %d\n", msg.String(), msg.Sender)
 
 		switch content := msg.Content.(type) {
 		case *messages.Message_Ack:
