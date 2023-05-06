@@ -8,18 +8,18 @@ import (
 )
 
 type Mailbox struct {
-	id           int64                 // Process' own id
+	id           int32                 // Process' own id
 	addresses    []string              // Addresses of all processes
-	writeChanMap map[int64]chan []byte // Receive messages to send
+	writeChanMap map[int32]chan []byte // Receive messages to send
 	readChan     chan []byte           // Send received messages to the process
 
 	conn *net.UDPConn
 }
 
 func NewMailbox(
-	ownId int64,
+	ownId int32,
 	addresses []string,
-	writeChanMap map[int64]chan []byte,
+	writeChanMap map[int32]chan []byte,
 	readChan chan []byte,
 ) *Mailbox {
 	pC := new(Mailbox)
@@ -73,9 +73,9 @@ func (pC *Mailbox) persistentList() {
 
 }
 
-func (pC *Mailbox) SendMessages(to int64, inChan chan []byte) {
+func (pC *Mailbox) SendMessages(to int32, inChan chan []byte) {
 	for data := range inChan {
-		go func(pR int64, pM []byte) {
+		go func(pR int32, pM []byte) {
 			address := make([]string, 2)
 			address = strings.Split(pC.addresses[pR], ":")
 			port, err := strconv.Atoi(address[1])

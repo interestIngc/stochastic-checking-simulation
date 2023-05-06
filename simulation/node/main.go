@@ -97,7 +97,7 @@ func main() {
 
 	a := &handler.Actor{}
 	a.InitActor(
-		int64(*processIndex),
+		int32(*processIndex),
 		pids,
 		&input.Parameters,
 		logger,

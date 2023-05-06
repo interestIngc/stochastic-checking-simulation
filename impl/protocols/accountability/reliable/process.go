@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-type ProcessId int64
+type ProcessId int32
 
 type WitnessStage int
 
@@ -46,10 +46,10 @@ type messageState struct {
 	readyFromWitnesses    map[ProcessId]bool
 	validateFromWitnesses map[ProcessId]bool
 
-	echoFromProcessesStat  map[int64]int
-	readyFromProcessesStat map[int64]int
-	readyFromWitnessesStat map[int64]int
-	validatesStat          map[int64]int
+	echoFromProcessesStat  map[int32]int
+	readyFromProcessesStat map[int32]int
+	readyFromWitnessesStat map[int32]int
+	validatesStat          map[int32]int
 
 	stage        Stage
 	witnessStage WitnessStage
@@ -68,10 +68,10 @@ func newMessageState() *messageState {
 	ms.readyFromWitnesses = make(map[ProcessId]bool)
 	ms.validateFromWitnesses = make(map[ProcessId]bool)
 
-	ms.echoFromProcessesStat = make(map[int64]int)
-	ms.readyFromWitnessesStat = make(map[int64]int)
-	ms.readyFromProcessesStat = make(map[int64]int)
-	ms.validatesStat = make(map[int64]int)
+	ms.echoFromProcessesStat = make(map[int32]int)
+	ms.readyFromWitnessesStat = make(map[int32]int)
+	ms.readyFromProcessesStat = make(map[int32]int)
+	ms.validatesStat = make(map[int32]int)
 
 	ms.stage = InitialStage
 	ms.witnessStage = InitialWitnessStage
@@ -87,12 +87,12 @@ type recoveryMessageState struct {
 	receivedEcho    map[ProcessId]bool
 	receivedReady   map[ProcessId]bool
 
-	recoverValues map[int64]bool
+	recoverValues map[int32]bool
 
-	replyMessagesStat map[int64]int
-	recoverReadyStat  map[int64]int
-	echoMessagesStat  map[int64]int
-	readyMessagesStat map[int64]int
+	replyMessagesStat map[int32]int
+	recoverReadyStat  map[int32]int
+	echoMessagesStat  map[int32]int
+	readyMessagesStat map[int32]int
 
 	stage RecoveryStage
 
@@ -107,12 +107,12 @@ func newRecoveryMessageState() *recoveryMessageState {
 	ms.receivedEcho = make(map[ProcessId]bool)
 	ms.receivedReady = make(map[ProcessId]bool)
 
-	ms.recoverValues = make(map[int64]bool)
+	ms.recoverValues = make(map[int32]bool)
 
-	ms.replyMessagesStat = make(map[int64]int)
-	ms.recoverReadyStat = make(map[int64]int)
-	ms.echoMessagesStat = make(map[int64]int)
-	ms.readyMessagesStat = make(map[int64]int)
+	ms.replyMessagesStat = make(map[int32]int)
+	ms.recoverReadyStat = make(map[int32]int)
+	ms.echoMessagesStat = make(map[int32]int)
+	ms.readyMessagesStat = make(map[int32]int)
 
 	ms.stage = InitialRecoveryStage
 
@@ -122,16 +122,16 @@ func newRecoveryMessageState() *recoveryMessageState {
 }
 
 type Process struct {
-	processIndex int64
+	processIndex int32
 	actorPids    map[string]ProcessId
 	pids         []string
 
-	transactionCounter int64
+	transactionCounter int32
 
-	deliveredMessages   map[ProcessId]map[int64]int64
-	messagesLog         map[ProcessId]map[int64]*messageState
-	lastSentPMessages   map[ProcessId]map[int64]*messages.ReliableProtocolMessage
-	recoveryMessagesLog map[ProcessId]map[int64]*recoveryMessageState
+	deliveredMessages   map[ProcessId]map[int32]int32
+	messagesLog         map[ProcessId]map[int32]*messageState
+	lastSentPMessages   map[ProcessId]map[int32]*messages.ReliableProtocolMessage
+	recoveryMessagesLog map[ProcessId]map[int32]*recoveryMessageState
 
 	quorumThreshold         int
 	readyMessagesThreshold  int
@@ -145,7 +145,7 @@ type Process struct {
 }
 
 func (p *Process) InitProcess(
-	processIndex int64,
+	processIndex int32,
 	actorPids []string,
 	parameters *parameters.Parameters,
 	logger *eventlogger.EventLogger,
@@ -161,17 +161,17 @@ func (p *Process) InitProcess(
 	p.witnessThreshold = parameters.WitnessThreshold
 
 	p.actorPids = make(map[string]ProcessId)
-	p.deliveredMessages = make(map[ProcessId]map[int64]int64)
-	p.messagesLog = make(map[ProcessId]map[int64]*messageState)
-	//p.lastSentPMessages = make(map[ProcessId]map[int64]*messages.ReliableProtocolMessage)
-	//p.recoveryMessagesLog = make(map[ProcessId]map[int64]*recoveryMessageState)
+	p.deliveredMessages = make(map[ProcessId]map[int32]int32)
+	p.messagesLog = make(map[ProcessId]map[int32]*messageState)
+	//p.lastSentPMessages = make(map[ProcessId]map[int32]*messages.ReliableProtocolMessage)
+	//p.recoveryMessagesLog = make(map[ProcessId]map[int32]*recoveryMessageState)
 
 	for i, pid := range actorPids {
 		p.actorPids[pid] = ProcessId(i)
-		p.deliveredMessages[ProcessId(i)] = make(map[int64]int64)
-		p.messagesLog[ProcessId(i)] = make(map[int64]*messageState)
-		//p.lastSentPMessages[ProcessId(i)] = make(map[int64]*messages.ReliableProtocolMessage)
-		//p.recoveryMessagesLog[ProcessId(i)] = make(map[int64]*recoveryMessageState)
+		p.deliveredMessages[ProcessId(i)] = make(map[int32]int32)
+		p.messagesLog[ProcessId(i)] = make(map[int32]*messageState)
+		//p.lastSentPMessages[ProcessId(i)] = make(map[int32]*messages.ReliableProtocolMessage)
+		//p.recoveryMessagesLog[ProcessId(i)] = make(map[int32]*recoveryMessageState)
 	}
 
 	var hasher hashing.Hasher
@@ -197,7 +197,7 @@ func (p *Process) InitProcess(
 func (p *Process) initMessageState(
 	reliableContext *context.ReliableContext,
 	bInstance *messages.BroadcastInstance,
-	value int64,
+	value int32,
 ) *messageState {
 	msgState := newMessageState()
 	p.messagesLog[ProcessId(bInstance.Author)][bInstance.SeqNumber] = msgState
@@ -223,7 +223,7 @@ func (p *Process) initMessageState(
 func (p *Process) registerMessage(
 	reliableContext *context.ReliableContext,
 	bInstance *messages.BroadcastInstance,
-	value int64,
+	value int32,
 ) *messageState {
 	msgState := p.messagesLog[ProcessId(bInstance.Author)][bInstance.SeqNumber]
 	if msgState == nil {
@@ -273,7 +273,7 @@ func (p *Process) sendProtocolMessage(
 		BroadcastInstanceMessage: bMessage,
 	}
 
-	reliableContext.Send(int64(to), msg)
+	reliableContext.Send(int32(to), msg)
 }
 
 func (p *Process) sendRecoveryMessage(
@@ -294,7 +294,7 @@ func (p *Process) sendRecoveryMessage(
 		BroadcastInstanceMessage: bMessage,
 	}
 
-	reliableContext.Send(int64(to), msg)
+	reliableContext.Send(int32(to), msg)
 }
 
 func (p *Process) broadcastProtocolMessage(
@@ -333,7 +333,7 @@ func (p *Process) broadcastToWitnesses(
 func (p *Process) broadcastReadyFromWitness(
 	reliableContext *context.ReliableContext,
 	bInstance *messages.BroadcastInstance,
-	value int64,
+	value int32,
 	msgState *messageState,
 ) {
 	p.broadcastProtocolMessage(
@@ -404,7 +404,7 @@ func (p *Process) isWitness(msgState *messageState) bool {
 
 func (p *Process) delivered(
 	bInstance *messages.BroadcastInstance,
-	value int64,
+	value int32,
 ) bool {
 	deliveredValue, delivered :=
 		p.deliveredMessages[ProcessId(bInstance.Author)][bInstance.SeqNumber]
@@ -418,12 +418,12 @@ func (p *Process) delivered(
 
 func (p *Process) deliver(
 	bInstance *messages.BroadcastInstance,
-	value int64,
+	value int32,
 ) {
 	author := ProcessId(bInstance.Author)
 	p.deliveredMessages[author][bInstance.SeqNumber] = value
 	p.historyHash.Insert(
-		utils.TransactionToBytes(p.pids[bInstance.Author], bInstance.SeqNumber))
+		utils.TransactionToBytes(p.pids[bInstance.Author], int64(bInstance.SeqNumber)))
 
 	msgState := p.messagesLog[author][bInstance.SeqNumber]
 	messagesReceived := msgState.receivedMessagesCnt
@@ -570,7 +570,7 @@ func (p *Process) processReliableProtocolMessage(
 	}
 }
 
-func makeReliableProtocolMessage(value int64) *messages.ReliableProtocolMessage {
+func makeReliableProtocolMessage(value int32) *messages.ReliableProtocolMessage {
 	return &messages.ReliableProtocolMessage{
 		Stage: messages.ReliableProtocolMessage_NOTIFY,
 		Value: value,
@@ -701,7 +701,7 @@ func (p *Process) processRecoveryProtocolMessage(
 
 func (p *Process) HandleMessage(
 	reliableContext *context.ReliableContext,
-	sender int64,
+	sender int32,
 	broadcastInstanceMessage *messages.BroadcastInstanceMessage,
 ) {
 	bInstance := broadcastInstanceMessage.BroadcastInstance
@@ -730,7 +730,7 @@ func (p *Process) HandleMessage(
 
 func (p *Process) Broadcast(
 	reliableContext *context.ReliableContext,
-	value int64,
+	value int32,
 ) {
 	broadcastInstance := &messages.BroadcastInstance{
 		Author:    p.processIndex,

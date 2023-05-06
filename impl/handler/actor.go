@@ -13,11 +13,11 @@ import (
 )
 
 type Actor struct {
-	processIndex int64
+	processIndex int32
 
 	context *context.ReliableContext
 
-	receivedMessages map[int64]map[int64]bool
+	receivedMessages map[int32]map[int32]bool
 
 	transactionsToSendOut    int
 	transactionInitTimeoutNs int
@@ -28,7 +28,7 @@ type Actor struct {
 }
 
 func (a *Actor) InitActor(
-	processIndex int64,
+	processIndex int32,
 	actorPids []string,
 	parameters *parameters.Parameters,
 	logger *log.Logger,
@@ -51,11 +51,11 @@ func (a *Actor) InitActor(
 	a.transactionsToSendOut = transactionsToSendOut
 	a.transactionInitTimeoutNs = transactionInitTimeoutNs
 
-	a.receivedMessages = make(map[int64]map[int64]bool)
-	writeChanMap := make(map[int64]chan []byte)
+	a.receivedMessages = make(map[int32]map[int32]bool)
+	writeChanMap := make(map[int32]chan []byte)
 	for i := 0; i <= n; i++ {
-		writeChanMap[int64(i)] = make(chan []byte, 500)
-		a.receivedMessages[int64(i)] = make(map[int64]bool)
+		writeChanMap[int32(i)] = make(chan []byte, 500)
+		a.receivedMessages[int32(i)] = make(map[int32]bool)
 	}
 
 	a.readChan = make(chan []byte, 500)
@@ -73,7 +73,7 @@ func (a *Actor) InitActor(
 	startedMessage.Content = &messages.Message_Started{
 		Started: &messages.Started{},
 	}
-	a.context.Send(int64(n), startedMessage)
+	a.context.Send(int32(n), startedMessage)
 
 	a.receiveMessages()
 }
@@ -123,7 +123,7 @@ func (a *Actor) Simulate() {
 		msg := a.context.MakeNewMessage()
 		msg.Content = &messages.Message_Broadcast{
 			Broadcast: &messages.Broadcast{
-				Value: int64(rand.Int()),
+				Value: int32(rand.Int()),
 			},
 		}
 		a.context.Send(a.processIndex, msg)

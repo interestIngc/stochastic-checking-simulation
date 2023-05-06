@@ -13,17 +13,17 @@ import (
 	"time"
 )
 
-type ProcessId int64
+type ProcessId int32
 
 type messageState struct {
 	receivedEcho  map[ProcessId]bool
-	receivedReady map[ProcessId]map[int64]bool
+	receivedReady map[ProcessId]map[int32]bool
 
-	echoMessagesStat   map[int64]int
-	readySampleStat    map[int64]int
-	deliverySampleStat map[int64]int
+	echoMessagesStat   map[int32]int
+	readySampleStat    map[int32]int
+	deliverySampleStat map[int32]int
 
-	sentReadyMessages map[int64]bool
+	sentReadyMessages map[int32]bool
 
 	gossipSample   map[ProcessId]int
 	echoSample     map[ProcessId]int
@@ -45,13 +45,13 @@ func newMessageState() *messageState {
 	ms := new(messageState)
 
 	ms.receivedEcho = make(map[ProcessId]bool)
-	ms.receivedReady = make(map[ProcessId]map[int64]bool)
+	ms.receivedReady = make(map[ProcessId]map[int32]bool)
 
-	ms.echoMessagesStat = make(map[int64]int)
-	ms.readySampleStat = make(map[int64]int)
-	ms.deliverySampleStat = make(map[int64]int)
+	ms.echoMessagesStat = make(map[int32]int)
+	ms.readySampleStat = make(map[int32]int)
+	ms.deliverySampleStat = make(map[int32]int)
 
-	ms.sentReadyMessages = make(map[int64]bool)
+	ms.sentReadyMessages = make(map[int32]bool)
 
 	ms.gossipSample = make(map[ProcessId]int)
 	ms.echoSample = make(map[ProcessId]int)
@@ -67,13 +67,13 @@ func newMessageState() *messageState {
 }
 
 type Process struct {
-	processIndex int64
+	processIndex int32
 	n            int
 
-	transactionCounter int64
+	transactionCounter int32
 
-	deliveredMessages map[ProcessId]map[int64]int64
-	messagesLog       map[ProcessId]map[int64]*messageState
+	deliveredMessages map[ProcessId]map[int32]int32
+	messagesLog       map[ProcessId]map[int32]*messageState
 	logMutex map[ProcessId]*sync.RWMutex
 
 	gossipSampleSize   int
@@ -120,7 +120,7 @@ func (p *Process) sample(
 	reliableContext *context.ReliableContext,
 	stage messages.ScalableProtocolMessage_Stage,
 	bInstance *messages.BroadcastInstance,
-	value int64,
+	value int32,
 	size int,
 ) map[ProcessId]int {
 	sample := make(map[ProcessId]int)
@@ -143,7 +143,7 @@ func (p *Process) sample(
 }
 
 func (p *Process) InitProcess(
-	processIndex int64,
+	processIndex int32,
 	actorPids []string,
 	parameters *parameters.Parameters,
 	logger *eventlogger.EventLogger,
@@ -153,13 +153,13 @@ func (p *Process) InitProcess(
 
 	p.transactionCounter = 0
 
-	p.deliveredMessages = make(map[ProcessId]map[int64]int64)
-	p.messagesLog = make(map[ProcessId]map[int64]*messageState)
+	p.deliveredMessages = make(map[ProcessId]map[int32]int32)
+	p.messagesLog = make(map[ProcessId]map[int32]*messageState)
 	p.logMutex = make(map[ProcessId]*sync.RWMutex)
 
 	for i := range actorPids {
-		p.deliveredMessages[ProcessId(i)] = make(map[int64]int64)
-		p.messagesLog[ProcessId(i)] = make(map[int64]*messageState)
+		p.deliveredMessages[ProcessId(i)] = make(map[int32]int32)
+		p.messagesLog[ProcessId(i)] = make(map[int32]*messageState)
 		p.logMutex[ProcessId(i)] = &sync.RWMutex{}
 	}
 
@@ -178,13 +178,13 @@ func (p *Process) InitProcess(
 func (p *Process) initMessageState(
 	reliableContext *context.ReliableContext,
 	bInstance *messages.BroadcastInstance,
-	value int64,
+	value int32,
 ) *messageState {
 	author := ProcessId(bInstance.Author)
 	msgState := newMessageState()
 
 	for i := 0; i < p.n; i++ {
-		msgState.receivedReady[ProcessId(i)] = make(map[int64]bool)
+		msgState.receivedReady[ProcessId(i)] = make(map[int32]bool)
 	}
 
 	msgState.gossipSample = p.generateGossipSample()
@@ -242,7 +242,7 @@ func (p *Process) sendMessage(
 		BroadcastInstanceMessage: bMessage,
 	}
 
-	reliableContext.Send(int64(to), msg)
+	reliableContext.Send(int32(to), msg)
 }
 
 func (p *Process) broadcastToSet(
@@ -260,7 +260,7 @@ func (p *Process) broadcastGossip(
 	reliableContext *context.ReliableContext,
 	msgState *messageState,
 	bInstance *messages.BroadcastInstance,
-	value int64,
+	value int32,
 ) {
 	msgState.gossipMessage =
 		&messages.ScalableProtocolMessage{
@@ -278,7 +278,7 @@ func (p *Process) broadcastReady(
 	reliableContext *context.ReliableContext,
 	msgState *messageState,
 	bInstance *messages.BroadcastInstance,
-	value int64,
+	value int32,
 ) {
 	msgState.sentReadyMessages[value] = true
 
@@ -292,7 +292,7 @@ func (p *Process) broadcastReady(
 		})
 }
 
-func (p *Process) delivered(bInstance *messages.BroadcastInstance, value int64) bool {
+func (p *Process) delivered(bInstance *messages.BroadcastInstance, value int32) bool {
 	deliveredValue, delivered :=
 		p.deliveredMessages[ProcessId(bInstance.Author)][bInstance.SeqNumber]
 
@@ -305,7 +305,7 @@ func (p *Process) delivered(bInstance *messages.BroadcastInstance, value int64) 
 
 func (p *Process) deliver(
 	bInstance *messages.BroadcastInstance,
-	value int64,
+	value int32,
 ) {
 	author := ProcessId(bInstance.Author)
 	p.deliveredMessages[author][bInstance.SeqNumber] = value
@@ -445,7 +445,7 @@ func (p *Process) processProtocolMessage(
 
 func (p *Process) HandleMessage(
 	reliableContext *context.ReliableContext,
-	sender int64,
+	sender int32,
 	broadcastInstanceMessage *messages.BroadcastInstanceMessage,
 ) {
 	bInstance := broadcastInstanceMessage.BroadcastInstance
@@ -465,7 +465,7 @@ func (p *Process) HandleMessage(
 
 func (p *Process) Broadcast(
 	reliableContext *context.ReliableContext,
-	value int64,
+	value int32,
 ) {
 	author := p.processIndex
 	p.logMutex[ProcessId(author)].Lock()

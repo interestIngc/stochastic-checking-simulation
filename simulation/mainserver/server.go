@@ -14,7 +14,7 @@ type MainServer struct {
 	logger          *log.Logger
 	reliableContext *context.ReliableContext
 
-	receivedMessages map[int64]bool
+	receivedMessages map[int32]bool
 
 	mailbox  *mailbox.Mailbox
 	readChan chan []byte
@@ -30,14 +30,14 @@ func (ms *MainServer) InitMainServer(
 
 	ms.readChan = make(chan []byte, 500)
 
-	ms.receivedMessages = make(map[int64]bool)
+	ms.receivedMessages = make(map[int32]bool)
 
-	writeChanMap := make(map[int64]chan []byte)
+	writeChanMap := make(map[int32]chan []byte)
 	for i := 0; i <= ms.n; i++ {
-		writeChanMap[int64(i)] = make(chan []byte, 500)
+		writeChanMap[int32(i)] = make(chan []byte, 500)
 	}
 
-	id := int64(ms.n)
+	id := int32(ms.n)
 	ms.mailbox = mailbox.NewMailbox(id, actorPids, writeChanMap, ms.readChan)
 	ms.mailbox.SetUp()
 
@@ -53,7 +53,7 @@ func (ms *MainServer) simulate() {
 		msg.Content = &messages.Message_Simulate{
 			Simulate: &messages.Simulate{},
 		}
-		ms.reliableContext.Send(int64(pid), msg)
+		ms.reliableContext.Send(int32(pid), msg)
 	}
 }
 
@@ -65,8 +65,6 @@ func (ms *MainServer) receiveMessages() {
 		if err != nil {
 			continue
 		}
-
-		//log.Printf("Received message: %s from sender: %d\n", msg.String(), msg.Sender)
 
 		switch content := msg.Content.(type) {
 		case *messages.Message_Ack:

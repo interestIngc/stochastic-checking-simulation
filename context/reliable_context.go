@@ -10,24 +10,24 @@ import (
 )
 
 type ReliableContext struct {
-	ProcessIndex int64
+	ProcessIndex int32
 	Logger       *eventlogger.EventLogger
 
 	retransmissionTimeoutNs int
 
-	messageCounter int64
+	messageCounter int32
 	counterMutex       *sync.RWMutex
 
-	writeChanMap map[int64]chan []byte
+	writeChanMap map[int32]chan []byte
 
-	receivedAcks map[int64]chan bool
+	receivedAcks map[int32]chan bool
 	mutex       *sync.RWMutex
 }
 
 func (c *ReliableContext) InitContext(
-	processIndex int64,
+	processIndex int32,
 	logger *log.Logger,
-	writeChanMap map[int64]chan []byte,
+	writeChanMap map[int32]chan []byte,
 	retransmissionTimeoutNs int,
 ) {
 	c.ProcessIndex = processIndex
@@ -38,7 +38,7 @@ func (c *ReliableContext) InitContext(
 
 	c.writeChanMap = writeChanMap
 
-	c.receivedAcks = make(map[int64]chan bool)
+	c.receivedAcks = make(map[int32]chan bool)
 	c.mutex = &sync.RWMutex{}
 	c.counterMutex = &sync.RWMutex{}
 }
@@ -55,7 +55,7 @@ func (c *ReliableContext) MakeNewMessage() *messages.Message {
 	return msg
 }
 
-func (c *ReliableContext) send(to int64, msg *messages.Message) {
+func (c *ReliableContext) send(to int32, msg *messages.Message) {
 	data, e := utils.Marshal(msg)
 	if e != nil {
 		return
@@ -64,7 +64,7 @@ func (c *ReliableContext) send(to int64, msg *messages.Message) {
 	c.Logger.OnMessageSent(msg.Stamp)
 }
 
-func (c *ReliableContext) Send(to int64, msg *messages.Message) {
+func (c *ReliableContext) Send(to int32, msg *messages.Message) {
 	c.send(to, msg)
 
 	stamp := msg.Stamp
@@ -79,7 +79,7 @@ func (c *ReliableContext) Send(to int64, msg *messages.Message) {
 		for {
 			select {
 			case <-t.C:
-				msg.RetransmissionStamp = msg.RetransmissionStamp + 1
+				msg.RetransmissionStamp++
 				c.send(to, msg)
 			case <-ackChan:
 				c.mutex.Lock()
@@ -91,7 +91,7 @@ func (c *ReliableContext) Send(to int64, msg *messages.Message) {
 	}()
 }
 
-func (c *ReliableContext) SendAck(sender int64, stamp int64) {
+func (c *ReliableContext) SendAck(sender int32, stamp int32) {
 	msg := c.MakeNewMessage()
 	msg.Content = &messages.Message_Ack{
 		Ack: &messages.Ack{

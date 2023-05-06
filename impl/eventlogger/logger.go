@@ -8,11 +8,11 @@ import (
 )
 
 type EventLogger struct {
-	pid    int64
+	pid    int32
 	logger *log.Logger
 }
 
-func InitEventLogger(pid int64, logger *log.Logger) *EventLogger {
+func InitEventLogger(pid int32, logger *log.Logger) *EventLogger {
 	l := new(EventLogger)
 	l.pid = pid
 	l.logger = logger
@@ -61,7 +61,7 @@ func (el *EventLogger) OnRecoveryProtocolSwitch(broadcastInstance *messages.Broa
 }
 
 func (el *EventLogger) OnDeliver(
-	broadcastInstance *messages.BroadcastInstance, value int64, messagesReceived int) {
+	broadcastInstance *messages.BroadcastInstance, value int32, messagesReceived int) {
 	el.logger.Printf(
 		"Delivered transaction: %s, value: %d, messages received: %d, timestamp: %d\n",
 		broadcastInstance.ToString(),
@@ -85,8 +85,8 @@ func (el *EventLogger) OnHistoryUsedInWitnessSetSelection(
 
 func (el *EventLogger) OnAttack(
 	broadcastInstance *messages.BroadcastInstance,
-	receivedValue int64,
-	committedValue int64,
+	receivedValue int32,
+	committedValue int32,
 ) {
 	el.logger.Printf(
 		"Detected a duplicated seq number attack; "+
@@ -109,7 +109,7 @@ func (el *EventLogger) OnMessageReceived(senderPid int64, msgId int64) {
 		senderPid, msgId, utils.GetNow())
 }
 
-func (el *EventLogger) OnAckReceived(msgId int64) {
+func (el *EventLogger) OnAckReceived(msgId int32) {
 	el.logger.Printf("Received ack: %d\n", msgId)
 }
 

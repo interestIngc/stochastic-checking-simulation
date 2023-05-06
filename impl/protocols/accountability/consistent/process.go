@@ -11,11 +11,11 @@ import (
 	"stochastic-checking-simulation/impl/utils"
 )
 
-type ProcessId int64
+type ProcessId int32
 
 type messageState struct {
 	receivedEcho map[ProcessId]bool
-	echoCount    map[int64]int
+	echoCount    map[int32]int
 	witnessSet   map[string]bool
 
 	receivedMessagesCnt int
@@ -25,7 +25,7 @@ func newMessageState() *messageState {
 	ms := new(messageState)
 
 	ms.receivedEcho = make(map[ProcessId]bool)
-	ms.echoCount = make(map[int64]int)
+	ms.echoCount = make(map[int32]int)
 
 	ms.receivedMessagesCnt = 0
 
@@ -33,14 +33,14 @@ func newMessageState() *messageState {
 }
 
 type CorrectProcess struct {
-	processIndex int64
+	processIndex int32
 	actorPids    map[string]ProcessId
 	pids         []string
 
-	transactionCounter int64
+	transactionCounter int32
 
-	deliveredMessages map[ProcessId]map[int64]int64
-	messagesLog       map[ProcessId]map[int64]*messageState
+	deliveredMessages map[ProcessId]map[int32]int32
+	messagesLog       map[ProcessId]map[int32]*messageState
 
 	witnessThreshold int
 
@@ -51,7 +51,7 @@ type CorrectProcess struct {
 }
 
 func (p *CorrectProcess) InitProcess(
-	processIndex int64,
+	processIndex int32,
 	actorPids []string,
 	parameters *parameters.Parameters,
 	logger *eventlogger.EventLogger,
@@ -62,15 +62,15 @@ func (p *CorrectProcess) InitProcess(
 	p.transactionCounter = 0
 
 	p.actorPids = make(map[string]ProcessId)
-	p.deliveredMessages = make(map[ProcessId]map[int64]int64)
-	p.messagesLog = make(map[ProcessId]map[int64]*messageState)
+	p.deliveredMessages = make(map[ProcessId]map[int32]int32)
+	p.messagesLog = make(map[ProcessId]map[int32]*messageState)
 
 	p.witnessThreshold = parameters.WitnessThreshold
 
 	for i, pid := range actorPids {
 		p.actorPids[pid] = ProcessId(i)
-		p.deliveredMessages[ProcessId(i)] = make(map[int64]int64)
-		p.messagesLog[ProcessId(i)] = make(map[int64]*messageState)
+		p.deliveredMessages[ProcessId(i)] = make(map[int32]int32)
+		p.messagesLog[ProcessId(i)] = make(map[int32]*messageState)
 	}
 
 	var hasher hashing.Hasher
@@ -131,7 +131,7 @@ func (p *CorrectProcess) sendMessage(
 		BroadcastInstanceMessage: bMessage,
 	}
 
-	reliableContext.Send(int64(to), msg)
+	reliableContext.Send(int32(to), msg)
 }
 
 func (p *CorrectProcess) broadcast(
@@ -144,12 +144,12 @@ func (p *CorrectProcess) broadcast(
 	}
 }
 
-func (p *CorrectProcess) deliver(bInstance *messages.BroadcastInstance, value int64) {
+func (p *CorrectProcess) deliver(bInstance *messages.BroadcastInstance, value int32) {
 	author := ProcessId(bInstance.Author)
 
 	p.deliveredMessages[author][bInstance.SeqNumber] = value
 	p.historyHash.Insert(
-		utils.TransactionToBytes(p.pids[bInstance.Author], bInstance.SeqNumber))
+		utils.TransactionToBytes(p.pids[bInstance.Author], int64(bInstance.SeqNumber)))
 
 	messagesReceived :=
 		p.messagesLog[author][bInstance.SeqNumber].receivedMessagesCnt
@@ -162,7 +162,7 @@ func (p *CorrectProcess) verify(
 	reliableContext *context.ReliableContext,
 	senderId ProcessId,
 	bInstance *messages.BroadcastInstance,
-	value int64,
+	value int32,
 ) bool {
 	author := ProcessId(bInstance.Author)
 	msgState := p.messagesLog[author][bInstance.SeqNumber]
@@ -200,7 +200,7 @@ func (p *CorrectProcess) verify(
 
 func (p *CorrectProcess) HandleMessage(
 	reliableContext *context.ReliableContext,
-	sender int64,
+	sender int32,
 	broadcastInstanceMessage *messages.BroadcastInstanceMessage,
 ) {
 	bInstance := broadcastInstanceMessage.BroadcastInstance
@@ -231,7 +231,7 @@ func (p *CorrectProcess) HandleMessage(
 
 func (p *CorrectProcess) Broadcast(
 	reliableContext *context.ReliableContext,
-	value int64,
+	value int32,
 ) {
 	broadcastInstance := &messages.BroadcastInstance{
 		Author:    p.processIndex,

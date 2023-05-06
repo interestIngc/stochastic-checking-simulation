@@ -10,15 +10,15 @@ import (
 type Process interface {
 	HandleMessage(
 		context *context.ReliableContext,
-		sender int64,
+		sender int32,
 		message *messages.BroadcastInstanceMessage)
 
 	InitProcess(
-		processIndex int64,
+		processIndex int32,
 		actorPids []string,
 		parameters *parameters.Parameters,
 		logger *eventlogger.EventLogger,
 	)
 
-	Broadcast(reliableContext *context.ReliableContext, value int64)
+	Broadcast(reliableContext *context.ReliableContext, value int32)
 }

@@ -2,33 +2,22 @@ syntax = "proto3";
 package messages;
 option go_package = "stochastic-checking-simulation/impl/messages";
 
-message ConnMessage {
-  int64 from = 1;
-  int64 stub = 2;
-}
-
-message Greet {
-  int64 from = 1;
-  int64 to = 2;
-  int64 stub = 3;
-}
-
 message Started {}
 
 message Simulate {}
 
 message Broadcast {
-  int64 value = 1;
+  int32 value = 1;
 }
 
 message Ack {
-  int64 sender = 1;
-  int64 stamp = 2;
+  int32 sender = 1;
+  int32 stamp = 2;
 }
 
 message BroadcastInstance {
-  int64 author = 1;
-  int64 seqNumber = 2;
+  int32 author = 1;
+  int32 seqNumber = 2;
 }
 
 message BrachaProtocolMessage {
@@ -39,7 +28,7 @@ message BrachaProtocolMessage {
   }
 
   Stage stage = 1;
-  int64 value = 2;
+  int32 value = 2;
 }
 
 message ConsistentProtocolMessage {
@@ -49,7 +38,7 @@ message ConsistentProtocolMessage {
   }
 
   Stage stage = 1;
-  int64 value = 2;
+  int32 value = 2;
 }
 
 message ReliableProtocolMessage {
@@ -63,7 +52,7 @@ message ReliableProtocolMessage {
   }
 
   Stage stage = 1;
-  int64 value = 2;
+  int32 value = 2;
 }
 
 message RecoveryProtocolMessage {
@@ -89,7 +78,7 @@ message ScalableProtocolMessage {
   }
 
   Stage stage = 1;
-  int64 value = 2;
+  int32 value = 2;
 }
 
 message BroadcastInstanceMessage {
@@ -105,9 +94,9 @@ message BroadcastInstanceMessage {
 }
 
 message Message {
-  int64 sender = 1;
-  int64 stamp = 2;
-  int64 retransmissionStamp = 3;
+  int32 sender = 1;
+  int32 stamp = 2;
+  int32 retransmissionStamp = 3;
 
   oneof content {
     Started started = 4;
