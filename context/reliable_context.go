@@ -73,6 +73,9 @@ func (c *ReliableContext) Send(to int64, msg *messages.Message) {
 		for {
 			select {
 			case <-ackChan:
+				c.mutex.Lock()
+				delete(c.receivedAcks, stamp)
+				c.mutex.Unlock()
 				return
 			case <-time.After(time.Duration(c.retransmissionTimeoutNs)):
 				c.send(to, data, stamp)
@@ -100,8 +103,11 @@ func (c *ReliableContext) SendAck(sender int64, stamp int64) {
 
 func (c *ReliableContext) OnAck(ack *messages.Ack) {
 	c.mutex.RLock()
-	ackChan := c.receivedAcks[ack.Stamp]
+	ackChan, exists := c.receivedAcks[ack.Stamp]
 	c.mutex.RUnlock()
+	if !exists {
+		return
+	}
 
 	ackChan <- true
 	c.Logger.OnAckReceived(ack.Stamp)
