@@ -30,6 +30,10 @@ var (
 	port     = flag.Int("port", 5001, "Port on which the node should be started")
 	localRun = flag.Bool("local_run", false,
 		"Defines whether to start the simulation locally, i.e. on a single machine, or in a distributed system")
+	retransmissionTimeoutNs = flag.Int(
+		"retransmission_timeout_ns",
+		6000000000,
+		"retransmission timeout in ns")
 )
 
 type Input struct {
@@ -101,5 +105,6 @@ func main() {
 		*transactions,
 		*transactionInitTimeoutNs,
 		process,
+		*retransmissionTimeoutNs,
 	)
 }

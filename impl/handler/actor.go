@@ -22,9 +22,9 @@ type Actor struct {
 	transactionsToSendOut    int
 	transactionInitTimeoutNs int
 
-	process protocols.Process
-	mailbox *mailbox.Mailbox
-	readChan  chan []byte
+	process  protocols.Process
+	mailbox  *mailbox.Mailbox
+	readChan chan []byte
 }
 
 func (a *Actor) InitActor(
@@ -36,6 +36,7 @@ func (a *Actor) InitActor(
 	transactionsToSendOut int,
 	transactionInitTimeoutNs int,
 	process protocols.Process,
+	retransmissionTimeoutNs int,
 ) {
 	n := len(actorPids)
 
@@ -63,7 +64,7 @@ func (a *Actor) InitActor(
 	a.mailbox.SetUp()
 
 	a.context = &context.ReliableContext{}
-	a.context.InitContext(processIndex, logger, writeChanMap, parameters.RetransmissionTimeoutNs)
+	a.context.InitContext(processIndex, logger, writeChanMap, retransmissionTimeoutNs)
 
 	a.process = process
 	a.process.InitProcess(processIndex, actorPids, parameters, a.context.Logger)
@@ -87,23 +88,23 @@ func (a *Actor) receiveMessages() {
 		}
 
 		content := msg.Content
-		//ack, ok := content.(*messages.Message_Ack)
-		//if ok {
-		//	a.context.OnAck(ack.Ack)
-		//	continue
-		//}
+		ack, ok := content.(*messages.Message_Ack)
+		if ok {
+			a.context.OnAck(ack.Ack)
+			continue
+		}
 
 		sender := msg.Sender
 		stamp := msg.Stamp
 
 		a.context.Logger.OnMessageReceived(sender, stamp)
 
-		//a.context.SendAck(sender, stamp)
-		//
-		//if a.receivedMessages[sender][stamp] {
-		//	return
-		//}
-		//a.receivedMessages[sender][stamp] = true
+		a.context.SendAck(sender, stamp)
+
+		if a.receivedMessages[sender][stamp] {
+			return
+		}
+		a.receivedMessages[sender][stamp] = true
 
 		switch c := content.(type) {
 		case *messages.Message_Broadcast:

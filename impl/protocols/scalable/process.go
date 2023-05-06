@@ -67,7 +67,7 @@ func newMessageState() *messageState {
 
 type Process struct {
 	processIndex int64
-	n int
+	n            int
 
 	transactionCounter int64
 

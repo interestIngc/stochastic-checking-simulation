@@ -123,7 +123,7 @@ func newRecoveryMessageState() *recoveryMessageState {
 
 type Process struct {
 	processIndex int64
-	actorPids map[string]ProcessId
+	actorPids    map[string]ProcessId
 	pids         []string
 
 	transactionCounter int64

@@ -18,7 +18,7 @@ var (
 		"Defines whether to start the simulation locally, i.e. on a single machine, or in a distributed system")
 	retransmissionTimeoutNs = flag.Int(
 		"retransmission_timeout_ns",
-		5000000000,
+		6000000000,
 		"retransmission timeout in ns")
 )
 

@@ -53,7 +53,7 @@ type Process struct {
 	deliveredTransactions map[ProcessId]map[int64]int64
 	transactionsLog       map[ProcessId]map[int64]*messageState
 
-	n int
+	n                   int
 	messagesForEcho     int
 	messagesForReady    int
 	messagesForDelivery int

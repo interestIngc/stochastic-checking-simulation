@@ -5,6 +5,8 @@ import (
 	"log"
 	"stochastic-checking-simulation/impl/eventlogger"
 	"stochastic-checking-simulation/impl/messages"
+	"sync"
+	"time"
 )
 
 type ReliableContext struct {
@@ -13,12 +15,12 @@ type ReliableContext struct {
 
 	retransmissionTimeoutNs int
 
-	messageCounter          int64
+	messageCounter int64
 
 	writeChanMap map[int64]chan []byte
 
-	//receivedAck      map[int64]bool
-	//mutex sync.RWMutex
+	receivedAck map[int64]bool
+	mutex       sync.RWMutex
 }
 
 func (c *ReliableContext) InitContext(
@@ -35,8 +37,8 @@ func (c *ReliableContext) InitContext(
 
 	c.writeChanMap = writeChanMap
 
-	//c.receivedAck = make(map[int64]bool)
-	//c.mutex = sync.RWMutex{}
+	c.receivedAck = make(map[int64]bool)
+	c.mutex = sync.RWMutex{}
 }
 
 func (c *ReliableContext) MakeNewMessage() *messages.Message {
@@ -61,39 +63,38 @@ func (c *ReliableContext) send(to int64, msg *messages.Message) {
 
 func (c *ReliableContext) Send(to int64, msg *messages.Message) {
 	c.send(to, msg)
-	//go func() {
-	//	for {
-	//		time.Sleep(time.Duration(c.retransmissionTimeoutNs))
-	//
-	//		c.mutex.RLock()
-	//		received := c.receivedAck[msg.Stamp]
-	//		c.mutex.RUnlock()
-	//
-	//		if received {
-	//			return
-	//		}
-	//
-	//		c.send(to, msg)
-	//	}
-	//}()
+	go func() {
+		for {
+			time.Sleep(time.Duration(c.retransmissionTimeoutNs))
+
+			c.mutex.RLock()
+			received := c.receivedAck[msg.Stamp]
+			c.mutex.RUnlock()
+
+			if received {
+				return
+			}
+
+			c.send(to, msg)
+		}
+	}()
 }
 
-//func (c *ReliableContext) SendAck(sender int64, stamp int64) {
-//	msg := c.MakeNewMessage()
-//	msg.Content = &messages.Message_Ack{
-//		Ack: &messages.Ack{
-//			Sender: sender,
-//			Stamp:  stamp,
-//		},
-//	}
-//	c.send(sender, msg)
-//}
+func (c *ReliableContext) SendAck(sender int64, stamp int64) {
+	msg := c.MakeNewMessage()
+	msg.Content = &messages.Message_Ack{
+		Ack: &messages.Ack{
+			Sender: sender,
+			Stamp:  stamp,
+		},
+	}
+	c.send(sender, msg)
+}
 
-//func (c *ReliableContext) OnAck(ack *messages.Ack) {
-//	c.mutex.Lock()
-//	defer c.mutex.Unlock()
-//
-//	stamp := ack.Stamp
-//	c.receivedAck[stamp] = true
-//	c.Logger.OnAckReceived(stamp)
-//}
+func (c *ReliableContext) OnAck(ack *messages.Ack) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	c.receivedAck[ack.Stamp] = true
+	c.Logger.OnAckReceived(ack.Stamp)
+}
