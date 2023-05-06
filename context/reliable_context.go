@@ -5,6 +5,7 @@ import (
 	"stochastic-checking-simulation/impl/eventlogger"
 	"stochastic-checking-simulation/impl/messages"
 	"stochastic-checking-simulation/impl/utils"
+	"sync"
 	"time"
 )
 
@@ -19,6 +20,7 @@ type ReliableContext struct {
 	writeChanMap map[int64]chan []byte
 
 	receivedAcks map[int64]chan bool
+	mutex       *sync.RWMutex
 }
 
 func (c *ReliableContext) InitContext(
@@ -36,6 +38,7 @@ func (c *ReliableContext) InitContext(
 	c.writeChanMap = writeChanMap
 
 	c.receivedAcks = make(map[int64]chan bool)
+	c.mutex = &sync.RWMutex{}
 }
 
 func (c *ReliableContext) MakeNewMessage() *messages.Message {
@@ -61,7 +64,10 @@ func (c *ReliableContext) Send(to int64, msg *messages.Message) {
 
 	c.send(to, data, stamp)
 	ackChan := make(chan bool)
+
+	c.mutex.Lock()
 	c.receivedAcks[stamp] = ackChan
+	c.mutex.Unlock()
 
 	go func() {
 		for {
