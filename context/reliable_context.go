@@ -99,6 +99,10 @@ func (c *ReliableContext) SendAck(sender int64, stamp int64) {
 }
 
 func (c *ReliableContext) OnAck(ack *messages.Ack) {
-	c.receivedAcks[ack.Stamp] <- true
+	c.mutex.RLock()
+	ackChan := c.receivedAcks[ack.Stamp]
+	c.mutex.RUnlock()
+
+	ackChan <- true
 	c.Logger.OnAckReceived(ack.Stamp)
 }
