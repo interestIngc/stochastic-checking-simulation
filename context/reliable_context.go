@@ -19,7 +19,7 @@ type ReliableContext struct {
 	messageCounter int32
 	counterMutex       *sync.RWMutex
 
-	writeChanMap chan mailbox.Destination
+	writeChan chan mailbox.Destination
 
 	receivedAcks map[int32]chan bool
 	mutex       *sync.RWMutex
@@ -28,7 +28,7 @@ type ReliableContext struct {
 func (c *ReliableContext) InitContext(
 	processIndex int32,
 	logger *log.Logger,
-	writeChanMap chan mailbox.Destination,
+	writeChan chan mailbox.Destination,
 	retransmissionTimeoutNs int,
 ) {
 	c.ProcessIndex = processIndex
@@ -37,12 +37,16 @@ func (c *ReliableContext) InitContext(
 	c.retransmissionTimeoutNs = retransmissionTimeoutNs
 	c.messageCounter = 0
 
-	c.writeChanMap = writeChanMap
+	c.writeChan = writeChan
 
 	c.receivedAcks = make(map[int32]chan bool)
+	c.mutex = &sync.RWMutex{}
+	c.counterMutex = &sync.RWMutex{}
 }
 
 func (c *ReliableContext) MakeNewMessage() *messages.Message {
+	c.counterMutex.Lock()
+	defer c.counterMutex.Unlock()
 	msg := &messages.Message{
 		Sender: c.ProcessIndex,
 		Stamp:  c.messageCounter,
@@ -57,7 +61,7 @@ func (c *ReliableContext) send(to int32, msg *messages.Message) {
 		log.Println("Error when serializing message")
 		return
 	}
-	c.writeChanMap <- mailbox.Destination{
+	c.writeChan <- mailbox.Destination{
 		To: to,
 		Data: data,
 	}
@@ -67,10 +71,10 @@ func (c *ReliableContext) send(to int32, msg *messages.Message) {
 func (c *ReliableContext) Send(to int32, msg *messages.Message) {
 	c.send(to, msg)
 
-	stamp := msg.Stamp
+	c.mutex.Lock()
 	ackChan := make(chan bool)
-
-	c.receivedAcks[stamp] = ackChan
+	c.receivedAcks[msg.Stamp] = ackChan
+	c.mutex.Unlock()
 
 	go func() {
 		t := time.NewTicker(time.Duration(c.retransmissionTimeoutNs))
@@ -99,11 +103,17 @@ func (c *ReliableContext) SendAck(sender int32, stamp int32) {
 }
 
 func (c *ReliableContext) OnAck(ack *messages.Ack) {
+	c.mutex.RLock()
 	ackChan, exists := c.receivedAcks[ack.Stamp]
+	c.mutex.RUnlock()
 	if !exists {
 		return
 	}
 	ackChan <- true
+
+	c.mutex.Lock()
 	delete(c.receivedAcks, ack.Stamp)
+	c.mutex.Unlock()
+
 	c.Logger.OnAckReceived(ack.Stamp)
 }
