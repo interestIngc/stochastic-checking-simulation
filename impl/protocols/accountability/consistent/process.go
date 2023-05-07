@@ -48,6 +48,7 @@ type CorrectProcess struct {
 	historyHash *hashing.HistoryHash
 
 	logger *eventlogger.EventLogger
+	ownDeliveredTransactions chan bool
 }
 
 func (p *CorrectProcess) InitProcess(
@@ -55,6 +56,7 @@ func (p *CorrectProcess) InitProcess(
 	actorPids []string,
 	parameters *parameters.Parameters,
 	logger *eventlogger.EventLogger,
+	ownDeliveredTransactions chan bool,
 ) {
 	p.processIndex = processIndex
 	p.pids = actorPids
@@ -91,6 +93,7 @@ func (p *CorrectProcess) InitProcess(
 	p.historyHash = hashing.NewHistoryHash(uint(parameters.NumberOfBins), binCapacity, hasher)
 
 	p.logger = logger
+	p.ownDeliveredTransactions = ownDeliveredTransactions
 }
 
 func (p *CorrectProcess) initMessageState(
@@ -150,6 +153,10 @@ func (p *CorrectProcess) deliver(bInstance *messages.BroadcastInstance, value in
 	p.deliveredMessages[author][bInstance.SeqNumber] = value
 	p.historyHash.Insert(
 		utils.TransactionToBytes(p.pids[bInstance.Author], int64(bInstance.SeqNumber)))
+
+	if bInstance.Author == p.processIndex {
+		p.ownDeliveredTransactions <- true
+	}
 
 	messagesReceived :=
 		p.messagesLog[author][bInstance.SeqNumber].receivedMessagesCnt

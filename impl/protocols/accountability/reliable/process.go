@@ -142,6 +142,7 @@ type Process struct {
 	historyHash *hashing.HistoryHash
 
 	logger *eventlogger.EventLogger
+	ownDeliveredTransactions chan bool
 }
 
 func (p *Process) InitProcess(
@@ -149,6 +150,7 @@ func (p *Process) InitProcess(
 	actorPids []string,
 	parameters *parameters.Parameters,
 	logger *eventlogger.EventLogger,
+	ownDeliveredTransactions chan bool,
 ) {
 	p.processIndex = processIndex
 	p.pids = actorPids
@@ -192,6 +194,7 @@ func (p *Process) InitProcess(
 	p.historyHash = hashing.NewHistoryHash(uint(parameters.NumberOfBins), binCapacity, hasher)
 
 	p.logger = logger
+	p.ownDeliveredTransactions = ownDeliveredTransactions
 }
 
 func (p *Process) initMessageState(
@@ -424,6 +427,10 @@ func (p *Process) deliver(
 	p.deliveredMessages[author][bInstance.SeqNumber] = value
 	p.historyHash.Insert(
 		utils.TransactionToBytes(p.pids[bInstance.Author], int64(bInstance.SeqNumber)))
+
+	if bInstance.Author == p.processIndex {
+		p.ownDeliveredTransactions <- true
+	}
 
 	msgState := p.messagesLog[author][bInstance.SeqNumber]
 	messagesReceived := msgState.receivedMessagesCnt

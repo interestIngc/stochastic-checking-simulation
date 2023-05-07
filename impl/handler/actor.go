@@ -9,7 +9,6 @@ import (
 	"stochastic-checking-simulation/impl/protocols"
 	"stochastic-checking-simulation/impl/utils"
 	"stochastic-checking-simulation/mailbox"
-	"time"
 )
 
 type Actor struct {
@@ -25,6 +24,8 @@ type Actor struct {
 	process  protocols.Process
 	mailbox  *mailbox.Mailbox
 	readChan chan []byte
+
+	ownDeliveredTransactions chan bool
 }
 
 func (a *Actor) InitActor(
@@ -65,8 +66,10 @@ func (a *Actor) InitActor(
 	a.context = &context.ReliableContext{}
 	a.context.InitContext(processIndex, logger, writeChanMap, retransmissionTimeoutNs)
 
+	a.ownDeliveredTransactions = make(chan bool, 200)
+
 	a.process = process
-	a.process.InitProcess(processIndex, actorPids, parameters, a.context.Logger)
+	a.process.InitProcess(processIndex, actorPids, parameters, a.context.Logger, a.ownDeliveredTransactions)
 
 	startedMessage := a.context.MakeNewMessage()
 	startedMessage.Content = &messages.Message_Started{
@@ -118,14 +121,32 @@ func (a *Actor) receiveMessages() {
 }
 
 func (a *Actor) Simulate() {
-	for i := 0; i < a.transactionsToSendOut; i++ {
-		msg := a.context.MakeNewMessage()
-		msg.Content = &messages.Message_Broadcast{
-			Broadcast: &messages.Broadcast{
-				Value: int32(rand.Int()),
-			},
+	a.sendMsg()
+	for i := 0; i < a.transactionsToSendOut - 1; i++ {
+	//for {
+		select {
+		case <- a.ownDeliveredTransactions:
+			a.sendMsg()
 		}
-		a.context.Send(a.processIndex, msg)
-		time.Sleep(time.Duration(a.transactionInitTimeoutNs))
 	}
+	//for i := 0; i < a.transactionsToSendOut; i++ {
+	//	msg := a.context.MakeNewMessage()
+	//	msg.Content = &messages.Message_Broadcast{
+	//		Broadcast: &messages.Broadcast{
+	//			Value: int32(rand.Int()),
+	//		},
+	//	}
+	//	a.context.Send(a.processIndex, msg)
+	//	time.Sleep(time.Duration(a.transactionInitTimeoutNs))
+	//}
+}
+
+func (a *Actor) sendMsg() {
+	msg := a.context.MakeNewMessage()
+	msg.Content = &messages.Message_Broadcast{
+		Broadcast: &messages.Broadcast{
+			Value: int32(rand.Int() % 1000000),
+		},
+	}
+	a.context.Send(a.processIndex, msg)
 }

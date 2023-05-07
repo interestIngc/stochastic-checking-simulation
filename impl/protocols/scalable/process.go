@@ -86,6 +86,7 @@ type Process struct {
 	cleanUpTimeout     time.Duration
 
 	logger *eventlogger.EventLogger
+	ownDeliveredTransactions chan bool
 }
 
 func (p *Process) getRandomPid(random *rand.Rand) ProcessId {
@@ -147,6 +148,7 @@ func (p *Process) InitProcess(
 	actorPids []string,
 	parameters *parameters.Parameters,
 	logger *eventlogger.EventLogger,
+	ownDeliveredTransactions chan bool,
 ) {
 	p.processIndex = processIndex
 	p.n = len(actorPids)
@@ -173,6 +175,7 @@ func (p *Process) InitProcess(
 	p.cleanUpTimeout = time.Duration(parameters.CleanUpTimeout)
 
 	p.logger = logger
+	p.ownDeliveredTransactions = ownDeliveredTransactions
 }
 
 func (p *Process) initMessageState(
@@ -312,6 +315,10 @@ func (p *Process) deliver(
 	messagesReceived := p.messagesLog[author][bInstance.SeqNumber].receivedMessagesCnt
 
 	p.logger.OnDeliver(bInstance, value, messagesReceived)
+
+	if bInstance.Author == p.processIndex {
+		p.ownDeliveredTransactions <- true
+	}
 
 	go func() {
 		time.Sleep(p.cleanUpTimeout)

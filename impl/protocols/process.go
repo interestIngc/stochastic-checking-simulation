@@ -18,6 +18,7 @@ type Process interface {
 		actorPids []string,
 		parameters *parameters.Parameters,
 		logger *eventlogger.EventLogger,
+		ownDeliveredTransactions chan bool,
 	)
 
 	Broadcast(reliableContext *context.ReliableContext, value int32)
