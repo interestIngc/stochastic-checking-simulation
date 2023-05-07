@@ -122,8 +122,8 @@ func (a *Actor) receiveMessages() {
 
 func (a *Actor) Simulate() {
 	a.sendMsg()
-	for i := 0; i < a.transactionsToSendOut - 1; i++ {
-	//for {
+	//for i := 0; i < a.transactionsToSendOut - 1; i++ {
+	for {
 		select {
 		case <- a.ownDeliveredTransactions:
 			a.sendMsg()
