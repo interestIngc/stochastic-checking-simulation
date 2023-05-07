@@ -7,10 +7,15 @@ import (
 	"strings"
 )
 
+type Destination struct {
+	To int32
+	Data []byte
+}
+
 type Mailbox struct {
 	id           int32                 // Process' own id
 	addresses    []string              // Addresses of all processes
-	writeChanMap map[int32]chan []byte // Receive messages to send
+	writeChanMap chan Destination // Receive messages to send
 	readChan     chan []byte           // Send received messages to the process
 
 	conn *net.UDPConn
@@ -19,7 +24,7 @@ type Mailbox struct {
 func NewMailbox(
 	ownId int32,
 	addresses []string,
-	writeChanMap map[int32]chan []byte,
+	writeChanMap chan Destination,
 	readChan chan []byte,
 ) *Mailbox {
 	pC := new(Mailbox)
@@ -51,9 +56,7 @@ func NewMailbox(
 
 func (pC *Mailbox) SetUp() {
 	go pC.persistentList()
-	for to, inChan := range pC.writeChanMap {
-		go pC.SendMessages(to, inChan)
-	}
+	go pC.SendMessages()
 }
 
 func (pC *Mailbox) persistentList() {
@@ -73,22 +76,21 @@ func (pC *Mailbox) persistentList() {
 
 }
 
-func (pC *Mailbox) SendMessages(to int32, inChan chan []byte) {
-	for data := range inChan {
-		go func(pR int32, pM []byte) {
+func (pC *Mailbox) SendMessages() {
+	for dest := range pC.writeChanMap {
+		go func(dest Destination) {
 			address := make([]string, 2)
-			address = strings.Split(pC.addresses[pR], ":")
+			address = strings.Split(pC.addresses[dest.To], ":")
 			port, err := strconv.Atoi(address[1])
 			addr := net.UDPAddr{
 				Port: port,
 				IP:   net.ParseIP(address[0]),
 			}
 
-			_, err = pC.conn.WriteToUDP(pM, &addr)
+			_, err = pC.conn.WriteToUDP(dest.Data, &addr)
 			if err != nil {
 				log.Printf("Response err %v", err)
 			}
-
-		}(to, data)
+		}(dest)
 	}
 }

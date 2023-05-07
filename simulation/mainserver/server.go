@@ -32,10 +32,7 @@ func (ms *MainServer) InitMainServer(
 
 	ms.receivedMessages = make(map[int32]bool)
 
-	writeChanMap := make(map[int32]chan []byte)
-	for i := 0; i <= ms.n; i++ {
-		writeChanMap[int32(i)] = make(chan []byte, 500)
-	}
+	writeChanMap := make(chan mailbox.Destination)
 
 	id := int32(ms.n)
 	ms.mailbox = mailbox.NewMailbox(id, actorPids, writeChanMap, ms.readChan)
@@ -78,7 +75,7 @@ func (ms *MainServer) receiveMessages() {
 			ms.reliableContext.SendAck(sender, stamp)
 
 			if ms.receivedMessages[sender] {
-				return
+				continue
 			}
 			ms.receivedMessages[sender] = true
 

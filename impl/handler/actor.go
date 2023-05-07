@@ -52,9 +52,8 @@ func (a *Actor) InitActor(
 	a.transactionInitTimeoutNs = transactionInitTimeoutNs
 
 	a.receivedMessages = make(map[int32]map[int32]bool)
-	writeChanMap := make(map[int32]chan []byte)
+	writeChanMap := make(chan mailbox.Destination)
 	for i := 0; i <= n; i++ {
-		writeChanMap[int32(i)] = make(chan []byte, 500)
 		a.receivedMessages[int32(i)] = make(map[int32]bool)
 	}
 
@@ -102,7 +101,7 @@ func (a *Actor) receiveMessages() {
 		a.context.SendAck(sender, stamp)
 
 		if a.receivedMessages[sender][stamp] {
-			return
+			continue
 		}
 		a.receivedMessages[sender][stamp] = true
 

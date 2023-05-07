@@ -5,6 +5,7 @@ import (
 	"stochastic-checking-simulation/impl/eventlogger"
 	"stochastic-checking-simulation/impl/messages"
 	"stochastic-checking-simulation/impl/utils"
+	"stochastic-checking-simulation/mailbox"
 	"sync"
 	"time"
 )
@@ -18,7 +19,7 @@ type ReliableContext struct {
 	messageCounter int32
 	counterMutex       *sync.RWMutex
 
-	writeChanMap map[int32]chan []byte
+	writeChanMap chan mailbox.Destination
 
 	receivedAcks map[int32]chan bool
 	mutex       *sync.RWMutex
@@ -27,7 +28,7 @@ type ReliableContext struct {
 func (c *ReliableContext) InitContext(
 	processIndex int32,
 	logger *log.Logger,
-	writeChanMap map[int32]chan []byte,
+	writeChanMap chan mailbox.Destination,
 	retransmissionTimeoutNs int,
 ) {
 	c.ProcessIndex = processIndex
@@ -39,14 +40,9 @@ func (c *ReliableContext) InitContext(
 	c.writeChanMap = writeChanMap
 
 	c.receivedAcks = make(map[int32]chan bool)
-	c.mutex = &sync.RWMutex{}
-	c.counterMutex = &sync.RWMutex{}
 }
 
 func (c *ReliableContext) MakeNewMessage() *messages.Message {
-	c.counterMutex.Lock()
-	defer c.counterMutex.Unlock()
-
 	msg := &messages.Message{
 		Sender: c.ProcessIndex,
 		Stamp:  c.messageCounter,
@@ -58,9 +54,13 @@ func (c *ReliableContext) MakeNewMessage() *messages.Message {
 func (c *ReliableContext) send(to int32, msg *messages.Message) {
 	data, e := utils.Marshal(msg)
 	if e != nil {
+		log.Println("Error when serializing message")
 		return
 	}
-	c.writeChanMap[to] <- data
+	c.writeChanMap <- mailbox.Destination{
+		To: to,
+		Data: data,
+	}
 	c.Logger.OnMessageSent(msg.Stamp)
 }
 
@@ -70,22 +70,17 @@ func (c *ReliableContext) Send(to int32, msg *messages.Message) {
 	stamp := msg.Stamp
 	ackChan := make(chan bool)
 
-	c.mutex.Lock()
 	c.receivedAcks[stamp] = ackChan
-	c.mutex.Unlock()
 
 	go func() {
 		t := time.NewTicker(time.Duration(c.retransmissionTimeoutNs))
 		for {
 			select {
-			case <-t.C:
-				msg.RetransmissionStamp++
-				c.send(to, msg)
-			case <-ackChan:
-				c.mutex.Lock()
-				delete(c.receivedAcks, stamp)
-				c.mutex.Unlock()
-				return
+				case <-ackChan:
+					return
+				case <-t.C:
+					msg.RetransmissionStamp++
+					c.send(to, msg)
 			}
 		}
 	}()
@@ -104,13 +99,11 @@ func (c *ReliableContext) SendAck(sender int32, stamp int32) {
 }
 
 func (c *ReliableContext) OnAck(ack *messages.Ack) {
-	c.mutex.RLock()
 	ackChan, exists := c.receivedAcks[ack.Stamp]
-	c.mutex.RUnlock()
 	if !exists {
 		return
 	}
-
 	ackChan <- true
+	delete(c.receivedAcks, ack.Stamp)
 	c.Logger.OnAckReceived(ack.Stamp)
 }
