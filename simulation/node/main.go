@@ -6,7 +6,6 @@ import (
 	"io"
 	"log"
 	"os"
-	"stochastic-checking-simulation/impl/handler"
 	"stochastic-checking-simulation/impl/parameters"
 	"stochastic-checking-simulation/impl/protocols"
 	"stochastic-checking-simulation/impl/protocols/accountability/consistent"
@@ -34,6 +33,10 @@ var (
 		"retransmission_timeout_ns",
 		6000000000,
 		"retransmission timeout in ns")
+	makeStressTest = flag.Bool(
+		"stress_test",
+		false,
+		"Defines whether to run the stress test. In this case, transactions are sent out infinitely")
 )
 
 type Input struct {
@@ -84,7 +87,7 @@ func main() {
 	case "reliable_accountability":
 		process = &reliable.Process{}
 	case "consistent_accountability":
-		process = &consistent.CorrectProcess{}
+		process = &consistent.Process{}
 	case "bracha":
 		process = &bracha.Process{}
 	case "scalable":
@@ -95,7 +98,7 @@ func main() {
 
 	logger.Printf("Running protocol: %s\n", input.Protocol)
 
-	a := &handler.Actor{}
+	a := &Actor{}
 	a.InitActor(
 		int32(*processIndex),
 		pids,
@@ -106,5 +109,6 @@ func main() {
 		*transactionInitTimeoutNs,
 		process,
 		*retransmissionTimeoutNs,
+		*makeStressTest,
 	)
 }

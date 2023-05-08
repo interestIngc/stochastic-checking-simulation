@@ -143,6 +143,7 @@ type Process struct {
 
 	logger *eventlogger.EventLogger
 	ownDeliveredTransactions chan bool
+	sendOwnDeliveredTransactions bool
 }
 
 func (p *Process) InitProcess(
@@ -151,6 +152,7 @@ func (p *Process) InitProcess(
 	parameters *parameters.Parameters,
 	logger *eventlogger.EventLogger,
 	ownDeliveredTransactions chan bool,
+	sendOwnDeliveredTransactions bool,
 ) {
 	p.processIndex = processIndex
 	p.pids = actorPids
@@ -195,6 +197,7 @@ func (p *Process) InitProcess(
 
 	p.logger = logger
 	p.ownDeliveredTransactions = ownDeliveredTransactions
+	p.sendOwnDeliveredTransactions = sendOwnDeliveredTransactions
 }
 
 func (p *Process) initMessageState(
@@ -428,7 +431,7 @@ func (p *Process) deliver(
 	p.historyHash.Insert(
 		utils.TransactionToBytes(p.pids[bInstance.Author], int64(bInstance.SeqNumber)))
 
-	if bInstance.Author == p.processIndex {
+	if p.sendOwnDeliveredTransactions && bInstance.Author == p.processIndex {
 		p.ownDeliveredTransactions <- true
 	}
 

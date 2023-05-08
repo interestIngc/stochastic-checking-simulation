@@ -60,6 +60,7 @@ type Process struct {
 
 	logger *eventlogger.EventLogger
 	ownDeliveredTransactions chan bool
+	sendOwnDeliveredTransactions bool
 }
 
 func (p *Process) InitProcess(
@@ -68,6 +69,7 @@ func (p *Process) InitProcess(
 	parameters *parameters.Parameters,
 	logger *eventlogger.EventLogger,
 	ownDeliveredTransactions chan bool,
+	sendOwnDeliveredTransactions bool,
 ) {
 	p.processIndex = processIndex
 	p.n = len(actorPids)
@@ -88,6 +90,7 @@ func (p *Process) InitProcess(
 
 	p.logger = logger
 	p.ownDeliveredTransactions = ownDeliveredTransactions
+	p.sendOwnDeliveredTransactions = sendOwnDeliveredTransactions
 }
 
 func (p *Process) initMessageState(bInstance *messages.BroadcastInstance) *messageState {
@@ -186,7 +189,7 @@ func (p *Process) deliver(
 	messagesReceived :=
 		p.transactionsLog[author][bInstance.SeqNumber].receivedMessagesCnt
 
-	if bInstance.Author == p.processIndex {
+	if p.sendOwnDeliveredTransactions && bInstance.Author == p.processIndex {
 		p.ownDeliveredTransactions <- true
 	}
 

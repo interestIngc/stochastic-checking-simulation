@@ -1,4 +1,4 @@
-package handler
+package main
 
 import (
 	"log"
@@ -9,6 +9,7 @@ import (
 	"stochastic-checking-simulation/impl/protocols"
 	"stochastic-checking-simulation/impl/utils"
 	"stochastic-checking-simulation/mailbox"
+	"time"
 )
 
 type Actor struct {
@@ -26,6 +27,7 @@ type Actor struct {
 	readChan chan []byte
 
 	ownDeliveredTransactions chan bool
+	stressTest bool
 }
 
 func (a *Actor) InitActor(
@@ -38,6 +40,7 @@ func (a *Actor) InitActor(
 	transactionInitTimeoutNs int,
 	process protocols.Process,
 	retransmissionTimeoutNs int,
+	stressTest bool,
 ) {
 	n := len(actorPids)
 
@@ -69,13 +72,22 @@ func (a *Actor) InitActor(
 	a.ownDeliveredTransactions = make(chan bool, 200)
 
 	a.process = process
-	a.process.InitProcess(processIndex, actorPids, parameters, a.context.Logger, a.ownDeliveredTransactions)
+	a.process.InitProcess(
+		processIndex,
+		actorPids,
+		parameters,
+		a.context.Logger,
+		a.ownDeliveredTransactions,
+		stressTest,
+	)
 
 	startedMessage := a.context.MakeNewMessage()
 	startedMessage.Content = &messages.Message_Started{
 		Started: &messages.Started{},
 	}
 	a.context.Send(int32(n), startedMessage)
+
+	a.stressTest = stressTest
 
 	a.receiveMessages()
 }
@@ -121,24 +133,20 @@ func (a *Actor) receiveMessages() {
 }
 
 func (a *Actor) Simulate() {
-	a.sendMsg()
-	//for i := 0; i < a.transactionsToSendOut - 1; i++ {
-	for {
-		select {
-		case <- a.ownDeliveredTransactions:
+	if a.stressTest {
+		a.sendMsg()
+		for {
+			select {
+			case <- a.ownDeliveredTransactions:
+				a.sendMsg()
+			}
+		}
+	} else {
+		for i := 0; i < a.transactionsToSendOut; i++ {
 			a.sendMsg()
+			time.Sleep(time.Duration(a.transactionInitTimeoutNs))
 		}
 	}
-	//for i := 0; i < a.transactionsToSendOut; i++ {
-	//	msg := a.context.MakeNewMessage()
-	//	msg.Content = &messages.Message_Broadcast{
-	//		Broadcast: &messages.Broadcast{
-	//			Value: int32(rand.Int()),
-	//		},
-	//	}
-	//	a.context.Send(a.processIndex, msg)
-	//	time.Sleep(time.Duration(a.transactionInitTimeoutNs))
-	//}
 }
 
 func (a *Actor) sendMsg() {

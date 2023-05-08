@@ -87,6 +87,7 @@ type Process struct {
 
 	logger *eventlogger.EventLogger
 	ownDeliveredTransactions chan bool
+	sendOwnDeliveredTransactions bool
 }
 
 func (p *Process) getRandomPid(random *rand.Rand) ProcessId {
@@ -149,6 +150,7 @@ func (p *Process) InitProcess(
 	parameters *parameters.Parameters,
 	logger *eventlogger.EventLogger,
 	ownDeliveredTransactions chan bool,
+	sendOwnDeliveredTransactions bool,
 ) {
 	p.processIndex = processIndex
 	p.n = len(actorPids)
@@ -176,6 +178,7 @@ func (p *Process) InitProcess(
 
 	p.logger = logger
 	p.ownDeliveredTransactions = ownDeliveredTransactions
+	p.sendOwnDeliveredTransactions = sendOwnDeliveredTransactions
 }
 
 func (p *Process) initMessageState(
@@ -316,7 +319,7 @@ func (p *Process) deliver(
 
 	p.logger.OnDeliver(bInstance, value, messagesReceived)
 
-	if bInstance.Author == p.processIndex {
+	if p.sendOwnDeliveredTransactions && bInstance.Author == p.processIndex {
 		p.ownDeliveredTransactions <- true
 	}
 

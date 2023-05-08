@@ -32,7 +32,7 @@ func newMessageState() *messageState {
 	return ms
 }
 
-type CorrectProcess struct {
+type Process struct {
 	processIndex int32
 	actorPids    map[string]ProcessId
 	pids         []string
@@ -49,14 +49,16 @@ type CorrectProcess struct {
 
 	logger *eventlogger.EventLogger
 	ownDeliveredTransactions chan bool
+	sendOwnDeliveredTransactions bool
 }
 
-func (p *CorrectProcess) InitProcess(
+func (p *Process) InitProcess(
 	processIndex int32,
 	actorPids []string,
 	parameters *parameters.Parameters,
 	logger *eventlogger.EventLogger,
 	ownDeliveredTransactions chan bool,
+	sendOwnDeliveredTransactions bool,
 ) {
 	p.processIndex = processIndex
 	p.pids = actorPids
@@ -94,9 +96,10 @@ func (p *CorrectProcess) InitProcess(
 
 	p.logger = logger
 	p.ownDeliveredTransactions = ownDeliveredTransactions
+	p.sendOwnDeliveredTransactions = sendOwnDeliveredTransactions
 }
 
-func (p *CorrectProcess) initMessageState(
+func (p *Process) initMessageState(
 	bInstance *messages.BroadcastInstance,
 ) *messageState {
 	msgState := newMessageState()
@@ -116,7 +119,7 @@ func (p *CorrectProcess) initMessageState(
 	return msgState
 }
 
-func (p *CorrectProcess) sendMessage(
+func (p *Process) sendMessage(
 	reliableContext *context.ReliableContext,
 	to ProcessId,
 	bInstance *messages.BroadcastInstance,
@@ -137,7 +140,7 @@ func (p *CorrectProcess) sendMessage(
 	reliableContext.Send(int32(to), msg)
 }
 
-func (p *CorrectProcess) broadcast(
+func (p *Process) broadcast(
 	reliableContext *context.ReliableContext,
 	bInstance *messages.BroadcastInstance,
 	message *messages.ConsistentProtocolMessage,
@@ -147,14 +150,14 @@ func (p *CorrectProcess) broadcast(
 	}
 }
 
-func (p *CorrectProcess) deliver(bInstance *messages.BroadcastInstance, value int32) {
+func (p *Process) deliver(bInstance *messages.BroadcastInstance, value int32) {
 	author := ProcessId(bInstance.Author)
 
 	p.deliveredMessages[author][bInstance.SeqNumber] = value
 	p.historyHash.Insert(
 		utils.TransactionToBytes(p.pids[bInstance.Author], int64(bInstance.SeqNumber)))
 
-	if bInstance.Author == p.processIndex {
+	if p.sendOwnDeliveredTransactions && bInstance.Author == p.processIndex {
 		p.ownDeliveredTransactions <- true
 	}
 
@@ -165,7 +168,7 @@ func (p *CorrectProcess) deliver(bInstance *messages.BroadcastInstance, value in
 	p.logger.OnDeliver(bInstance, value, messagesReceived)
 }
 
-func (p *CorrectProcess) verify(
+func (p *Process) verify(
 	reliableContext *context.ReliableContext,
 	senderId ProcessId,
 	bInstance *messages.BroadcastInstance,
@@ -205,7 +208,7 @@ func (p *CorrectProcess) verify(
 	return true
 }
 
-func (p *CorrectProcess) HandleMessage(
+func (p *Process) HandleMessage(
 	reliableContext *context.ReliableContext,
 	sender int32,
 	broadcastInstanceMessage *messages.BroadcastInstanceMessage,
@@ -236,7 +239,7 @@ func (p *CorrectProcess) HandleMessage(
 	}
 }
 
-func (p *CorrectProcess) Broadcast(
+func (p *Process) Broadcast(
 	reliableContext *context.ReliableContext,
 	value int32,
 ) {

@@ -11,7 +11,8 @@ type Process interface {
 	HandleMessage(
 		context *context.ReliableContext,
 		sender int32,
-		message *messages.BroadcastInstanceMessage)
+		message *messages.BroadcastInstanceMessage,
+	)
 
 	InitProcess(
 		processIndex int32,
@@ -19,6 +20,7 @@ type Process interface {
 		parameters *parameters.Parameters,
 		logger *eventlogger.EventLogger,
 		ownDeliveredTransactions chan bool,
+		sendOwnDeliveredTransactions bool,
 	)
 
 	Broadcast(reliableContext *context.ReliableContext, value int32)
