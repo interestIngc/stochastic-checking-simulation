@@ -359,16 +359,19 @@ func (p *Process) processProtocolMessage(
 	defer p.logMutex[author].Unlock()
 
 	msgState := p.messagesLog[author][bInstance.SeqNumber]
+	delivered := p.delivered(bInstance, value)
 
 	if msgState == nil {
-		if p.delivered(bInstance, value) {
+		if delivered {
 			return
 		} else {
 			msgState = p.initMessageState(reliableContext, bInstance, value)
 		}
 	}
 
-	msgState.receivedMessagesCnt++
+	if !delivered {
+		msgState.receivedMessagesCnt++
+	}
 
 	switch message.Stage {
 	case messages.ScalableProtocolMessage_GOSSIP_SUBSCRIBE:
@@ -445,7 +448,7 @@ func (p *Process) processProtocolMessage(
 		if msgState.deliverySample[senderId] > 0 {
 			msgState.deliverySampleStat[value] += msgState.deliverySample[senderId]
 
-			if !p.delivered(bInstance, value) &&
+			if !delivered &&
 				msgState.deliverySampleStat[value] >= p.deliveryThreshold {
 				p.deliver(bInstance, value)
 			}
