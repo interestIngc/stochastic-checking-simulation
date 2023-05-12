@@ -88,13 +88,15 @@ func GetNow() int64 {
 	return time.Now().UnixNano()
 }
 
-func Unmarshal(data []byte, message *messages.Message) error {
-	err := proto.Unmarshal(data, message)
+func Unmarshal(data []byte) (*messages.Message, error) {
+	msg := &messages.Message{}
+
+	err := proto.Unmarshal(data, msg)
 	if err != nil {
 		log.Printf("Could not unmarshal message: %v", data)
-		return err
+		return nil, err
 	}
-	return nil
+	return msg, nil
 }
 
 func Marshal(message *messages.Message) ([]byte, error) {

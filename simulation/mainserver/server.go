@@ -56,9 +56,7 @@ func (ms *MainServer) simulate() {
 
 func (ms *MainServer) receiveMessages() {
 	for data := range ms.readChan {
-		msg := &messages.Message{}
-
-		err := utils.Unmarshal(data, msg)
+		msg, err := utils.Unmarshal(data)
 		if err != nil {
 			continue
 		}

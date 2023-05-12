@@ -94,16 +94,14 @@ func (a *Actor) InitActor(
 
 func (a *Actor) receiveMessages() {
 	for data := range a.readChan {
-		msg := &messages.Message{}
-
-		err := utils.Unmarshal(data, msg)
+		msg, err := utils.Unmarshal(data)
 		if err != nil {
 			continue
 		}
 
 		content := msg.Content
-		ack, ok := content.(*messages.Message_Ack)
-		if ok {
+		ack, isAck := content.(*messages.Message_Ack)
+		if isAck {
 			a.context.OnAck(ack.Ack)
 			continue
 		}
@@ -134,22 +132,22 @@ func (a *Actor) receiveMessages() {
 
 func (a *Actor) Simulate() {
 	if a.stressTest {
-		a.sendMsg()
+		a.doBroadcast()
 		for {
 			select {
 			case <-a.ownDeliveredTransactions:
-				a.sendMsg()
+				a.doBroadcast()
 			}
 		}
 	} else {
 		for i := 0; i < a.transactionsToSendOut; i++ {
-			a.sendMsg()
+			a.doBroadcast()
 			time.Sleep(time.Duration(a.transactionInitTimeoutNs))
 		}
 	}
 }
 
-func (a *Actor) sendMsg() {
+func (a *Actor) doBroadcast() {
 	msg := a.context.MakeNewMessage()
 	msg.Content = &messages.Message_Broadcast{
 		Broadcast: &messages.Broadcast{

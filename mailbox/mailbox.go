@@ -84,6 +84,7 @@ func (m *Mailbox) sendMessages() {
 	for packet := range m.writeChannel {
 		go func(packet Packet) {
 			_, err := m.conn.WriteToUDP(packet.Data, m.udpAddresses[packet.To])
+
 			if err != nil {
 				log.Printf("Could not write data to udp: %e", err)
 			}
