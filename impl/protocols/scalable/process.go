@@ -74,7 +74,7 @@ type Process struct {
 
 	deliveredMessages map[ProcessId]map[int32]int32
 	messagesLog       map[ProcessId]map[int32]*messageState
-	logMutex map[ProcessId]*sync.RWMutex
+	logMutex          map[ProcessId]*sync.RWMutex
 
 	gossipSampleSize   int
 	echoSampleSize     int
@@ -85,8 +85,8 @@ type Process struct {
 	deliveryThreshold  int
 	cleanUpTimeout     time.Duration
 
-	logger *eventlogger.EventLogger
-	ownDeliveredTransactions chan bool
+	logger                       *eventlogger.EventLogger
+	ownDeliveredTransactions     chan bool
 	sendOwnDeliveredTransactions bool
 }
 

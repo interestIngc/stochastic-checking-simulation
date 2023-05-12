@@ -27,7 +27,7 @@ type Actor struct {
 	readChan chan []byte
 
 	ownDeliveredTransactions chan bool
-	stressTest bool
+	stressTest               bool
 }
 
 func (a *Actor) InitActor(
@@ -56,18 +56,18 @@ func (a *Actor) InitActor(
 	a.transactionInitTimeoutNs = transactionInitTimeoutNs
 
 	a.receivedMessages = make(map[int32]map[int32]bool)
-	writeChanMap := make(chan mailbox.Destination)
 	for i := 0; i <= n; i++ {
 		a.receivedMessages[int32(i)] = make(map[int32]bool)
 	}
 
 	a.readChan = make(chan []byte, 500)
+	writeChan := make(chan mailbox.Packet)
 
-	a.mailbox = mailbox.NewMailbox(processIndex, pids, writeChanMap, a.readChan)
+	a.mailbox = mailbox.NewMailbox(processIndex, pids, writeChan, a.readChan)
 	a.mailbox.SetUp()
 
 	a.context = &context.ReliableContext{}
-	a.context.InitContext(processIndex, logger, writeChanMap, retransmissionTimeoutNs)
+	a.context.InitContext(processIndex, logger, writeChan, retransmissionTimeoutNs)
 
 	a.ownDeliveredTransactions = make(chan bool, 200)
 
@@ -137,7 +137,7 @@ func (a *Actor) Simulate() {
 		a.sendMsg()
 		for {
 			select {
-			case <- a.ownDeliveredTransactions:
+			case <-a.ownDeliveredTransactions:
 				a.sendMsg()
 			}
 		}

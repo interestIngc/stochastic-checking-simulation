@@ -17,18 +17,18 @@ type ReliableContext struct {
 	retransmissionTimeoutNs int
 
 	messageCounter int32
-	counterMutex       *sync.RWMutex
+	counterMutex   *sync.RWMutex
 
-	writeChan chan mailbox.Destination
+	writeChan chan mailbox.Packet
 
 	receivedAcks map[int32]chan bool
-	mutex       *sync.RWMutex
+	mutex        *sync.RWMutex
 }
 
 func (c *ReliableContext) InitContext(
 	processIndex int32,
 	logger *log.Logger,
-	writeChan chan mailbox.Destination,
+	writeChan chan mailbox.Packet,
 	retransmissionTimeoutNs int,
 ) {
 	c.ProcessIndex = processIndex
@@ -61,8 +61,8 @@ func (c *ReliableContext) send(to int32, msg *messages.Message) {
 		log.Println("Error when serializing message")
 		return
 	}
-	c.writeChan <- mailbox.Destination{
-		To: to,
+	c.writeChan <- mailbox.Packet{
+		To:   to,
 		Data: data,
 	}
 	c.Logger.OnMessageSent(msg.Stamp)
@@ -80,11 +80,11 @@ func (c *ReliableContext) Send(to int32, msg *messages.Message) {
 		t := time.NewTicker(time.Duration(c.retransmissionTimeoutNs))
 		for {
 			select {
-				case <-ackChan:
-					return
-				case <-t.C:
-					msg.RetransmissionStamp++
-					c.send(to, msg)
+			case <-ackChan:
+				return
+			case <-t.C:
+				msg.RetransmissionStamp++
+				c.send(to, msg)
 			}
 		}
 	}()
@@ -104,13 +104,14 @@ func (c *ReliableContext) SendAck(sender int32, stamp int32) {
 
 func (c *ReliableContext) OnAck(ack *messages.Ack) {
 	c.mutex.RLock()
-	ackChan, exists := c.receivedAcks[ack.Stamp]
+	ackChan, pending := c.receivedAcks[ack.Stamp]
 	c.mutex.RUnlock()
-	if !exists {
+
+	if !pending {
 		return
 	}
-	ackChan <- true
 
+	ackChan <- true
 	c.mutex.Lock()
 	delete(c.receivedAcks, ack.Stamp)
 	c.mutex.Unlock()

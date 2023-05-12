@@ -7,16 +7,18 @@ import (
 	"strings"
 )
 
-type Destination struct {
-	To int32
+const BufferSize = 1024
+
+type Packet struct {
+	To   int32
 	Data []byte
 }
 
 type Mailbox struct {
-	id           int32                 // Process' own id
-	addresses    []string              // Addresses of all processes
-	writeChanMap chan Destination // Receive messages to send
-	readChan     chan []byte           // Send received messages to the process
+	id           int32          // Process own id
+	udpAddresses []*net.UDPAddr // UDP addresses of all processes
+	writeChannel chan Packet    // Receive messages to send
+	readChannel  chan []byte    // Send messages to other processes
 
 	conn *net.UDPConn
 }
@@ -24,73 +26,67 @@ type Mailbox struct {
 func NewMailbox(
 	ownId int32,
 	addresses []string,
-	writeChanMap chan Destination,
-	readChan chan []byte,
+	writeChannel chan Packet,
+	readChannel chan []byte,
 ) *Mailbox {
-	pC := new(Mailbox)
-	pC.id = ownId
-	pC.addresses = addresses
-	pC.writeChanMap = writeChanMap
-	pC.readChan = readChan
+	m := new(Mailbox)
+	m.id = ownId
+	m.writeChannel = writeChannel
+	m.readChannel = readChannel
 
-	address := pC.addresses[pC.id]
-	log.Printf("Listening To %s.\n", address)
-
-	addrSplit := strings.Split(address, ":")
-	port, err := strconv.Atoi(addrSplit[1])
-	addr := net.UDPAddr{
-		Port: port,
-		IP:   net.ParseIP(addrSplit[0]),
+	m.udpAddresses = make([]*net.UDPAddr, len(addresses))
+	for i, currAddress := range addresses {
+		hostAndPort := strings.Split(currAddress, ":")
+		port, err := strconv.Atoi(hostAndPort[1])
+		if err != nil {
+			log.Fatalf("Port %s is not an integer value\n", hostAndPort[1])
+		}
+		m.udpAddresses[i] = &net.UDPAddr{
+			Port: port,
+			IP:   net.ParseIP(hostAndPort[0]),
+		}
 	}
 
-	conn, err := net.ListenUDP("udp", &addr)
+	log.Printf("Listening To %s.\n", addresses[m.id])
 
+	conn, err := net.ListenUDP("udp", m.udpAddresses[m.id])
 	if err != nil {
-		log.Fatalf("P%d: Listening failed. %s\n", pC.id, err)
+		log.Fatalf("P%d: Listening failed: %e\n", m.id, err)
 	}
 
-	pC.conn = conn
+	m.conn = conn
 
-	return pC
+	return m
 }
 
-func (pC *Mailbox) SetUp() {
-	go pC.persistentList()
-	go pC.SendMessages()
+func (m *Mailbox) SetUp() {
+	go m.listenForMessages()
+	go m.sendMessages()
 }
 
-func (pC *Mailbox) persistentList() {
-	defer pC.conn.Close()
+func (m *Mailbox) listenForMessages() {
+	defer m.conn.Close()
 
 	for {
-		buf := make([]byte, 1024)
-		size, _, err := pC.conn.ReadFromUDP(buf)
+		buf := make([]byte, BufferSize)
+		size, _, err := m.conn.ReadFromUDP(buf)
 
 		if err != nil {
-			log.Printf("P%d: Failed when reading an incoming message. %d\n", pC.id, err)
+			log.Printf("P%d: Failed when reading an incoming message: %d\n", m.id, err)
 			return
 		}
 
-		pC.readChan <- buf[:size]
+		m.readChannel <- buf[:size]
 	}
-
 }
 
-func (pC *Mailbox) SendMessages() {
-	for dest := range pC.writeChanMap {
-		go func(dest Destination) {
-			address := make([]string, 2)
-			address = strings.Split(pC.addresses[dest.To], ":")
-			port, err := strconv.Atoi(address[1])
-			addr := net.UDPAddr{
-				Port: port,
-				IP:   net.ParseIP(address[0]),
-			}
-
-			_, err = pC.conn.WriteToUDP(dest.Data, &addr)
+func (m *Mailbox) sendMessages() {
+	for packet := range m.writeChannel {
+		go func(packet Packet) {
+			_, err := m.conn.WriteToUDP(packet.Data, m.udpAddresses[packet.To])
 			if err != nil {
-				log.Printf("Response err %v", err)
+				log.Printf("Could not write data to udp: %e", err)
 			}
-		}(dest)
+		}(packet)
 	}
 }

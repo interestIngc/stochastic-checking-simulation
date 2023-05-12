@@ -141,8 +141,8 @@ type Process struct {
 	wSelector   *hashing.WitnessesSelector
 	historyHash *hashing.HistoryHash
 
-	logger *eventlogger.EventLogger
-	ownDeliveredTransactions chan bool
+	logger                       *eventlogger.EventLogger
+	ownDeliveredTransactions     chan bool
 	sendOwnDeliveredTransactions bool
 }
 

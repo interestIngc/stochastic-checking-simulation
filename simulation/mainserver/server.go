@@ -32,14 +32,14 @@ func (ms *MainServer) InitMainServer(
 
 	ms.receivedMessages = make(map[int32]bool)
 
-	writeChanMap := make(chan mailbox.Destination)
+	writeChan := make(chan mailbox.Packet)
 
 	id := int32(ms.n)
-	ms.mailbox = mailbox.NewMailbox(id, actorPids, writeChanMap, ms.readChan)
+	ms.mailbox = mailbox.NewMailbox(id, actorPids, writeChan, ms.readChan)
 	ms.mailbox.SetUp()
 
 	ms.reliableContext = &context.ReliableContext{}
-	ms.reliableContext.InitContext(id, logger, writeChanMap, retransmissionTimeoutNs)
+	ms.reliableContext.InitContext(id, logger, writeChan, retransmissionTimeoutNs)
 
 	ms.receiveMessages()
 }

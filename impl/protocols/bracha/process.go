@@ -58,8 +58,8 @@ type Process struct {
 	messagesForReady    int
 	messagesForDelivery int
 
-	logger *eventlogger.EventLogger
-	ownDeliveredTransactions chan bool
+	logger                       *eventlogger.EventLogger
+	ownDeliveredTransactions     chan bool
 	sendOwnDeliveredTransactions bool
 }
 

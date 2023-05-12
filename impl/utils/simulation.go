@@ -104,4 +104,3 @@ func Marshal(message *messages.Message) ([]byte, error) {
 	}
 	return data, e
 }
-
