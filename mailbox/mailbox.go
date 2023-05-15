@@ -2,12 +2,15 @@ package mailbox
 
 import (
 	"log"
+	"math"
 	"net"
 	"strconv"
 	"strings"
 )
 
 const BufferSize = 1024
+
+var ReadBufferSize = int(math.Pow(2, 20))
 
 type Packet struct {
 	To   int32
@@ -52,6 +55,11 @@ func NewMailbox(
 	conn, err := net.ListenUDP("udp", m.udpAddresses[m.id])
 	if err != nil {
 		log.Fatalf("P%d: Listening failed: %e\n", m.id, err)
+	}
+
+	err = conn.SetReadBuffer(ReadBufferSize)
+	if err != nil {
+		log.Fatalf("P%d: Could not set read buffer size to %d", m.id, ReadBufferSize)
 	}
 
 	m.conn = conn
