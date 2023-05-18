@@ -23,6 +23,12 @@ func (el *EventLogger) Println(msg string) {
 	el.logger.Println(msg)
 }
 
+func (el *EventLogger) OnBroadcastStart() {
+	el.logger.Printf(
+		"Starting broadcast: %d, timestamp: %d\n",
+		el.pid, utils.GetNow())
+}
+
 func (el *EventLogger) OnSimulationStart() {
 	el.logger.Printf(
 		"Simulation started: %d, timestamp: %d\n",

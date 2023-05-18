@@ -11,8 +11,8 @@ import (
 )
 
 type ReliableContext struct {
-	ProcessIndex int32
-	Logger       *eventlogger.EventLogger
+	processIndex int32
+	eventLogger  *eventlogger.EventLogger
 
 	retransmissionTimeoutNs int
 
@@ -25,30 +25,34 @@ type ReliableContext struct {
 	mutex        *sync.RWMutex
 }
 
-func (c *ReliableContext) InitContext(
+func NewReliableContext(
 	processIndex int32,
-	logger *log.Logger,
 	writeChan chan mailbox.Packet,
 	retransmissionTimeoutNs int,
-) {
-	c.ProcessIndex = processIndex
-	c.Logger = eventlogger.InitEventLogger(processIndex, logger)
+	eventLogger *eventlogger.EventLogger,
+) *ReliableContext {
+	c := new(ReliableContext)
+	c.processIndex = processIndex
 
 	c.retransmissionTimeoutNs = retransmissionTimeoutNs
-	c.messageCounter = 0
+	c.eventLogger = eventLogger
 
 	c.writeChan = writeChan
+
+	c.messageCounter = 0
 
 	c.receivedAcks = make(map[int32]chan bool)
 	c.mutex = &sync.RWMutex{}
 	c.counterMutex = &sync.RWMutex{}
+
+	return c
 }
 
 func (c *ReliableContext) MakeNewMessage() *messages.Message {
 	c.counterMutex.Lock()
 	defer c.counterMutex.Unlock()
 	msg := &messages.Message{
-		Sender: c.ProcessIndex,
+		Sender: c.processIndex,
 		Stamp:  c.messageCounter,
 	}
 	c.messageCounter++
@@ -58,14 +62,14 @@ func (c *ReliableContext) MakeNewMessage() *messages.Message {
 func (c *ReliableContext) send(to int32, msg *messages.Message) {
 	data, e := utils.Marshal(msg)
 	if e != nil {
-		log.Println("Error when serializing message")
+		log.Printf("Error while serializing message happened: %e\n", e)
 		return
 	}
 	c.writeChan <- mailbox.Packet{
 		To:   to,
 		Data: data,
 	}
-	c.Logger.OnMessageSent(msg.Stamp)
+	c.eventLogger.OnMessageSent(msg.Stamp)
 }
 
 func (c *ReliableContext) Send(to int32, msg *messages.Message) {
@@ -116,5 +120,5 @@ func (c *ReliableContext) OnAck(ack *messages.Ack) {
 	delete(c.receivedAcks, ack.Stamp)
 	c.mutex.Unlock()
 
-	c.Logger.OnAckReceived(ack.Stamp)
+	c.eventLogger.OnAckReceived(ack.Stamp)
 }

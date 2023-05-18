@@ -9,7 +9,6 @@ import (
 
 type Process interface {
 	HandleMessage(
-		context *context.ReliableContext,
 		sender int32,
 		message *messages.BroadcastInstanceMessage,
 	)
@@ -18,10 +17,11 @@ type Process interface {
 		processIndex int32,
 		actorPids []string,
 		parameters *parameters.Parameters,
-		logger *eventlogger.EventLogger,
+		context *context.ReliableContext,
+		eventLogger *eventlogger.EventLogger,
 		ownDeliveredTransactions chan bool,
 		sendOwnDeliveredTransactions bool,
 	)
 
-	Broadcast(reliableContext *context.ReliableContext, value int32)
+	Broadcast(value int32)
 }

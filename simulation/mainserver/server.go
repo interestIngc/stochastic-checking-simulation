@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"stochastic-checking-simulation/context"
+	"stochastic-checking-simulation/impl/eventlogger"
 	"stochastic-checking-simulation/impl/messages"
 	"stochastic-checking-simulation/impl/utils"
 	"stochastic-checking-simulation/mailbox"
@@ -11,7 +12,7 @@ import (
 type MainServer struct {
 	n int
 
-	logger          *log.Logger
+	eventLogger     *eventlogger.EventLogger
 	reliableContext *context.ReliableContext
 
 	receivedMessages map[int32]bool
@@ -26,7 +27,6 @@ func (ms *MainServer) InitMainServer(
 	retransmissionTimeoutNs int,
 ) {
 	ms.n = len(actorPids) - 1
-	ms.logger = logger
 
 	ms.readChan = make(chan []byte, 500)
 
@@ -38,8 +38,15 @@ func (ms *MainServer) InitMainServer(
 	ms.mailbox = mailbox.NewMailbox(id, actorPids, writeChan, ms.readChan)
 	ms.mailbox.SetUp()
 
-	ms.reliableContext = &context.ReliableContext{}
-	ms.reliableContext.InitContext(id, logger, writeChan, retransmissionTimeoutNs)
+	ms.eventLogger = eventlogger.InitEventLogger(id, logger)
+
+	ms.reliableContext =
+		context.NewReliableContext(
+			id,
+			writeChan,
+			retransmissionTimeoutNs,
+			ms.eventLogger,
+		)
 
 	ms.receiveMessages()
 }
@@ -68,7 +75,7 @@ func (ms *MainServer) receiveMessages() {
 			sender := msg.Sender
 			stamp := msg.Stamp
 
-			ms.reliableContext.Logger.OnMessageReceived(sender, stamp)
+			ms.eventLogger.OnMessageReceived(sender, stamp)
 
 			ms.reliableContext.SendAck(sender, stamp)
 
@@ -78,7 +85,7 @@ func (ms *MainServer) receiveMessages() {
 			ms.receivedMessages[sender] = true
 
 			if len(ms.receivedMessages) == ms.n {
-				ms.logger.Printf("Starting broadcast, timestamp: %d\n", utils.GetNow())
+				ms.eventLogger.OnBroadcastStart()
 				ms.simulate()
 			}
 		}

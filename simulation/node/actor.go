@@ -4,6 +4,7 @@ import (
 	"log"
 	"math/rand"
 	"stochastic-checking-simulation/context"
+	"stochastic-checking-simulation/impl/eventlogger"
 	"stochastic-checking-simulation/impl/messages"
 	"stochastic-checking-simulation/impl/parameters"
 	"stochastic-checking-simulation/impl/protocols"
@@ -15,7 +16,8 @@ import (
 type Actor struct {
 	processIndex int32
 
-	context *context.ReliableContext
+	context     *context.ReliableContext
+	eventLogger *eventlogger.EventLogger
 
 	receivedMessages map[int32]map[int32]bool
 
@@ -66,8 +68,15 @@ func (a *Actor) InitActor(
 	a.mailbox = mailbox.NewMailbox(processIndex, pids, writeChan, a.readChan)
 	a.mailbox.SetUp()
 
-	a.context = &context.ReliableContext{}
-	a.context.InitContext(processIndex, logger, writeChan, retransmissionTimeoutNs)
+	a.eventLogger = eventlogger.InitEventLogger(processIndex, logger)
+
+	a.context =
+		context.NewReliableContext(
+			processIndex,
+			writeChan,
+			retransmissionTimeoutNs,
+			a.eventLogger,
+		)
 
 	a.ownDeliveredTransactions = make(chan bool, 200)
 
@@ -76,7 +85,8 @@ func (a *Actor) InitActor(
 		processIndex,
 		actorPids,
 		parameters,
-		a.context.Logger,
+		a.context,
+		a.eventLogger,
 		a.ownDeliveredTransactions,
 		stressTest,
 	)
@@ -109,7 +119,7 @@ func (a *Actor) receiveMessages() {
 		sender := msg.Sender
 		stamp := msg.Stamp
 
-		a.context.Logger.OnMessageReceived(sender, stamp)
+		a.eventLogger.OnMessageReceived(sender, stamp)
 
 		a.context.SendAck(sender, stamp)
 
@@ -120,12 +130,12 @@ func (a *Actor) receiveMessages() {
 
 		switch c := content.(type) {
 		case *messages.Message_Broadcast:
-			a.process.Broadcast(a.context, c.Broadcast.Value)
+			a.process.Broadcast(c.Broadcast.Value)
 		case *messages.Message_Simulate:
-			a.context.Logger.OnSimulationStart()
+			a.eventLogger.OnSimulationStart()
 			go a.Simulate()
 		case *messages.Message_BroadcastInstanceMessage:
-			a.process.HandleMessage(a.context, sender, c.BroadcastInstanceMessage)
+			a.process.HandleMessage(sender, c.BroadcastInstanceMessage)
 		}
 	}
 }

@@ -85,9 +85,93 @@ type Process struct {
 	deliveryThreshold  int
 	cleanUpTimeout     time.Duration
 
+	context                      *context.ReliableContext
 	logger                       *eventlogger.EventLogger
 	ownDeliveredTransactions     chan bool
 	sendOwnDeliveredTransactions bool
+}
+
+func (p *Process) InitProcess(
+	processIndex int32,
+	actorPids []string,
+	parameters *parameters.Parameters,
+	context *context.ReliableContext,
+	logger *eventlogger.EventLogger,
+	ownDeliveredTransactions chan bool,
+	sendOwnDeliveredTransactions bool,
+) {
+	p.processIndex = processIndex
+	p.n = len(actorPids)
+
+	p.transactionCounter = 0
+
+	p.deliveredMessages = make(map[ProcessId]map[int32]int32)
+	p.messagesLog = make(map[ProcessId]map[int32]*messageState)
+	p.logMutex = make(map[ProcessId]*sync.RWMutex)
+
+	for i := range actorPids {
+		p.deliveredMessages[ProcessId(i)] = make(map[int32]int32)
+		p.messagesLog[ProcessId(i)] = make(map[int32]*messageState)
+		p.logMutex[ProcessId(i)] = &sync.RWMutex{}
+	}
+
+	p.gossipSampleSize = parameters.GossipSampleSize
+	p.echoSampleSize = parameters.EchoSampleSize
+	p.echoThreshold = parameters.EchoThreshold
+	p.readySampleSize = parameters.ReadySampleSize
+	p.readyThreshold = parameters.ReadyThreshold
+	p.deliverySampleSize = parameters.DeliverySampleSize
+	p.deliveryThreshold = parameters.DeliveryThreshold
+	p.cleanUpTimeout = time.Duration(parameters.CleanUpTimeout)
+
+	p.context = context
+	p.logger = logger
+	p.ownDeliveredTransactions = ownDeliveredTransactions
+	p.sendOwnDeliveredTransactions = sendOwnDeliveredTransactions
+}
+
+func (p *Process) initMessageState(
+	bInstance *messages.BroadcastInstance,
+	value int32,
+) *messageState {
+	author := ProcessId(bInstance.Author)
+	msgState := newMessageState()
+
+	for i := 0; i < p.n; i++ {
+		msgState.receivedReady[ProcessId(i)] = make(map[int32]bool)
+	}
+
+	msgState.gossipSample = p.generateGossipSample()
+	p.broadcastToSet(
+		msgState.gossipSample,
+		bInstance,
+		&messages.ScalableProtocolMessage{
+			Stage: messages.ScalableProtocolMessage_GOSSIP_SUBSCRIBE,
+			Value: value,
+		})
+
+	msgState.echoSample =
+		p.sample(
+			messages.ScalableProtocolMessage_ECHO_SUBSCRIBE,
+			bInstance,
+			value,
+			p.echoSampleSize)
+	msgState.readySample =
+		p.sample(
+			messages.ScalableProtocolMessage_READY_SUBSCRIBE,
+			bInstance,
+			value,
+			p.readySampleSize)
+	msgState.deliverySample =
+		p.sample(
+			messages.ScalableProtocolMessage_READY_SUBSCRIBE,
+			bInstance,
+			value,
+			p.deliverySampleSize)
+
+	p.messagesLog[author][bInstance.SeqNumber] = msgState
+
+	return msgState
 }
 
 func (p *Process) getRandomPid(random *rand.Rand) ProcessId {
@@ -119,7 +203,6 @@ func (p *Process) generateGossipSample() map[ProcessId]int {
 }
 
 func (p *Process) sample(
-	reliableContext *context.ReliableContext,
 	stage messages.ScalableProtocolMessage_Stage,
 	bInstance *messages.BroadcastInstance,
 	value int32,
@@ -133,7 +216,6 @@ func (p *Process) sample(
 	}
 
 	p.broadcastToSet(
-		reliableContext,
 		sample,
 		bInstance,
 		&messages.ScalableProtocolMessage{
@@ -144,94 +226,7 @@ func (p *Process) sample(
 	return sample
 }
 
-func (p *Process) InitProcess(
-	processIndex int32,
-	actorPids []string,
-	parameters *parameters.Parameters,
-	logger *eventlogger.EventLogger,
-	ownDeliveredTransactions chan bool,
-	sendOwnDeliveredTransactions bool,
-) {
-	p.processIndex = processIndex
-	p.n = len(actorPids)
-
-	p.transactionCounter = 0
-
-	p.deliveredMessages = make(map[ProcessId]map[int32]int32)
-	p.messagesLog = make(map[ProcessId]map[int32]*messageState)
-	p.logMutex = make(map[ProcessId]*sync.RWMutex)
-
-	for i := range actorPids {
-		p.deliveredMessages[ProcessId(i)] = make(map[int32]int32)
-		p.messagesLog[ProcessId(i)] = make(map[int32]*messageState)
-		p.logMutex[ProcessId(i)] = &sync.RWMutex{}
-	}
-
-	p.gossipSampleSize = parameters.GossipSampleSize
-	p.echoSampleSize = parameters.EchoSampleSize
-	p.echoThreshold = parameters.EchoThreshold
-	p.readySampleSize = parameters.ReadySampleSize
-	p.readyThreshold = parameters.ReadyThreshold
-	p.deliverySampleSize = parameters.DeliverySampleSize
-	p.deliveryThreshold = parameters.DeliveryThreshold
-	p.cleanUpTimeout = time.Duration(parameters.CleanUpTimeout)
-
-	p.logger = logger
-	p.ownDeliveredTransactions = ownDeliveredTransactions
-	p.sendOwnDeliveredTransactions = sendOwnDeliveredTransactions
-}
-
-func (p *Process) initMessageState(
-	reliableContext *context.ReliableContext,
-	bInstance *messages.BroadcastInstance,
-	value int32,
-) *messageState {
-	author := ProcessId(bInstance.Author)
-	msgState := newMessageState()
-
-	for i := 0; i < p.n; i++ {
-		msgState.receivedReady[ProcessId(i)] = make(map[int32]bool)
-	}
-
-	msgState.gossipSample = p.generateGossipSample()
-	p.broadcastToSet(
-		reliableContext,
-		msgState.gossipSample,
-		bInstance,
-		&messages.ScalableProtocolMessage{
-			Stage: messages.ScalableProtocolMessage_GOSSIP_SUBSCRIBE,
-			Value: value,
-		})
-
-	msgState.echoSample =
-		p.sample(
-			reliableContext,
-			messages.ScalableProtocolMessage_ECHO_SUBSCRIBE,
-			bInstance,
-			value,
-			p.echoSampleSize)
-	msgState.readySample =
-		p.sample(
-			reliableContext,
-			messages.ScalableProtocolMessage_READY_SUBSCRIBE,
-			bInstance,
-			value,
-			p.readySampleSize)
-	msgState.deliverySample =
-		p.sample(
-			reliableContext,
-			messages.ScalableProtocolMessage_READY_SUBSCRIBE,
-			bInstance,
-			value,
-			p.deliverySampleSize)
-
-	p.messagesLog[author][bInstance.SeqNumber] = msgState
-
-	return msgState
-}
-
 func (p *Process) sendMessage(
-	reliableContext *context.ReliableContext,
 	to ProcessId,
 	bInstance *messages.BroadcastInstance,
 	message *messages.ScalableProtocolMessage,
@@ -243,27 +238,25 @@ func (p *Process) sendMessage(
 		},
 	}
 
-	msg := reliableContext.MakeNewMessage()
+	msg := p.context.MakeNewMessage()
 	msg.Content = &messages.Message_BroadcastInstanceMessage{
 		BroadcastInstanceMessage: bMessage,
 	}
 
-	reliableContext.Send(int32(to), msg)
+	p.context.Send(int32(to), msg)
 }
 
 func (p *Process) broadcastToSet(
-	reliableContext *context.ReliableContext,
 	set map[ProcessId]int,
 	bInstance *messages.BroadcastInstance,
 	msg *messages.ScalableProtocolMessage,
 ) {
 	for pid := range set {
-		p.sendMessage(reliableContext, pid, bInstance, msg)
+		p.sendMessage(pid, bInstance, msg)
 	}
 }
 
 func (p *Process) broadcastGossip(
-	reliableContext *context.ReliableContext,
 	msgState *messageState,
 	bInstance *messages.BroadcastInstance,
 	value int32,
@@ -274,14 +267,13 @@ func (p *Process) broadcastGossip(
 			Value: value,
 		}
 	p.broadcastToSet(
-		reliableContext,
 		msgState.gossipSample,
 		bInstance,
-		msgState.gossipMessage)
+		msgState.gossipMessage,
+	)
 }
 
 func (p *Process) broadcastReady(
-	reliableContext *context.ReliableContext,
 	msgState *messageState,
 	bInstance *messages.BroadcastInstance,
 	value int32,
@@ -289,13 +281,13 @@ func (p *Process) broadcastReady(
 	msgState.sentReadyMessages[value] = true
 
 	p.broadcastToSet(
-		reliableContext,
 		msgState.readySubscriptionSet,
 		bInstance,
 		&messages.ScalableProtocolMessage{
 			Stage: messages.ScalableProtocolMessage_READY,
 			Value: value,
-		})
+		},
+	)
 }
 
 func (p *Process) delivered(bInstance *messages.BroadcastInstance, value int32) bool {
@@ -333,21 +325,19 @@ func (p *Process) deliver(
 }
 
 func (p *Process) maybeSendReadyFromSieve(
-	reliableContext *context.ReliableContext,
 	msgState *messageState,
 	bInstance *messages.BroadcastInstance,
 ) {
 	if !msgState.sentReadyFromSieve && msgState.echoMessage != nil {
 		echoValue := msgState.echoMessage.Value
 		if msgState.echoMessagesStat[echoValue] >= p.echoThreshold {
-			p.broadcastReady(reliableContext, msgState, bInstance, echoValue)
+			p.broadcastReady(msgState, bInstance, echoValue)
 			msgState.sentReadyFromSieve = true
 		}
 	}
 }
 
 func (p *Process) processProtocolMessage(
-	reliableContext *context.ReliableContext,
 	senderId ProcessId,
 	bInstance *messages.BroadcastInstance,
 	message *messages.ScalableProtocolMessage,
@@ -365,7 +355,7 @@ func (p *Process) processProtocolMessage(
 		if delivered {
 			return
 		} else {
-			msgState = p.initMessageState(reliableContext, bInstance, value)
+			msgState = p.initMessageState(bInstance, value)
 		}
 	}
 
@@ -378,14 +368,14 @@ func (p *Process) processProtocolMessage(
 		msgState.gossipSample[senderId] = 1
 		if msgState.gossipMessage != nil {
 			p.sendMessage(
-				reliableContext,
 				senderId,
 				bInstance,
-				msgState.gossipMessage)
+				msgState.gossipMessage,
+			)
 		}
 	case messages.ScalableProtocolMessage_GOSSIP:
 		if msgState.gossipMessage == nil {
-			p.broadcastGossip(reliableContext, msgState, bInstance, value)
+			p.broadcastGossip(msgState, bInstance, value)
 		}
 		if msgState.echoMessage == nil {
 			msgState.echoMessage = &messages.ScalableProtocolMessage{
@@ -393,11 +383,11 @@ func (p *Process) processProtocolMessage(
 				Value: value,
 			}
 			p.broadcastToSet(
-				reliableContext,
 				msgState.echoSubscriptionSet,
 				bInstance,
-				msgState.echoMessage)
-			p.maybeSendReadyFromSieve(reliableContext, msgState, bInstance)
+				msgState.echoMessage,
+			)
+			p.maybeSendReadyFromSieve(msgState, bInstance)
 		}
 	case messages.ScalableProtocolMessage_ECHO_SUBSCRIBE:
 		if msgState.echoSubscriptionSet[senderId] > 0 {
@@ -406,7 +396,7 @@ func (p *Process) processProtocolMessage(
 
 		msgState.echoSubscriptionSet[senderId] = 1
 		if msgState.echoMessage != nil {
-			p.sendMessage(reliableContext, senderId, bInstance, msgState.echoMessage)
+			p.sendMessage(senderId, bInstance, msgState.echoMessage)
 		}
 	case messages.ScalableProtocolMessage_ECHO:
 		if msgState.echoSample[senderId] == 0 || msgState.receivedEcho[senderId] {
@@ -416,7 +406,7 @@ func (p *Process) processProtocolMessage(
 		msgState.receivedEcho[senderId] = true
 		msgState.echoMessagesStat[value] += msgState.echoSample[senderId]
 
-		p.maybeSendReadyFromSieve(reliableContext, msgState, bInstance)
+		p.maybeSendReadyFromSieve(msgState, bInstance)
 	case messages.ScalableProtocolMessage_READY_SUBSCRIBE:
 		if msgState.readySubscriptionSet[senderId] > 0 {
 			return
@@ -426,7 +416,6 @@ func (p *Process) processProtocolMessage(
 
 		for val := range msgState.sentReadyMessages {
 			p.sendMessage(
-				reliableContext,
 				senderId,
 				bInstance,
 				&messages.ScalableProtocolMessage{
@@ -441,7 +430,7 @@ func (p *Process) processProtocolMessage(
 
 			if !msgState.sentReadyMessages[value] &&
 				msgState.readySampleStat[value] >= p.readyThreshold {
-				p.broadcastReady(reliableContext, msgState, bInstance, value)
+				p.broadcastReady(msgState, bInstance, value)
 			}
 		}
 
@@ -457,7 +446,6 @@ func (p *Process) processProtocolMessage(
 }
 
 func (p *Process) HandleMessage(
-	reliableContext *context.ReliableContext,
 	sender int32,
 	broadcastInstanceMessage *messages.BroadcastInstanceMessage,
 ) {
@@ -466,7 +454,6 @@ func (p *Process) HandleMessage(
 	switch protocolMessage := broadcastInstanceMessage.Message.(type) {
 	case *messages.BroadcastInstanceMessage_ScalableProtocolMessage:
 		p.processProtocolMessage(
-			reliableContext,
 			ProcessId(sender),
 			bInstance,
 			protocolMessage.ScalableProtocolMessage,
@@ -476,10 +463,7 @@ func (p *Process) HandleMessage(
 	}
 }
 
-func (p *Process) Broadcast(
-	reliableContext *context.ReliableContext,
-	value int32,
-) {
+func (p *Process) Broadcast(value int32) {
 	author := p.processIndex
 	p.logMutex[ProcessId(author)].Lock()
 	defer p.logMutex[ProcessId(author)].Unlock()
@@ -489,8 +473,8 @@ func (p *Process) Broadcast(
 		SeqNumber: p.transactionCounter,
 	}
 
-	msgState := p.initMessageState(reliableContext, broadcastInstance, value)
-	p.broadcastGossip(reliableContext, msgState, broadcastInstance, value)
+	msgState := p.initMessageState(broadcastInstance, value)
+	p.broadcastGossip(msgState, broadcastInstance, value)
 
 	p.logger.OnTransactionInit(broadcastInstance)
 

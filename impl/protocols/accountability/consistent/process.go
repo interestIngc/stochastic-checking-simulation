@@ -47,6 +47,7 @@ type Process struct {
 	wSelector   *hashing.WitnessesSelector
 	historyHash *hashing.HistoryHash
 
+	context                      *context.ReliableContext
 	logger                       *eventlogger.EventLogger
 	ownDeliveredTransactions     chan bool
 	sendOwnDeliveredTransactions bool
@@ -56,6 +57,7 @@ func (p *Process) InitProcess(
 	processIndex int32,
 	actorPids []string,
 	parameters *parameters.Parameters,
+	context *context.ReliableContext,
 	logger *eventlogger.EventLogger,
 	ownDeliveredTransactions chan bool,
 	sendOwnDeliveredTransactions bool,
@@ -94,6 +96,7 @@ func (p *Process) InitProcess(
 	binCapacity := uint(math.Pow(2, float64(parameters.NodeIdSize/parameters.NumberOfBins)))
 	p.historyHash = hashing.NewHistoryHash(uint(parameters.NumberOfBins), binCapacity, hasher)
 
+	p.context = context
 	p.logger = logger
 	p.ownDeliveredTransactions = ownDeliveredTransactions
 	p.sendOwnDeliveredTransactions = sendOwnDeliveredTransactions
@@ -120,7 +123,6 @@ func (p *Process) initMessageState(
 }
 
 func (p *Process) sendMessage(
-	reliableContext *context.ReliableContext,
 	to ProcessId,
 	bInstance *messages.BroadcastInstance,
 	message *messages.ConsistentProtocolMessage,
@@ -132,21 +134,20 @@ func (p *Process) sendMessage(
 		},
 	}
 
-	msg := reliableContext.MakeNewMessage()
+	msg := p.context.MakeNewMessage()
 	msg.Content = &messages.Message_BroadcastInstanceMessage{
 		BroadcastInstanceMessage: bMessage,
 	}
 
-	reliableContext.Send(int32(to), msg)
+	p.context.Send(int32(to), msg)
 }
 
 func (p *Process) broadcast(
-	reliableContext *context.ReliableContext,
 	bInstance *messages.BroadcastInstance,
 	message *messages.ConsistentProtocolMessage,
 ) {
 	for _, pid := range p.actorPids {
-		p.sendMessage(reliableContext, pid, bInstance, message)
+		p.sendMessage(pid, bInstance, message)
 	}
 }
 
@@ -169,7 +170,6 @@ func (p *Process) deliver(bInstance *messages.BroadcastInstance, value int32) {
 }
 
 func (p *Process) verify(
-	reliableContext *context.ReliableContext,
 	senderId ProcessId,
 	bInstance *messages.BroadcastInstance,
 	value int32,
@@ -202,14 +202,13 @@ func (p *Process) verify(
 			Value: value,
 		}
 		for pid := range msgState.witnessSet {
-			p.sendMessage(reliableContext, p.actorPids[pid], bInstance, message)
+			p.sendMessage(p.actorPids[pid], bInstance, message)
 		}
 	}
 	return true
 }
 
 func (p *Process) HandleMessage(
-	reliableContext *context.ReliableContext,
 	sender int32,
 	broadcastInstanceMessage *messages.BroadcastInstanceMessage,
 ) {
@@ -220,35 +219,32 @@ func (p *Process) HandleMessage(
 		consistentMessage := protocolMessage.ConsistentProtocolMessage
 
 		doBroadcast := p.verify(
-			reliableContext,
 			ProcessId(sender),
 			bInstance,
-			consistentMessage.Value)
+			consistentMessage.Value,
+		)
 
 		if consistentMessage.Stage == messages.ConsistentProtocolMessage_VERIFY && doBroadcast {
 			p.broadcast(
-				reliableContext,
 				bInstance,
 				&messages.ConsistentProtocolMessage{
 					Stage: messages.ConsistentProtocolMessage_ECHO,
 					Value: consistentMessage.Value,
-				})
+				},
+			)
 		}
 	default:
 		p.logger.Fatal(fmt.Sprintf("Invalid protocol message type %t", protocolMessage))
 	}
 }
 
-func (p *Process) Broadcast(
-	reliableContext *context.ReliableContext,
-	value int32,
-) {
+func (p *Process) Broadcast(value int32) {
 	broadcastInstance := &messages.BroadcastInstance{
 		Author:    p.processIndex,
 		SeqNumber: p.transactionCounter,
 	}
 
-	p.verify(reliableContext, ProcessId(p.processIndex), broadcastInstance, value)
+	p.verify(ProcessId(p.processIndex), broadcastInstance, value)
 
 	p.logger.OnTransactionInit(broadcastInstance)
 
