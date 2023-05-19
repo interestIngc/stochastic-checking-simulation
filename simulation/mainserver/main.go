@@ -4,6 +4,7 @@ import (
 	"flag"
 	"log"
 	"stochastic-checking-simulation/impl/utils"
+	"stochastic-checking-simulation/simulation/actor"
 )
 
 var (
@@ -28,16 +29,19 @@ func main() {
 	f := utils.OpenLogFile(*logFile)
 	logger := log.New(f, "", log.LstdFlags)
 
+	n := *processCount
+
 	var pids []string
 	if *localRun {
-		pids = utils.GetLocalPids(*baseIpAddress, *basePort, *processCount)
+		pids = utils.GetLocalPids(*baseIpAddress, *basePort, n)
 	} else {
-		pids = utils.GetRemotePids(*baseIpAddress, *basePort, *processCount, logger)
+		pids = utils.GetRemotePids(*baseIpAddress, *basePort, n, logger)
 	}
 
-	ownId := utils.JoinIpAndPort(*baseIpAddress, *basePort)
-	pids = append(pids, ownId)
+	ownAddress := utils.JoinIpAndPort(*baseIpAddress, *basePort)
 
-	server := &MainServer{}
-	server.InitMainServer(pids, logger, *retransmissionTimeoutNs)
+	server := &MainServer{n: n}
+
+	a := actor.Actor{}
+	a.InitActor(int32(n), pids, ownAddress, server, logger, *retransmissionTimeoutNs)
 }

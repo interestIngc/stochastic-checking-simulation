@@ -8,11 +8,6 @@ import (
 )
 
 type Process interface {
-	HandleMessage(
-		sender int32,
-		message *messages.BroadcastInstanceMessage,
-	)
-
 	InitProcess(
 		processIndex int32,
 		actorPids []string,
@@ -21,6 +16,11 @@ type Process interface {
 		eventLogger *eventlogger.EventLogger,
 		ownDeliveredTransactions chan bool,
 		sendOwnDeliveredTransactions bool,
+	)
+
+	HandleMessage(
+		sender int32,
+		message *messages.BroadcastInstanceMessage,
 	)
 
 	Broadcast(value int32)

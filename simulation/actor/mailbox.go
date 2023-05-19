@@ -1,9 +1,10 @@
-package mailbox
+package actor
 
 import (
 	"log"
 	"math"
 	"net"
+	"stochastic-checking-simulation/context"
 	"strconv"
 	"strings"
 )
@@ -12,24 +13,19 @@ const BufferSize = 1024
 
 var ReadBufferSize = int(math.Pow(2, 20))
 
-type Packet struct {
-	To   int32
-	Data []byte
-}
-
 type Mailbox struct {
-	id           int32          // Process own id
-	udpAddresses []*net.UDPAddr // UDP addresses of all processes
-	writeChannel chan Packet    // Receive messages to send
-	readChannel  chan []byte    // Send messages to other processes
+	id           int32               // Process own id
+	udpAddresses []*net.UDPAddr      // UDP addresses of all processes
+	writeChannel chan context.Packet // Receive messages to send
+	readChannel  chan []byte         // Send messages to other processes
 
 	conn *net.UDPConn
 }
 
-func NewMailbox(
+func newMailbox(
 	ownId int32,
 	addresses []string,
-	writeChannel chan Packet,
+	writeChannel chan context.Packet,
 	readChannel chan []byte,
 ) *Mailbox {
 	m := new(Mailbox)
@@ -64,12 +60,10 @@ func NewMailbox(
 
 	m.conn = conn
 
-	return m
-}
-
-func (m *Mailbox) SetUp() {
 	go m.listenForMessages()
 	go m.sendMessages()
+
+	return m
 }
 
 func (m *Mailbox) listenForMessages() {
@@ -90,7 +84,7 @@ func (m *Mailbox) listenForMessages() {
 
 func (m *Mailbox) sendMessages() {
 	for packet := range m.writeChannel {
-		go func(packet Packet) {
+		go func(packet context.Packet) {
 			_, err := m.conn.WriteToUDP(packet.Data, m.udpAddresses[packet.To])
 
 			if err != nil {

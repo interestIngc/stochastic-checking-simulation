@@ -13,6 +13,7 @@ import (
 	"stochastic-checking-simulation/impl/protocols/bracha"
 	"stochastic-checking-simulation/impl/protocols/scalable"
 	"stochastic-checking-simulation/impl/utils"
+	"stochastic-checking-simulation/simulation/actor"
 )
 
 var (
@@ -79,7 +80,7 @@ func main() {
 		pids = utils.GetRemotePids(*baseIpAddress, *port, processCount, logger)
 	}
 
-	mainServer := utils.JoinIpAndPort(*baseIpAddress, *port)
+	mainServerAddr := utils.JoinIpAndPort(*baseIpAddress, *port)
 
 	var process protocols.Process
 
@@ -98,17 +99,20 @@ func main() {
 
 	logger.Printf("Running protocol: %s\n", input.Protocol)
 
-	a := &Actor{}
-	a.InitActor(
-		int32(*processIndex),
-		pids,
-		&input.Parameters,
-		logger,
-		mainServer,
-		*transactions,
-		*transactionInitTimeoutNs,
-		process,
-		*retransmissionTimeoutNs,
-		*makeStressTest,
-	)
+	id := int32(*processIndex)
+	node := &Node{
+		processIndex:             id,
+		pids:                     pids,
+		parameters:               &input.Parameters,
+		transactionsToSendOut:    *transactions,
+		transactionInitTimeoutNs: *transactionInitTimeoutNs,
+		process:                  process,
+		stressTest:               *makeStressTest,
+	}
+
+	copiedPids := make([]string, len(pids))
+	copy(copiedPids, pids)
+
+	a := actor.Actor{}
+	a.InitActor(id, copiedPids, mainServerAddr, node, logger, *retransmissionTimeoutNs)
 }

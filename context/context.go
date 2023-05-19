@@ -5,10 +5,14 @@ import (
 	"stochastic-checking-simulation/impl/eventlogger"
 	"stochastic-checking-simulation/impl/messages"
 	"stochastic-checking-simulation/impl/utils"
-	"stochastic-checking-simulation/mailbox"
 	"sync"
 	"time"
 )
+
+type Packet struct {
+	To   int32
+	Data []byte
+}
 
 type ReliableContext struct {
 	processIndex int32
@@ -19,7 +23,7 @@ type ReliableContext struct {
 	messageCounter int32
 	counterMutex   *sync.RWMutex
 
-	writeChan chan mailbox.Packet
+	writeChan chan Packet
 
 	receivedAcks map[int32]chan bool
 	mutex        *sync.RWMutex
@@ -27,7 +31,7 @@ type ReliableContext struct {
 
 func NewReliableContext(
 	processIndex int32,
-	writeChan chan mailbox.Packet,
+	writeChan chan Packet,
 	retransmissionTimeoutNs int,
 	eventLogger *eventlogger.EventLogger,
 ) *ReliableContext {
@@ -65,7 +69,7 @@ func (c *ReliableContext) send(to int32, msg *messages.Message) {
 		log.Printf("Error while serializing message happened: %e\n", e)
 		return
 	}
-	c.writeChan <- mailbox.Packet{
+	c.writeChan <- Packet{
 		To:   to,
 		Data: data,
 	}
