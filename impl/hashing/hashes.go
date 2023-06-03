@@ -5,6 +5,8 @@ import (
 	"crypto/sha512"
 )
 
+// Hasher is the interface that wraps a Hash method.
+// Hash applies a hash function to the given byte array.
 type Hasher interface {
 	Hash([]byte) []byte
 }

@@ -8,26 +8,32 @@ import (
 const modulo = uint(8)
 const dimension = uint(4)
 
-func TestBaseCopy(t *testing.T) {
-	mr := NewMultiRing(modulo, dimension)
+func makeDefaultMultiRing() *MultiRing {
+	vect := make([]int, dimension)
 	for i := uint(0); i < dimension; i++ {
-		mr.set(uint64(i), int(i))
+		vect[i] = int(i) % int(modulo)
 	}
+	return &MultiRing{
+		dimension: dimension,
+		modulo:    modulo,
+		vector:    vect,
+	}
+}
+
+func TestCopy_simple(t *testing.T) {
+	mr := makeDefaultMultiRing()
 
 	mrCopy := mr.copy()
 
 	assert.Equal(t, modulo, mrCopy.modulo)
 	assert.Equal(t, dimension, mrCopy.dimension)
-	for i := 0; i < int(dimension); i++ {
-		assert.Equal(t, i, mrCopy.vector[i])
+	for i := uint(0); i < dimension; i++ {
+		assert.Equal(t, int(i%modulo), mrCopy.vector[i])
 	}
 }
 
-func TestCopyInitialRingModified(t *testing.T) {
-	mr := NewMultiRing(modulo, dimension)
-	for i := uint(0); i < dimension; i++ {
-		mr.set(uint64(i), int(i))
-	}
+func TestCopy_initialRingModified(t *testing.T) {
+	mr := makeDefaultMultiRing()
 
 	mrCopy := mr.copy()
 
@@ -51,4 +57,45 @@ func TestMultiRingFromBytes(t *testing.T) {
 	for i := uint(0); i < dimension; i++ {
 		assert.Equal(t, int(i*10), mr.vector[i])
 	}
+}
+
+func TestMultiRingDistance_multiRingsEqual(t *testing.T) {
+	mr1 := makeDefaultMultiRing()
+	mr2 := makeDefaultMultiRing()
+
+	dist, e := multiRingDistance(mr1, mr2)
+
+	assert.Equal(t, nil, e)
+	assert.Equal(t, 0.0, dist)
+}
+
+func TestMultiRingDistance_OneElementDiff(t *testing.T) {
+	mr1 := makeDefaultMultiRing()
+	mr2 := makeDefaultMultiRing()
+	mr2.set(0, 2)
+
+	dist, e := multiRingDistance(mr1, mr2)
+
+	assert.Equal(t, nil, e)
+	assert.Equal(t, 2.0, dist)
+}
+
+func TestMultiRingDistance_oneElementDiff_roundDistance(t *testing.T) {
+	mr1 := makeDefaultMultiRing()
+	mr2 := makeDefaultMultiRing()
+	mr2.set(0, 6)
+
+	dist, e := multiRingDistance(mr1, mr2)
+
+	assert.Equal(t, nil, e)
+	assert.Equal(t, 2.0, dist)
+}
+
+func TestMultiRingDistance_differentModulo(t *testing.T) {
+	mr1 := NewMultiRing(2, dimension)
+	mr2 := NewMultiRing(3, dimension)
+
+	_, e := multiRingDistance(mr1, mr2)
+
+	assert.NotEqual(t, nil, e)
 }

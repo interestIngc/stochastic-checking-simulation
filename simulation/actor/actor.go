@@ -8,7 +8,13 @@ import (
 	"stochastic-checking-simulation/impl/utils"
 )
 
-type ActorImpl interface {
+const ChannelSize = 200
+
+// ActorInstance interface represents an instance of actor: either mainserver or node.
+// It exports two methods:
+// Start sets up current instance of actor;
+// ProcessMessage processes the given message.
+type ActorInstance interface {
 	Start(
 		context *context.ReliableContext,
 		eventLogger *eventlogger.EventLogger,
@@ -16,11 +22,13 @@ type ActorImpl interface {
 	ProcessMessage(message *messages.Message)
 }
 
+// Actor represents a basic actor.
+// It reads incoming messages, processes them and potentially sends messages to others.
 type Actor struct {
 	context     *context.ReliableContext
 	eventLogger *eventlogger.EventLogger
 
-	actorImpl ActorImpl
+	actorInstance ActorInstance
 
 	receivedMessages map[int32]map[int32]bool
 
@@ -32,7 +40,7 @@ func (a *Actor) InitActor(
 	processIndex int32,
 	nodeAddresses []string,
 	mainServerAddr string,
-	actorImpl ActorImpl,
+	actorInstance ActorInstance,
 	logger *log.Logger,
 	retransmissionTimeoutNs int,
 ) {
@@ -42,12 +50,12 @@ func (a *Actor) InitActor(
 		a.receivedMessages[int32(i)] = make(map[int32]bool)
 	}
 
-	a.readChan = make(chan []byte, 500)
-	writeChan := make(chan context.Packet)
+	a.readChan = make(chan []byte, ChannelSize)
+	writeChan := make(chan context.Packet, ChannelSize)
 
 	a.mailbox = newMailbox(processIndex, nodeAddresses, writeChan, a.readChan)
 
-	a.actorImpl = actorImpl
+	a.actorInstance = actorInstance
 	a.eventLogger = eventlogger.InitEventLogger(processIndex, logger)
 
 	a.context =
@@ -58,7 +66,7 @@ func (a *Actor) InitActor(
 			a.eventLogger,
 		)
 
-	a.actorImpl.Start(a.context, a.eventLogger)
+	a.actorInstance.Start(a.context, a.eventLogger)
 
 	a.receiveMessages()
 }
@@ -89,6 +97,6 @@ func (a *Actor) receiveMessages() {
 		}
 		a.receivedMessages[sender][stamp] = true
 
-		a.actorImpl.ProcessMessage(msg)
+		a.actorInstance.ProcessMessage(msg)
 	}
 }

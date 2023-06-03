@@ -14,6 +14,8 @@ type Packet struct {
 	Data []byte
 }
 
+// ReliableContext allows a process to send messages reliably, with possible retransmissions.
+// It retransmits message with a predefined timeout until acknowledgement is received.
 type ReliableContext struct {
 	processIndex int32
 	eventLogger  *eventlogger.EventLogger

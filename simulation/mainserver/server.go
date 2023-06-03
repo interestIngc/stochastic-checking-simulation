@@ -6,6 +6,8 @@ import (
 	"stochastic-checking-simulation/impl/messages"
 )
 
+// MainServer is an actor which waits until
+// receiving connections from all the nodes and then starts the simulation.
 type MainServer struct {
 	n int
 

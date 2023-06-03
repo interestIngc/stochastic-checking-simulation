@@ -7,6 +7,7 @@ import (
 	"stochastic-checking-simulation/impl/utils"
 )
 
+// EventLogger logs new events.
 type EventLogger struct {
 	pid    int32
 	logger *log.Logger

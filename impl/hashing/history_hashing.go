@@ -21,6 +21,7 @@ func NewHistoryHash(binNum uint, binCapacity uint, hasher Hasher) *HistoryHash {
 	return hh
 }
 
+// Insert adds a new transaction into the multiRing representing history hash
 func (hh *HistoryHash) Insert(bytes []byte) {
 	h := utils.ToUint64(hh.hasher.Hash(bytes))
 	binIndex := h % uint64(hh.binNum)
@@ -31,6 +32,7 @@ func (hh *HistoryHash) Insert(bytes []byte) {
 	hh.bins.add(binIndex, direction)
 }
 
+// ToString converts the current historyHash to string
 func (hh *HistoryHash) ToString() string {
 	return fmt.Sprintf("%v", hh.bins.vector)
 }

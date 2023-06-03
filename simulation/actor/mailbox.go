@@ -13,6 +13,7 @@ const BufferSize = 1024
 
 var ReadBufferSize = int(math.Pow(2, 20))
 
+// Mailbox allows an actor to read and send messages from or to other actors in the system.
 type Mailbox struct {
 	id           int32               // Process own id
 	udpAddresses []*net.UDPAddr      // UDP addresses of all processes

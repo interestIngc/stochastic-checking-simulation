@@ -10,6 +10,7 @@ import (
 	"time"
 )
 
+// Node represents an actor executing the reliable broadcast protocol.
 type Node struct {
 	processIndex int32
 	pids         []string

@@ -8,6 +8,7 @@ import (
 	"strconv"
 )
 
+// WitnessesSelector enables witness set selection.
 type WitnessesSelector struct {
 	Hasher Hasher
 
@@ -36,14 +37,12 @@ func (bd byDist) Less(i, j int) bool {
 	return bd[i].d < bd[j].d
 }
 
+// GetWitnessSet returns own and potential witness sets for a given transaction,
+// which is identified by a pair of authorId and seqNumber, and a given history hash.
 func (ws *WitnessesSelector) GetWitnessSet(
 	nodeIds []string,
 	authorIndex int32, seqNumber int32, historyHash *HistoryHash,
 ) (map[string]bool, map[string]bool) {
-	//transaction := utils.TransactionToBytes(author, seqNumber)
-	//transactionRing := multiRingFromBytes(
-	//	256, historyHash.binNum, ws.Hasher.Hash(transaction))
-
 	distances := make([]dist, len(nodeIds))
 	for i, pid := range nodeIds {
 		historyHashRingCopy := historyHash.bins.copy()
@@ -59,8 +58,7 @@ func (ws *WitnessesSelector) GetWitnessSet(
 
 		idRing.merge(historyHashRingCopy)
 		defaultRing := NewMultiRing(historyHash.binCapacity, historyHash.binNum)
-		d, e := multiRingDistance(defaultRing, idRing, 1.0)
-		//d, e := multiRingDistanceLInf(defaultRing, idRing)
+		d, e := multiRingDistance(defaultRing, idRing)
 
 		if e != nil {
 			log.Printf("Error while generating a witness set happened: %s\n", e)
