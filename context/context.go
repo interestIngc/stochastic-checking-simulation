@@ -79,12 +79,12 @@ func (c *ReliableContext) send(to int32, msg *messages.Message) {
 }
 
 func (c *ReliableContext) Send(to int32, msg *messages.Message) {
-	c.send(to, msg)
-
 	c.mutex.Lock()
 	ackChan := make(chan bool)
 	c.receivedAcks[msg.Stamp] = ackChan
 	c.mutex.Unlock()
+
+	c.send(to, msg)
 
 	go func() {
 		t := time.NewTicker(time.Duration(c.retransmissionTimeoutNs))
@@ -113,18 +113,13 @@ func (c *ReliableContext) SendAck(sender int32, stamp int32) {
 }
 
 func (c *ReliableContext) OnAck(ack *messages.Ack) {
-	c.mutex.RLock()
 	ackChan, pending := c.receivedAcks[ack.Stamp]
-	c.mutex.RUnlock()
-
 	if !pending {
 		return
 	}
 
 	ackChan <- true
-	c.mutex.Lock()
 	delete(c.receivedAcks, ack.Stamp)
-	c.mutex.Unlock()
 
 	c.eventLogger.OnAckReceived(ack.Stamp)
 }
