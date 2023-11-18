@@ -16,18 +16,13 @@ func JoinIpAndPort(ip string, port int) string {
 	return fmt.Sprintf("%s:%d", ip, port)
 }
 
-func GetLocalPids(baseIp string, basePort int, processCount int) []string {
-	pids := make([]string, processCount)
-
-	for i := 0; i < processCount; i++ {
-		currPort := basePort + i + 1
-		pids[i] = JoinIpAndPort(baseIp, currPort)
-	}
-
-	return pids
-}
-
-func GetRemotePids(baseIp string, basePort int, processCount int, logger *log.Logger) []string {
+func GeneratePids(
+	baseIp string,
+	basePort int,
+	nodes int,
+	processesPerNode int,
+	logger *log.Logger,
+) []string {
 	const Bytes = 4
 
 	ipBytes := make([]int, Bytes)
@@ -35,7 +30,7 @@ func GetRemotePids(baseIp string, basePort int, processCount int, logger *log.Lo
 	var e error
 	for i, currByte := range strings.Split(baseIp, ".") {
 		ipBytes[i], e = strconv.Atoi(currByte)
-		if e != nil {
+		if e != nil || ipBytes[i] < 0 || ipBytes[i] > 255 {
 			logger.Fatalf("Byte %d in base ip address is invalid", i)
 		}
 		if i >= Bytes {
@@ -43,9 +38,10 @@ func GetRemotePids(baseIp string, basePort int, processCount int, logger *log.Lo
 		}
 	}
 
-	pids := make([]string, processCount)
+	nodeIps := make([]string, nodes)
 
-	for i := 0; i < processCount; i++ {
+	nodeIps[0] = baseIp
+	for i := 1; i < nodes; i++ {
 		leftByteInd := Bytes - 1
 		for ; leftByteInd >= 0 && ipBytes[leftByteInd] == 255; leftByteInd-- {
 		}
@@ -61,9 +57,15 @@ func GetRemotePids(baseIp string, basePort int, processCount int, logger *log.Lo
 		for ind := 0; ind < Bytes; ind++ {
 			ipBytesAsStr[ind] = strconv.Itoa(ipBytes[ind])
 		}
-		currIp := strings.Join(ipBytesAsStr, ".")
+		nodeIps[i] = strings.Join(ipBytesAsStr, ".")
+	}
 
-		pids[i] = JoinIpAndPort(currIp, basePort)
+	pids := make([]string, nodes*processesPerNode)
+
+	for i, ip := range nodeIps {
+		for j := 0; j < processesPerNode; j++ {
+			pids[i*processesPerNode+j] = JoinIpAndPort(ip, basePort+j)
+		}
 	}
 
 	return pids

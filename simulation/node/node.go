@@ -36,9 +36,10 @@ func (node *Node) Start(
 
 	node.ownDeliveredTransactions = make(chan bool, 200)
 
+	mainServerAddr := int32(len(node.pids)) - 1
 	node.process.InitProcess(
 		node.processIndex,
-		node.pids,
+		node.pids[:mainServerAddr],
 		node.parameters,
 		node.context,
 		node.eventLogger,
@@ -50,7 +51,7 @@ func (node *Node) Start(
 	startedMessage.Content = &messages.Message_Started{
 		Started: &messages.Started{},
 	}
-	node.context.Send(int32(len(node.pids)), startedMessage)
+	node.context.Send(mainServerAddr, startedMessage)
 }
 
 func (node *Node) ProcessMessage(message *messages.Message) {

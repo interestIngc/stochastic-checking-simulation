@@ -9,14 +9,13 @@ import (
 
 var (
 	processCount = flag.Int("n", 0, "Number of processes in the system (excluding the main server)")
+	nodes        = flag.Int("nodes", 1, "Number of nodes on which processes are started")
 	logFile      = flag.String(
 		"log_file",
 		"",
 		"Path to the file where to save logs produced by the main server")
-	baseIpAddress = flag.String("ip", "10.0.0.1", "Ip address of the main server")
-	basePort      = flag.Int("port", 5001, "Port on which the main server should be started")
-	localRun      = flag.Bool("local_run", false,
-		"Defines whether to start the simulation locally, i.e. on a single machine, or in a distributed system")
+	baseIpAddress           = flag.String("base_ip", "10.0.0.1", "Ip address of the main server")
+	basePort                = flag.Int("base_port", 5001, "Port on which the main server should be started")
 	retransmissionTimeoutNs = flag.Int(
 		"retransmission_timeout_ns",
 		6000000000,
@@ -31,17 +30,18 @@ func main() {
 
 	n := *processCount
 
-	var pids []string
-	if *localRun {
-		pids = utils.GetLocalPids(*baseIpAddress, *basePort, n)
-	} else {
-		pids = utils.GetRemotePids(*baseIpAddress, *basePort, n, logger)
+	if (n+1)%*nodes != 0 {
+		logger.Fatal(
+			"Total number of started processes, including the mainserver, must be divisible by the number of nodes",
+		)
 	}
 
-	ownAddress := utils.JoinIpAndPort(*baseIpAddress, *basePort)
+	processesPerNode := (n + 1) / *nodes
+
+	pids := utils.GeneratePids(*baseIpAddress, *basePort, *nodes, processesPerNode, logger)
 
 	server := &MainServer{n: n}
 
 	a := actor.Actor{}
-	a.InitActor(int32(n), pids, ownAddress, server, logger, *retransmissionTimeoutNs)
+	a.InitActor(int32(n), pids, server, logger, *retransmissionTimeoutNs)
 }

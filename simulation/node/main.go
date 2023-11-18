@@ -21,15 +21,14 @@ var (
 	logFile   = flag.String("log_file", "",
 		"Path to the file where to save logs produced by the process")
 	processIndex = flag.Int("i", 0, "Index of the current process in the system")
+	nodes        = flag.Int("nodes", 1, "Number of nodes on which processes are started")
 	transactions = flag.Int("transactions", 5,
 		"number of transactions for the process to broadcast")
 	transactionInitTimeoutNs = flag.Int("transaction_init_timeout_ns", 10000000,
 		"timeout the process should wait before initialising a new transaction")
 	baseIpAddress = flag.String("base_ip", "10.0.0.1",
 		"Address of the main server. Ip addresses for nodes are assigned by incrementing base_ip n times")
-	port     = flag.Int("port", 5001, "Port on which the node should be started")
-	localRun = flag.Bool("local_run", false,
-		"Defines whether to start the simulation locally, i.e. on a single machine, or in a distributed system")
+	basePort                = flag.Int("base_port", 5001, "Port on which the process should be started")
 	retransmissionTimeoutNs = flag.Int(
 		"retransmission_timeout_ns",
 		6000000000,
@@ -73,14 +72,15 @@ func main() {
 
 	processCount := input.Parameters.ProcessCount
 
-	var pids []string
-	if *localRun {
-		pids = utils.GetLocalPids(*baseIpAddress, *port, processCount)
-	} else {
-		pids = utils.GetRemotePids(*baseIpAddress, *port, processCount, logger)
+	if (processCount+1)%*nodes != 0 {
+		logger.Fatal(
+			"Total number of started processes, including the mainserver, must be divisible by the number of nodes",
+		)
 	}
 
-	mainServerAddr := utils.JoinIpAndPort(*baseIpAddress, *port)
+	processesPerNode := (processCount + 1) / *nodes
+
+	pids := utils.GeneratePids(*baseIpAddress, *basePort, *nodes, processesPerNode, logger)
 
 	var process protocols.Process
 
@@ -110,9 +110,6 @@ func main() {
 		stressTest:               *makeStressTest,
 	}
 
-	copiedPids := make([]string, len(pids))
-	copy(copiedPids, pids)
-
 	a := actor.Actor{}
-	a.InitActor(id, copiedPids, mainServerAddr, node, logger, *retransmissionTimeoutNs)
+	a.InitActor(id, pids, node, logger, *retransmissionTimeoutNs)
 }

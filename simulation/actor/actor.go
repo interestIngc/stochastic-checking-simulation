@@ -39,12 +39,10 @@ type Actor struct {
 func (a *Actor) InitActor(
 	processIndex int32,
 	nodeAddresses []string,
-	mainServerAddr string,
 	actorInstance ActorInstance,
 	logger *log.Logger,
 	retransmissionTimeoutNs int,
 ) {
-	nodeAddresses = append(nodeAddresses, mainServerAddr)
 	a.receivedMessages = make(map[int32]map[int32]bool)
 	for i := range nodeAddresses {
 		a.receivedMessages[int32(i)] = make(map[int32]bool)
