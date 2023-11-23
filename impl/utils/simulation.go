@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"google.golang.org/protobuf/proto"
 	"log"
+	"math"
 	"os"
 	"path/filepath"
 	"stochastic-checking-simulation/impl/messages"
@@ -12,35 +13,18 @@ import (
 	"time"
 )
 
+const Bytes = 4
+
 func JoinIpAndPort(ip string, port int) string {
 	return fmt.Sprintf("%s:%d", ip, port)
 }
 
-func GeneratePids(
-	baseIp string,
-	basePort int,
-	nodes int,
-	processesPerNode int,
-	logger *log.Logger,
-) []string {
-	const Bytes = 4
-
-	ipBytes := make([]int, Bytes)
-
-	var e error
-	for i, currByte := range strings.Split(baseIp, ".") {
-		ipBytes[i], e = strconv.Atoi(currByte)
-		if e != nil || ipBytes[i] < 0 || ipBytes[i] > 255 {
-			logger.Fatalf("Byte %d in base ip address is invalid", i)
-		}
-		if i >= Bytes {
-			logger.Fatal("Base ip address must be ipv4")
-		}
-	}
+func GenerateStarTopology(nodes int, baseIp string, logger *log.Logger) []string {
+	ipBytes := parseIpv4(baseIp, logger)
 
 	nodeIps := make([]string, nodes)
-
 	nodeIps[0] = baseIp
+
 	for i := 1; i < nodes; i++ {
 		leftByteInd := Bytes - 1
 		for ; leftByteInd >= 0 && ipBytes[leftByteInd] == 255; leftByteInd-- {
@@ -53,18 +37,54 @@ func GeneratePids(
 			ipBytes[ind] = 0
 		}
 
-		ipBytesAsStr := make([]string, Bytes)
-		for ind := 0; ind < Bytes; ind++ {
-			ipBytesAsStr[ind] = strconv.Itoa(ipBytes[ind])
-		}
-		nodeIps[i] = strings.Join(ipBytesAsStr, ".")
+		nodeIps[i] = convertIpByteArrayToStr(ipBytes)
 	}
 
-	pids := make([]string, nodes*processesPerNode)
+	return nodeIps
+}
 
-	for i, ip := range nodeIps {
-		for j := 0; j < processesPerNode; j++ {
-			pids[i*processesPerNode+j] = JoinIpAndPort(ip, basePort+j)
+func GenerateTreeTopology(
+	numberOfChildren int,
+	nodes int,
+	baseIp string,
+	logger *log.Logger,
+) []string {
+	nodeIps := make([]string, nodes)
+
+	currIp := parseIpv4(baseIp, logger)
+
+	for i := 0; i < nodes; i++ {
+		endIp := byte(i + 1)
+		lowSubnet := byte(i / numberOfChildren)
+		upSubnet := byte(i / (int(math.Pow(float64(numberOfChildren), 2))))
+
+		currIp[3] = endIp
+		currIp[2] = lowSubnet
+		currIp[1] = upSubnet
+		nodeIps[i] = convertIpByteArrayToStr(currIp)
+	}
+
+	return nodeIps
+}
+
+func GeneratePids(
+	nodeIps []string,
+	basePort int,
+	processCount int,
+) []string {
+	pids := make([]string, processCount)
+
+	nodes := len(nodeIps)
+	processesPerNode := processCount / nodes
+
+	currNodeInd := 0
+	nodeProcessId := 0
+	for i := 0; i < processCount; i++ {
+		pids[i] = JoinIpAndPort(nodeIps[currNodeInd], basePort+nodeProcessId)
+		nodeProcessId++
+		if nodeProcessId == processesPerNode && currNodeInd < nodes-1 {
+			currNodeInd++
+			nodeProcessId = 0
 		}
 	}
 
@@ -107,4 +127,30 @@ func Marshal(message *messages.Message) ([]byte, error) {
 		log.Printf("Could not marshal message, %e", e)
 	}
 	return data, e
+}
+
+func parseIpv4(ip string, logger *log.Logger) []byte {
+	splittedIp := strings.Split(ip, ".")
+	if len(splittedIp) != Bytes {
+		logger.Fatal("Ip address %s is invalid", ip)
+	}
+
+	ipBytes := make([]byte, Bytes)
+	for i, currByte := range splittedIp {
+		byteAsInt, e := strconv.Atoi(currByte)
+		if e != nil || byteAsInt < 0 || byteAsInt > 255 {
+			logger.Fatalf("Ip address %s is invalid, byte at index %d is %s", ip, i, currByte)
+		}
+		ipBytes[i] = byte(byteAsInt)
+	}
+
+	return ipBytes
+}
+
+func convertIpByteArrayToStr(ipBytes []byte) string {
+	ipBytesAsStr := make([]string, Bytes)
+	for ind := 0; ind < Bytes; ind++ {
+		ipBytesAsStr[ind] = strconv.Itoa(int(ipBytes[ind]))
+	}
+	return strings.Join(ipBytesAsStr, ".")
 }

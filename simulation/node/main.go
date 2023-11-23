@@ -37,6 +37,9 @@ var (
 		"stress_test",
 		false,
 		"Defines whether to run the stress test. In this case, transactions are sent out infinitely")
+	topology = flag.String("topo", "star",
+		"Topology used to run the simulation on Mininet. One of: 'star', 'tree'")
+	numberOfChildren = flag.Int("number_of_children", 4, "Number of children in a tree topology")
 )
 
 type Input struct {
@@ -70,17 +73,17 @@ func main() {
 		logger.Fatal("Parameter protocol is mandatory")
 	}
 
-	processCount := input.Parameters.ProcessCount
-
-	if (processCount+1)%*nodes != 0 {
-		logger.Fatal(
-			"Total number of started processes, including the mainserver, must be divisible by the number of nodes",
-		)
+	var nodeIps []string
+	switch *topology {
+	case "star":
+		nodeIps = utils.GenerateStarTopology(*nodes, *baseIpAddress, logger)
+	case "tree":
+		nodeIps = utils.GenerateTreeTopology(*numberOfChildren, *nodes, *baseIpAddress, logger)
+	default:
+		logger.Fatal("This topology is not supported. It should be one of: 'star', 'tree'")
 	}
 
-	processesPerNode := (processCount + 1) / *nodes
-
-	pids := utils.GeneratePids(*baseIpAddress, *basePort, *nodes, processesPerNode, logger)
+	pids := utils.GeneratePids(nodeIps, *basePort, input.Parameters.ProcessCount+1)
 
 	var process protocols.Process
 
