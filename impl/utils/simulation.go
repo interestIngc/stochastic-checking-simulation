@@ -77,7 +77,7 @@ func GeneratePids(
 	nodes := len(nodeIps)
 
 	for i := 0; i < processCount; i++ {
-		pids[i] = JoinIpAndPort(nodeIps[i%nodes], basePort+i/nodes)
+		pids[i] = JoinIpAndPort(nodeIps[i%nodes], basePort+i)
 	}
 
 	return pids
