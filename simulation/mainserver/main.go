@@ -23,6 +23,7 @@ var (
 	topology = flag.String("topo", "star",
 		"Topology used to run the simulation on Mininet. One of: 'star', 'tree'")
 	numberOfChildren = flag.Int("number_of_children", 4, "Number of children in a tree topology")
+	messageDelay     = flag.Int("message_delay", 0, "Minimal delay between consecutive message dispatches")
 )
 
 func main() {
@@ -48,5 +49,5 @@ func main() {
 	server := &MainServer{n: n}
 
 	a := actor.Actor{}
-	a.InitActor(int32(n), pids, server, logger, *retransmissionTimeoutNs)
+	a.InitActor(int32(n), pids, server, logger, *retransmissionTimeoutNs, *messageDelay)
 }

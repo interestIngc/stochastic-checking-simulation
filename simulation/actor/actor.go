@@ -8,7 +8,7 @@ import (
 	"stochastic-checking-simulation/impl/utils"
 )
 
-const ChannelSize = 200
+const ChannelSize = 1024
 
 // ActorInstance interface represents an instance of actor: either mainserver or node.
 // It exports two methods:
@@ -42,6 +42,7 @@ func (a *Actor) InitActor(
 	actorInstance ActorInstance,
 	logger *log.Logger,
 	retransmissionTimeoutNs int,
+	messageDelay int,
 ) {
 	a.receivedMessages = make(map[int32]map[int32]bool)
 	for i := range nodeAddresses {
@@ -51,7 +52,7 @@ func (a *Actor) InitActor(
 	a.readChan = make(chan []byte, ChannelSize)
 	writeChan := make(chan context.Packet, ChannelSize)
 
-	a.mailbox = newMailbox(processIndex, nodeAddresses, writeChan, a.readChan)
+	a.mailbox = newMailbox(processIndex, nodeAddresses, writeChan, a.readChan, messageDelay)
 
 	a.actorInstance = actorInstance
 	a.eventLogger = eventlogger.InitEventLogger(processIndex, logger)
@@ -76,19 +77,19 @@ func (a *Actor) receiveMessages() {
 			continue
 		}
 
-		content := msg.Content
-		ack, isAck := content.(*messages.Message_Ack)
-		if isAck {
-			a.context.OnAck(ack.Ack)
-			continue
-		}
+		//content := msg.Content
+		//ack, isAck := content.(*messages.Message_Ack)
+		//if isAck {
+		//	a.context.OnAck(ack.Ack)
+		//	continue
+		//}
 
 		sender := msg.Sender
 		stamp := msg.Stamp
 
 		a.eventLogger.OnMessageReceived(sender, stamp)
 
-		a.context.SendAck(sender, stamp)
+		//a.context.SendAck(sender, stamp)
 
 		if a.receivedMessages[sender][stamp] {
 			continue
