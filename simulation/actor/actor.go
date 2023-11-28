@@ -8,7 +8,7 @@ import (
 	"stochastic-checking-simulation/impl/utils"
 )
 
-const ChannelSize = 1024
+const ChannelSize = 100000
 
 // ActorInstance interface represents an instance of actor: either mainserver or node.
 // It exports two methods:
