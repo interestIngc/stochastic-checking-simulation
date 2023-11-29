@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import json
+import sys
 
 SENT_MESSAGE = "Sent message"
 RECEIVED_MESSAGE = "Received message"
@@ -150,12 +150,13 @@ def parse_data_from_files(directory, n):
 
 def calc_message_latencies(sent_messages, received_messages):
     latencies = []
+    lost_messages_cnt = 0
     for message, send_timestamp in sent_messages.items():
         receive_timestamp = received_messages.get(message)
         if receive_timestamp is None:
+            lost_messages_cnt += 1
             continue
-        latency = receive_timestamp - send_timestamp
-        latencies.append(latency)
+        latencies.append(receive_timestamp - send_timestamp)
 
     if len(latencies) == 0:
         return 0, 0, 0
@@ -167,7 +168,7 @@ def calc_message_latencies(sent_messages, received_messages):
         max_latency = max(max_latency, latency)
         sum_latency += latency
 
-    return min_latency, max_latency, sum_latency / len(latencies)
+    return lost_messages_cnt, len(sent_messages), min_latency, max_latency, sum_latency / len(latencies)
 
 
 def calc_transaction_stat(n, transaction_inits, transaction_commit_infos, simulation_start, simulation_end):
@@ -247,10 +248,10 @@ def get_histories_diff_metrics(transaction_histories, n):
     return metrics
 
 
-def calculate_stat(protocol, directory, n):
+def calculate_stat(directory, n):
     data = parse_data_from_files(directory, n)
 
-    min_message_latency, max_message_latency, avg_message_latency = \
+    lost_messages_cnt, total_messages_cnt, min_message_latency, max_message_latency, avg_message_latency = \
         calc_message_latencies(
             sent_messages=data["sent_messages"],
             received_messages=data["received_messages"]
@@ -264,7 +265,9 @@ def calculate_stat(protocol, directory, n):
             simulation_end=data["simulation_end"]
         )
 
-    results = {
+    return {
+        "lost_messages_cnt": lost_messages_cnt,
+        "total_messages_cnt": total_messages_cnt,
         "min_message_latency": min_message_latency / 1e9,
         "max_message_latency": max_message_latency / 1e9,
         "avg_message_latency": avg_message_latency / 1e9,
@@ -275,47 +278,25 @@ def calculate_stat(protocol, directory, n):
         "throughput": throughput,
     }
 
-    if protocol in {CONSISTENT_ACCOUNTABILITY, RELIABLE_ACCOUNTABILITY}:
-        results["own_witness_sets_diff_metrics"] = \
-            get_witness_sets_diff_metrics(
-                transaction_witness_sets=data["transaction_witness_sets"],
-                n=n,
-                ws_type="own"
-            )
-        if protocol == RELIABLE_ACCOUNTABILITY:
-            results["pot_witness_sets_diff_metrics"] = \
-                get_witness_sets_diff_metrics(
-                    transaction_witness_sets=data["transaction_witness_sets"],
-                    n=n,
-                    ws_type="pot"
-                )
-        results["histories_diff_metrics"] = \
-            get_histories_diff_metrics(
-                transaction_histories=data["transaction_histories"],
-                n=n
-            )
-
-    return results
-
 
 if __name__ == "__main__":
-    input_file = open("input.json")
-    input_json = json.load(input_file)
-    protocol = input_json["protocol"]
-    process_cnt = input_json["parameters"]["n"]
+    process_cnt = int(sys.argv[1])
 
-    print(f"Protocol: {protocol}, {process_cnt} processes")
+    print(f"Calculating statistics for {process_cnt} processes")
     print()
 
-    stat = calculate_stat(protocol=protocol, directory="outputs", n=process_cnt)
+    stat = calculate_stat(directory="outputs", n=process_cnt)
 
-    min_message_latency, max_message_latency, avg_message_latency = \
+    lost_messages_cnt, total_messages_cnt, min_message_latency, max_message_latency, avg_message_latency = \
+        stat["lost_messages_cnt"], stat["total_messages_cnt"], \
         stat["min_message_latency"], stat["max_message_latency"], stat["avg_message_latency"]
     min_transaction_latency, max_transaction_latency, avg_transaction_latency, avg_messages_exchanged, throughput = \
         stat["min_transaction_latency"], stat["max_transaction_latency"], \
         stat["avg_transaction_latency"], stat["avg_messages_exchanged"], stat["throughput"]
 
-    print("Message latencies:")
+    print("Messages statistics:")
+    print(f"\tMessages lost: {lost_messages_cnt}")
+    print(f"\tMessages total: {total_messages_cnt}")
     print(f"\tMinimal: {min_message_latency}")
     print(f"\tMaximal: {max_message_latency}")
     print(f"\tAverage: {avg_message_latency}")
@@ -332,18 +313,3 @@ if __name__ == "__main__":
 
     print(f"Throughput per second: {throughput}")
     print()
-
-    if stat.get("own_witness_sets_diff_metrics") is not None:
-        own_witness_sets_diff_metrics = stat["own_witness_sets_diff_metrics"]
-        print(f"Difference metrics for own witness sets: {own_witness_sets_diff_metrics}")
-        print()
-
-    if stat.get("pot_witness_sets_diff_metrics") is not None:
-        pot_witness_sets_diff_metrics = stat["pot_witness_sets_diff_metrics"]
-        print(f"Difference metrics for pot witness sets: {pot_witness_sets_diff_metrics}")
-        print()
-
-    if stat.get("histories_diff_metrics") is not None:
-        histories_diff_metrics = stat["histories_diff_metrics"]
-        print(f"Difference metrics of histories: {histories_diff_metrics}")
-        print()
