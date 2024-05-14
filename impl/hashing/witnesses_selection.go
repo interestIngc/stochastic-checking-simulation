@@ -2,10 +2,7 @@ package hashing
 
 import (
 	"log"
-	"math/rand"
 	"sort"
-	"stochastic-checking-simulation/impl/utils"
-	"strconv"
 )
 
 // WitnessesSelector enables witness set selection.
@@ -46,15 +43,8 @@ func (ws *WitnessesSelector) GetWitnessSet(
 	distances := make([]dist, len(nodeIds))
 	for i, pid := range nodeIds {
 		historyHashRingCopy := historyHash.bins.copy()
-		pidHash := ws.Hasher.Hash([]byte(pid + nodeIds[authorIndex] + strconv.Itoa(int(seqNumber))))
+		pidHash := ws.Hasher.Hash([]byte(pid))
 		idRing := multiRingFromBytes(historyHash.binCapacity, historyHash.binNum, pidHash)
-		rd := rand.New(rand.NewSource(int64(utils.ToUint64(pidHash))))
-		rd.Shuffle(
-			int(historyHashRingCopy.dimension),
-			func(i, j int) {
-				historyHashRingCopy.vector[i], historyHashRingCopy.vector[j] =
-					historyHashRingCopy.vector[j], historyHashRingCopy.vector[i]
-			})
 
 		idRing.merge(historyHashRingCopy)
 		defaultRing := NewMultiRing(historyHash.binCapacity, historyHash.binNum)
