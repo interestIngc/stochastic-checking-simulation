@@ -1,6 +1,8 @@
 package messages
 
-import "fmt"
+import (
+	"fmt"
+)
 
 func (b *BroadcastInstance) ToString() string {
 	return fmt.Sprintf("{%d;%d}", b.Author, b.SeqNumber)
@@ -17,6 +19,17 @@ func (b *BroadcastInstance) Copy() *BroadcastInstance {
 	return &BroadcastInstance{
 		Author:    b.Author,
 		SeqNumber: b.SeqNumber,
+	}
+}
+
+func (m *Broadcast) Copy() *Broadcast {
+	if m == nil {
+		return nil
+	}
+
+	return &Broadcast{
+		Value: m.Value,
+		XHash: m.XHash,
 	}
 }
 
@@ -44,9 +57,14 @@ func (m *ReliableProtocolMessage) Copy() *ReliableProtocolMessage {
 	if m == nil {
 		return nil
 	}
+
+	encryptedShares := make([][]byte, len(m.EncryptedShares))
+	copy(encryptedShares, m.EncryptedShares)
+
 	return &ReliableProtocolMessage{
-		Stage: m.Stage,
-		Value: m.Value,
+		Stage:            m.Stage,
+		BroadcastMessage: m.BroadcastMessage.Copy(),
+		EncryptedShares: encryptedShares,
 	}
 }
 

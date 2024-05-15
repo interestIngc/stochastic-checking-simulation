@@ -1,5 +1,5 @@
 {
-  "protocol": "bracha",
+  "protocol": "reliable_accountability",
   "parameters": {
     "n": 2,
     "f": 0,
@@ -7,7 +7,7 @@
     "v": 2,
     "wr": 1900.0,
     "vr": 1910.0,
-    "u": 2,
+    "u": 3,
     "recovery_timeout": 1000000,
     "node_id_size": 256,
     "number_of_bins": 32,

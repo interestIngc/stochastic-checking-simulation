@@ -18,6 +18,10 @@ func ToUint64(bytes []byte) uint64 {
 	return binary.LittleEndian.Uint64(data)
 }
 
+func ToInt32(bytes []byte) int32 {
+	return int32(binary.LittleEndian.Uint32(bytes))
+}
+
 func TransactionToBytes(author string, seqNumber int64) []byte {
 	return addBytes([]byte(author), ToBytes(uint64(seqNumber)))
 }
@@ -25,6 +29,12 @@ func TransactionToBytes(author string, seqNumber int64) []byte {
 func ToBytes(value uint64) []byte {
 	bytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(bytes, value)
+	return bytes
+}
+
+func Int32ToBytes(value int32) []byte {
+	bytes := make([]byte, 4)
+	binary.LittleEndian.PutUint32(bytes, uint32(value))
 	return bytes
 }
 
@@ -40,4 +50,18 @@ func addBytes(fst []byte, snd []byte) []byte {
 		res[i] += val
 	}
 	return res
+}
+
+func AreEqual(fst []byte, snd []byte) bool {
+	if len(fst) != len(snd) {
+		return false
+	}
+
+	for i := 0; i < len(fst); i++ {
+		if fst[i] != snd[i] {
+			return false
+		}
+	}
+
+	return true
 }

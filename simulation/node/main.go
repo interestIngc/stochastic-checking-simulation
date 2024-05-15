@@ -1,8 +1,11 @@
 package main
 
 import (
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -37,6 +40,14 @@ var (
 		"stress_test",
 		false,
 		"Defines whether to run the stress test. In this case, transactions are sent out infinitely")
+	mixingTime = flag.Int(
+		"mixing_time",
+		2,
+		"Mixing time, used in the reveal phase of the protocol")
+	keysDirPath = flag.String(
+		"keys_dir",
+		"keys",
+		"Path to the directory with private keys")
 )
 
 type Input struct {
@@ -82,11 +93,44 @@ func main() {
 
 	pids := utils.GeneratePids(*baseIpAddress, *basePort, *nodes, processesPerNode, logger)
 
+	id := *processIndex
+
 	var process protocols.Process
 
 	switch input.Protocol {
 	case "reliable_accountability":
-		process = &reliable.Process{}
+		publicKeys := make([]*rsa.PublicKey, processCount)
+		var ownPrivateKey *rsa.PrivateKey
+
+		for i := 0; i < processCount; i++ {
+			filename := fmt.Sprintf("%s/%d.txt", *keysDirPath, i)
+			privateKeyBytes, err := os.ReadFile(filename)
+
+			if err != nil {
+				logger.Fatal(
+					fmt.Sprintf("Could not read bytes from file %s: %e", filename, err),
+				)
+			}
+
+			privateKey, err := x509.ParsePKCS1PrivateKey(privateKeyBytes)
+			if err != nil {
+				logger.Fatal(
+					fmt.Sprintf("Error while generating a private key from bytes: %e", err),
+				)
+			}
+
+			if i == id {
+				ownPrivateKey = privateKey
+			}
+
+			publicKeys[i] = &privateKey.PublicKey
+		}
+
+		process = &reliable.Process{
+			PublicKeys: publicKeys,
+			PrivateKey: ownPrivateKey,
+			MixingTime: *mixingTime,
+		}
 	case "consistent_accountability":
 		process = &consistent.Process{}
 	case "bracha":
@@ -99,9 +143,8 @@ func main() {
 
 	logger.Printf("Running protocol: %s\n", input.Protocol)
 
-	id := int32(*processIndex)
 	node := &Node{
-		processIndex:             id,
+		processIndex:             int32(id),
 		pids:                     pids,
 		parameters:               &input.Parameters,
 		transactionsToSendOut:    *transactions,
@@ -111,5 +154,5 @@ func main() {
 	}
 
 	a := actor.Actor{}
-	a.InitActor(id, pids, node, logger, *retransmissionTimeoutNs)
+	a.InitActor(int32(id), pids, node, logger, *retransmissionTimeoutNs)
 }

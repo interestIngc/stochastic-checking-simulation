@@ -7,8 +7,6 @@ import (
 
 // WitnessesSelector enables witness set selection.
 type WitnessesSelector struct {
-	Hasher Hasher
-
 	MinPotWitnessSetSize int
 	MinOwnWitnessSetSize int
 	PotWitnessSetRadius  float64
@@ -38,17 +36,12 @@ func (bd byDist) Less(i, j int) bool {
 // which is identified by a pair of authorId and seqNumber, and a given history hash.
 func (ws *WitnessesSelector) GetWitnessSet(
 	nodeIds []string,
-	authorIndex int32, seqNumber int32, historyHash *HistoryHash,
+	historyHashes []*HistoryHash,
 ) (map[string]bool, map[string]bool) {
 	distances := make([]dist, len(nodeIds))
-	for i, pid := range nodeIds {
-		historyHashRingCopy := historyHash.bins.copy()
-		pidHash := ws.Hasher.Hash([]byte(pid))
-		idRing := multiRingFromBytes(historyHash.binCapacity, historyHash.binNum, pidHash)
-
-		idRing.merge(historyHashRingCopy)
-		defaultRing := NewMultiRing(historyHash.binCapacity, historyHash.binNum)
-		d, e := multiRingDistance(defaultRing, idRing)
+	for i := range nodeIds {
+		defaultRing := NewMultiRing(historyHashes[0].binCapacity, historyHashes[0].binNum)
+		d, e := multiRingDistance(defaultRing, historyHashes[i].bins)
 
 		if e != nil {
 			log.Printf("Error while generating a witness set happened: %s\n", e)

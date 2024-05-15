@@ -87,14 +87,13 @@ func (p *Process) InitProcess(
 	}
 
 	p.wSelector = &hashing.WitnessesSelector{
-		Hasher:               hasher,
 		MinPotWitnessSetSize: parameters.MinPotWitnessSetSize,
 		MinOwnWitnessSetSize: parameters.MinOwnWitnessSetSize,
 		PotWitnessSetRadius:  parameters.PotWitnessSetRadius,
 		OwnWitnessSetRadius:  parameters.OwnWitnessSetRadius,
 	}
 	binCapacity := uint(math.Pow(2, float64(parameters.NodeIdSize/parameters.NumberOfBins)))
-	p.historyHash = hashing.NewHistoryHash(uint(parameters.NumberOfBins), binCapacity, hasher)
+	p.historyHash = hashing.NewHistoryHash(uint(parameters.NumberOfBins), binCapacity, hasher, 0)
 
 	p.context = context
 	p.logger = logger
@@ -115,7 +114,7 @@ func (p *Process) initMessageState(
 	//)
 
 	msgState.witnessSet, _ =
-		p.wSelector.GetWitnessSet(p.pids, bInstance.Author, bInstance.SeqNumber, p.historyHash)
+		p.wSelector.GetWitnessSet(p.pids, []*hashing.HistoryHash{p.historyHash})
 
 	p.logger.OnWitnessSetSelected("own", bInstance, msgState.witnessSet)
 

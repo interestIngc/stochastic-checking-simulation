@@ -8,6 +8,7 @@ message Simulate {}
 
 message Broadcast {
   int32 value = 1;
+  int32 xHash = 2;
 }
 
 message Ack {
@@ -52,7 +53,20 @@ message ReliableProtocolMessage {
   }
 
   Stage stage = 1;
-  int32 value = 2;
+  Broadcast broadcastMessage = 2;
+  repeated bytes encryptedShares = 3;
+}
+
+message CommitmentProtocolMessage {
+  enum Stage {
+    REVEAL = 0;
+    DONE = 1;
+    FAILED = 2;
+  }
+
+  Stage stage = 1;
+  bytes decryptedShare = 2;
+  repeated int32 x = 3;
 }
 
 message RecoveryProtocolMessage {
@@ -88,8 +102,9 @@ message BroadcastInstanceMessage {
     BrachaProtocolMessage brachaProtocolMessage = 4;
     ConsistentProtocolMessage consistentProtocolMessage = 5;
     ReliableProtocolMessage reliableProtocolMessage = 6;
-    RecoveryProtocolMessage recoveryProtocolMessage = 7;
-    ScalableProtocolMessage scalableProtocolMessage = 8;
+    CommitmentProtocolMessage commitmentProtocolMessage = 7;
+    RecoveryProtocolMessage recoveryProtocolMessage = 8;
+    ScalableProtocolMessage scalableProtocolMessage = 9;
   }
 }
 
