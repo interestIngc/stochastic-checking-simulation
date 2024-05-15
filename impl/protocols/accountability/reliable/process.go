@@ -39,7 +39,6 @@ type RevealStage int
 
 const (
 	InitialRevealStage RevealStage = iota
-	SentReveal
 	SentDoneToWitnesses
 	SentDoneToProcesses
 	SentFailedToProcesses
@@ -577,7 +576,7 @@ func (p *Process) processCommitmentProtocolMessage(
 		decryptedShare := commitmentMessage.DecryptedShare
 		msgState.decryptedShares[senderId] = decryptedShare
 
-		encryptedShare := encrypt(p.PublicKeys[senderId], decryptedShare, p.logger)
+		encryptedShare := Encrypt(p.PublicKeys[senderId], decryptedShare, p.logger)
 		if !utils.AreEqual(encryptedShare, msgState.encryptedShares[senderId]) {
 			p.logger.Fatal(
 				fmt.Sprintf(
@@ -729,7 +728,7 @@ func (p *Process) Broadcast(
 
 	encryptedShares := make([][]byte, p.processCount)
 	for i := 0; i < p.processCount; i++ {
-		encryptedShares[i] = encrypt(p.PublicKeys[i], data[i], p.logger)
+		encryptedShares[i] = Encrypt(p.PublicKeys[i], data[i], p.logger)
 	}
 	p.logger.Println("Broadcasting: " + fmt.Sprint(encryptedShares))
 

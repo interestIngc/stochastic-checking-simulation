@@ -18,7 +18,7 @@ func main() {
 			log.Fatal("Error while creating an output file")
 		}
 
-		privateKey, err := rsa.GenerateKey(rand.Reader, 1024)
+		privateKey, err := rsa.GenerateKey(rand.Reader, 128)
 		if err != nil {
 			log.Fatalf("Error while generating a private key: %e", err)
 		}
