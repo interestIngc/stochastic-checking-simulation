@@ -97,7 +97,7 @@ func main() {
 		logger.Fatal("This topology is not supported. It should be one of: 'star', 'tree'")
 	}
 
-	pids := utils.GeneratePids(nodeIps, *basePort, input.Parameters.ProcessCount+1)
+	pids := utils.GeneratePids(nodeIps, *basePort, processCount+1)
 
 	id := *processIndex
 
