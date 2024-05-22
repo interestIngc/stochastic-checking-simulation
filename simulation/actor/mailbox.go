@@ -7,6 +7,7 @@ import (
 	"stochastic-checking-simulation/context"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const BufferSize = 1024
@@ -21,6 +22,8 @@ type Mailbox struct {
 	readChannel  chan []byte         // Send messages to other processes
 
 	conn *net.UDPConn
+
+	messageDelay int
 }
 
 func newMailbox(
@@ -28,11 +31,13 @@ func newMailbox(
 	addresses []string,
 	writeChannel chan context.Packet,
 	readChannel chan []byte,
+	messageDelay int,
 ) *Mailbox {
 	m := new(Mailbox)
 	m.id = ownId
 	m.writeChannel = writeChannel
 	m.readChannel = readChannel
+	m.messageDelay = messageDelay
 
 	m.udpAddresses = make([]*net.UDPAddr, len(addresses))
 	for i, currAddress := range addresses {
@@ -85,12 +90,12 @@ func (m *Mailbox) listenForMessages() {
 
 func (m *Mailbox) sendMessages() {
 	for packet := range m.writeChannel {
-		go func(packet context.Packet) {
-			_, err := m.conn.WriteToUDP(packet.Data, m.udpAddresses[packet.To])
+		_, err := m.conn.WriteToUDP(packet.Data, m.udpAddresses[packet.To])
 
-			if err != nil {
-				log.Printf("Could not write data to udp: %e", err)
-			}
-		}(packet)
+		if err != nil {
+			log.Printf("Could not write data to udp: %e", err)
+		}
+
+		time.Sleep(time.Duration(m.messageDelay))
 	}
 }

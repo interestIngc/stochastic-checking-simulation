@@ -6,7 +6,6 @@ import (
 	"stochastic-checking-simulation/impl/messages"
 	"stochastic-checking-simulation/impl/utils"
 	"sync"
-	"time"
 )
 
 type Packet struct {
@@ -79,47 +78,47 @@ func (c *ReliableContext) send(to int32, msg *messages.Message) {
 }
 
 func (c *ReliableContext) Send(to int32, msg *messages.Message) {
-	c.mutex.Lock()
-	ackChan := make(chan bool)
-	c.receivedAcks[msg.Stamp] = ackChan
-	c.mutex.Unlock()
-
+	//c.mutex.Lock()
+	//ackChan := make(chan bool)
+	//c.receivedAcks[msg.Stamp] = ackChan
+	//c.mutex.Unlock()
+	//
 	c.send(to, msg)
 
-	go func() {
-		t := time.NewTicker(time.Duration(c.retransmissionTimeoutNs))
-		for {
-			select {
-			case <-ackChan:
-				return
-			case <-t.C:
-				msg.RetransmissionStamp++
-				c.send(to, msg)
-			}
-		}
-	}()
+	//go func() {
+	//	t := time.NewTicker(time.Duration(c.retransmissionTimeoutNs))
+	//	for {
+	//		select {
+	//		case <-ackChan:
+	//			return
+	//		case <-t.C:
+	//			msg.RetransmissionStamp++
+	//			c.send(to, msg)
+	//		}
+	//	}
+	//}()
 }
 
-func (c *ReliableContext) SendAck(sender int32, stamp int32) {
-	msg := c.MakeNewMessage()
-	msg.Content = &messages.Message_Ack{
-		Ack: &messages.Ack{
-			Sender: sender,
-			Stamp:  stamp,
-		},
-	}
+//func (c *ReliableContext) SendAck(sender int32, stamp int32) {
+//	msg := c.MakeNewMessage()
+//	msg.Content = &messages.Message_Ack{
+//		Ack: &messages.Ack{
+//			Sender: sender,
+//			Stamp:  stamp,
+//		},
+//	}
+//
+//	c.send(sender, msg)
+//}
 
-	c.send(sender, msg)
-}
-
-func (c *ReliableContext) OnAck(ack *messages.Ack) {
-	ackChan, pending := c.receivedAcks[ack.Stamp]
-	if !pending {
-		return
-	}
-
-	ackChan <- true
-	delete(c.receivedAcks, ack.Stamp)
-
-	c.eventLogger.OnAckReceived(ack.Stamp)
-}
+//func (c *ReliableContext) OnAck(ack *messages.Ack) {
+//	ackChan, pending := c.receivedAcks[ack.Stamp]
+//	if !pending {
+//		return
+//	}
+//
+//	ackChan <- true
+//	delete(c.receivedAcks, ack.Stamp)
+//
+//	c.eventLogger.OnAckReceived(ack.Stamp)
+//}
