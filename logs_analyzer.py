@@ -281,11 +281,12 @@ def calculate_stat(directory, n):
 
 if __name__ == "__main__":
     process_cnt = int(sys.argv[1])
+    output_dir = sys.argv[2]
 
     print(f"Calculating statistics for {process_cnt} processes")
     print()
 
-    stat = calculate_stat(directory="outputs", n=process_cnt)
+    stat = calculate_stat(directory=output_dir, n=process_cnt)
 
     lost_messages_cnt, total_messages_cnt, min_message_latency, max_message_latency, avg_message_latency = \
         stat["lost_messages_cnt"], stat["total_messages_cnt"], \
