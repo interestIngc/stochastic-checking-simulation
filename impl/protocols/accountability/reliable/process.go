@@ -72,6 +72,8 @@ type messageState struct {
 	decryptedShares [][]byte
 
 	receivedMessagesCnt int
+
+	pendingRevealProtocolMessages []*CommitmentMessageAndSender
 }
 
 func newMessageState() *messageState {
@@ -93,6 +95,8 @@ func newMessageState() *messageState {
 	ms.revealStage = InitialRevealStage
 
 	ms.receivedMessagesCnt = 0
+
+	ms.pendingRevealProtocolMessages = make([]*CommitmentMessageAndSender, 0)
 
 	return ms
 }
@@ -345,6 +349,17 @@ func (p *Process) deliver(
 	p.transactionToCheckpoint[ProcessId(bInstance.Author)][bInstance.SeqNumber] =
 		p.deliveredMessagesCount
 
+	msgState := p.messagesLog[author][bInstance.SeqNumber]
+
+	for _, msgAndSender := range msgState.pendingRevealProtocolMessages {
+		p.processCommitmentProtocolMessage(
+			msgAndSender.sender,
+			bInstance,
+			msgAndSender.message,
+		)
+	}
+	msgState.pendingRevealProtocolMessages = nil
+
 	transactionToReveal, ok := p.checkpoints[p.deliveredMessagesCount-p.MixingTime]
 	if ok {
 		p.startRevealPhase(transactionToReveal)
@@ -352,7 +367,6 @@ func (p *Process) deliver(
 		delete(p.checkpoints, p.deliveredMessagesCount-p.MixingTime)
 	}
 
-	msgState := p.messagesLog[author][bInstance.SeqNumber]
 	p.logger.OnDeliver(bInstance, broadcastMessage.Value, msgState.receivedMessagesCnt)
 
 	if p.sendOwnDeliveredTransactions && bInstance.Author == p.processIndex {
@@ -414,8 +428,7 @@ func (p *Process) processReliableProtocolMessage(
 
 		encryptedShares := reliableMessage.EncryptedShares
 		msgState.encryptedShares = encryptedShares
-
-		p.logger.Println("Received shares: " + fmt.Sprint(encryptedShares))
+		msgState.ownEncryptedShare = encryptedShares[p.processIndex]
 
 		for i := 0; i < p.processCount; i++ {
 			share := encryptedShares[i]
@@ -557,7 +570,20 @@ func (p *Process) processCommitmentProtocolMessage(
 	msgState.receivedMessagesCnt++
 
 	senderPid := p.pids[senderId]
-	deliveredBroadcast := p.deliveredMessages[ProcessId(bInstance.Author)][bInstance.SeqNumber]
+
+	deliveredBroadcast, delivered :=
+		p.deliveredMessages[ProcessId(bInstance.Author)][bInstance.SeqNumber]
+
+	if !delivered {
+		msgState.pendingRevealProtocolMessages = append(
+			msgState.pendingRevealProtocolMessages,
+			&CommitmentMessageAndSender{
+				sender:  senderId,
+				message: commitmentMessage,
+			},
+		)
+		return
+	}
 
 	switch commitmentMessage.Stage {
 	case messages.CommitmentProtocolMessage_REVEAL:
@@ -576,16 +602,19 @@ func (p *Process) processCommitmentProtocolMessage(
 		decryptedShare := commitmentMessage.DecryptedShare
 		msgState.decryptedShares[senderId] = decryptedShare
 
-		encryptedShare := Encrypt(p.PublicKeys[senderId], decryptedShare, p.logger)
-		if !utils.AreEqual(encryptedShare, msgState.encryptedShares[senderId]) {
-			p.logger.Fatal(
-				fmt.Sprintf(
-					"Non-equal encrypted shares detected: expected %d, got %d from sender %d",
-					msgState.encryptedShares[senderId],
-					encryptedShare,
-					senderId,
-				),
-			)
+		if msgState.encryptedShares != nil && len(msgState.encryptedShares) > 0 {
+			encryptedShare := Encrypt(p.PublicKeys[senderId], decryptedShare, p.logger)
+
+			if !utils.AreEqual(encryptedShare, msgState.encryptedShares[senderId]) {
+				p.logger.Fatal(
+					fmt.Sprintf(
+						"Non-equal encrypted shares detected: expected %d, got %d from sender %d",
+						msgState.encryptedShares[senderId],
+						encryptedShare,
+						senderId,
+					),
+				)
+			}
 		}
 
 		if len(msgState.revealFromProcesses) >= 2*p.faultyProcesses+1 {
@@ -611,19 +640,19 @@ func (p *Process) processCommitmentProtocolMessage(
 				)
 				msgState.revealStage = SentDoneToProcesses
 			} else {
-				p.logger.Fatal(
+				p.logger.Println(
 					fmt.Sprintf(
-						"X hash mismatch: delivered %d, received %d",
+						"X hash mismatch: delivered: %d, received: %d\n",
 						deliveredBroadcast.XHash, xPrimeHash,
 					),
 				)
-				//p.broadcastCommitmentMessage(
-				//	bInstance,
-				//	&messages.CommitmentProtocolMessage{
-				//		Stage: messages.CommitmentProtocolMessage_FAILED,
-				//	},
-				//)
-				//msgState.revealStage = SentFailedToProcesses
+				p.broadcastCommitmentMessage(
+					bInstance,
+					&messages.CommitmentProtocolMessage{
+						Stage: messages.CommitmentProtocolMessage_FAILED,
+					},
+				)
+				msgState.revealStage = SentFailedToProcesses
 			}
 		}
 	case messages.CommitmentProtocolMessage_DONE:
@@ -730,7 +759,6 @@ func (p *Process) Broadcast(
 	for i := 0; i < p.processCount; i++ {
 		encryptedShares[i] = Encrypt(p.PublicKeys[i], data[i], p.logger)
 	}
-	p.logger.Println("Broadcasting: " + fmt.Sprint(encryptedShares))
 
 	msgState := p.initMessageState(broadcastInstance)
 
@@ -776,4 +804,9 @@ func (p *Process) encodeEntropy(x []int32) ([][]byte, error) {
 	err := p.encoder.Encode(data)
 
 	return data, err
+}
+
+type CommitmentMessageAndSender struct {
+	sender  ProcessId
+	message *messages.CommitmentProtocolMessage
 }

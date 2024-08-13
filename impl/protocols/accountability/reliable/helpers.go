@@ -26,10 +26,6 @@ func Encrypt(
 	}
 
 	return cipher
-
-	//output := make([]byte, len(share))
-	//copy(output, share)
-	//return output
 }
 
 func decrypt(
@@ -42,10 +38,6 @@ func decrypt(
 		logger.Fatal("Could not decrypt ciphertext: " + err.Error())
 	}
 	return share
-
-	//output := make([]byte, len(encryptedShare))
-	//copy(output, encryptedShare)
-	//return output
 }
 
 func hash(input []int32) int32 {
