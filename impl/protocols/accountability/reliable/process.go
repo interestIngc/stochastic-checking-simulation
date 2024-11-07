@@ -1,9 +1,9 @@
 package reliable
 
 import (
-	"crypto/rsa"
+	//"crypto/rsa"
 	"fmt"
-	"github.com/klauspost/reedsolomon"
+	//"github.com/klauspost/reedsolomon"
 	"math"
 	"math/rand"
 	"stochastic-checking-simulation/context"
@@ -11,8 +11,13 @@ import (
 	"stochastic-checking-simulation/impl/hashing"
 	"stochastic-checking-simulation/impl/messages"
 	"stochastic-checking-simulation/impl/parameters"
-	"stochastic-checking-simulation/impl/utils"
+	//"stochastic-checking-simulation/impl/utils"
 	"time"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4/schnorr"
+	"strconv"
+	"crypto/sha256"
+	sss "go.openfort.xyz/shamir-secret-sharing-go"
 )
 
 type ProcessId int32
@@ -45,7 +50,8 @@ const (
 	SentFailedToWitnesses
 )
 
-const bytes = 4
+//const bytes = 4
+const bytes = 64
 
 type messageState struct {
 	echoFromProcesses     map[ProcessId]bool
@@ -66,10 +72,12 @@ type messageState struct {
 	ownWitnessSet map[string]bool
 	potWitnessSet map[string]bool
 
-	encryptedShares   [][]byte
-	ownEncryptedShare []byte
+	//encryptedShares   [][]byte
+	//ownEncryptedShare []byte
+	ownShare []byte
 
-	decryptedShares [][]byte
+	shares [][]byte
+	//decryptedShares [][]byte
 
 	receivedMessagesCnt int
 
@@ -106,7 +114,7 @@ type Process struct {
 	actorPids    map[string]ProcessId
 	pids         []string
 
-	encoder reedsolomon.Encoder
+	//encoder reedsolomon.Encoder
 
 	transactionCounter int32
 
@@ -125,21 +133,22 @@ type Process struct {
 	faultyProcesses         int
 
 	dataShares   int
-	parityShares int
+	//parityShares int
 	processCount int
+	historyLines int
 
 	MixingTime int
 
 	wSelector     *hashing.WitnessesSelector
-	historyHashes []*hashing.HistoryHash
+	historyHashes [][]*hashing.HistoryHash
 
 	context                      *context.ReliableContext
 	logger                       *eventlogger.EventLogger
 	ownDeliveredTransactions     chan bool
 	sendOwnDeliveredTransactions bool
 
-	PublicKeys []*rsa.PublicKey
-	PrivateKey *rsa.PrivateKey
+	PublicKeys []*secp256k1.PublicKey
+	PrivateKey *secp256k1.PrivateKey
 }
 
 func (p *Process) InitProcess(
@@ -164,14 +173,16 @@ func (p *Process) InitProcess(
 	p.faultyProcesses = parameters.FaultyProcesses
 
 	p.dataShares = parameters.FaultyProcesses + 1
-	p.parityShares = parameters.ProcessCount - p.dataShares
+	//p.parityShares = parameters.ProcessCount - p.dataShares
 	p.processCount = parameters.ProcessCount
 
+	/*
 	var err error
 	p.encoder, err = reedsolomon.New(p.dataShares, p.parityShares)
 	if err != nil {
 		p.logger.Fatal("Could not instantiate the reed-solomon encoder")
 	}
+	*/
 
 	p.actorPids = make(map[string]ProcessId)
 	p.deliveredMessages = make(map[ProcessId]map[int32]*messages.Broadcast)
@@ -203,12 +214,24 @@ func (p *Process) InitProcess(
 		PotWitnessSetRadius:  parameters.PotWitnessSetRadius,
 		OwnWitnessSetRadius:  parameters.OwnWitnessSetRadius,
 	}
-
+	
+	//p.historyLines = 2*int(math.Ceil(math.Log2(float64(parameters.ProcessCount))))
+	p.historyLines = 8
+	p.historyHashes = make([][]*hashing.HistoryHash, p.historyLines)
+	for i := 0; i < p.historyLines; i++ {
+		p.historyHashes[i] = make([]*hashing.HistoryHash, parameters.ProcessCount)
+		for j := 0; j < parameters.ProcessCount; j++ {
+			p.historyHashes[i][j] = hashing.NewHistoryHash(uint(parameters.NumberOfBins), binCapacity, hasher, int32(j + i*parameters.ProcessCount))
+		}
+	}
+	
+	/*
 	p.historyHashes = make([]*hashing.HistoryHash, parameters.ProcessCount)
 	for i := 0; i < parameters.ProcessCount; i++ {
 		p.historyHashes[i] =
 			hashing.NewHistoryHash(uint(parameters.NumberOfBins), binCapacity, hasher, int32(i))
 	}
+	*/
 
 	p.context = context
 	p.logger = logger
@@ -223,7 +246,7 @@ func (p *Process) initMessageState(
 	p.messagesLog[ProcessId(bInstance.Author)][bInstance.SeqNumber] = msgState
 
 	msgState.ownWitnessSet, msgState.potWitnessSet =
-		p.wSelector.GetWitnessSet(p.pids, p.historyHashes)
+		p.wSelector.GetWitnessSet(p.pids, p.historyHashes[bInstance.Author % int32(p.historyLines)])
 
 	p.logger.OnWitnessSetSelected("own", bInstance, msgState.ownWitnessSet)
 	p.logger.OnWitnessSetSelected("pot", bInstance, msgState.potWitnessSet)
@@ -383,13 +406,14 @@ func (p *Process) cleanUp(bInstance *messages.BroadcastInstance, value int32) {
 func (p *Process) startRevealPhase(transaction *messages.BroadcastInstance) {
 	msgState := p.messagesLog[ProcessId(transaction.Author)][transaction.SeqNumber]
 
-	decryptedShare := decrypt(p.PrivateKey, msgState.ownEncryptedShare, p.logger)
+	//decryptedShare := decrypt(p.PrivateKey, msgState.ownEncryptedShare, p.logger)
 
 	p.broadcastCommitmentToWitnesses(
 		transaction,
 		&messages.CommitmentProtocolMessage{
 			Stage:          messages.CommitmentProtocolMessage_REVEAL,
-			DecryptedShare: decryptedShare,
+			//DecryptedShare: decryptedShare,
+			Share: msgState.ownShare,
 		},
 		msgState,
 	)
@@ -422,14 +446,16 @@ func (p *Process) processReliableProtocolMessage(
 
 	switch reliableMessage.Stage {
 	case messages.ReliableProtocolMessage_NOTIFY:
-		if !p.isWitness(msgState) || msgState.witnessStage >= SentEchoFromWitness {
+		//if !p.isWitness(msgState) || msgState.witnessStage >= SentEchoFromWitness {
+		if msgState.stage >= SentEchoFromProcess {
 			return
 		}
 
-		encryptedShares := reliableMessage.EncryptedShares
-		msgState.encryptedShares = encryptedShares
-		msgState.ownEncryptedShare = encryptedShares[p.processIndex]
+		//encryptedShares := reliableMessage.EncryptedShares
+		//msgState.encryptedShares = encryptedShares
+		//msgState.ownEncryptedShare = encryptedShares[p.processIndex]
 
+		/*
 		for i := 0; i < p.processCount; i++ {
 			share := encryptedShares[i]
 			p.sendProtocolMessage(
@@ -442,8 +468,23 @@ func (p *Process) processReliableProtocolMessage(
 				},
 			)
 		}
+		*/
 
-		msgState.witnessStage = SentEchoFromWitness
+		//msgState.witnessStage = SentEchoFromWitness
+		
+		msgState.ownShare = reliableMessage.Share
+		
+		p.broadcastToWitnesses(
+			bInstance,
+			&messages.ReliableProtocolMessage{
+				Stage:            messages.ReliableProtocolMessage_ECHO_FROM_PROCESS,
+				BroadcastMessage: broadcastMessage,
+			},
+			msgState)
+		
+		msgState.stage = SentEchoFromProcess
+	
+	/*
 	case messages.ReliableProtocolMessage_ECHO_FROM_WITNESS:
 		if !msgState.ownWitnessSet[senderPid] || msgState.stage >= SentEchoFromProcess {
 			return
@@ -460,6 +501,8 @@ func (p *Process) processReliableProtocolMessage(
 			msgState)
 
 		msgState.stage = SentEchoFromProcess
+	*/
+	
 	case messages.ReliableProtocolMessage_ECHO_FROM_PROCESS:
 		if !p.isWitness(msgState) ||
 			msgState.witnessStage >= SentReadyFromWitness ||
@@ -543,7 +586,12 @@ func (p *Process) processReliableProtocolMessage(
 	}
 }
 
-func (p *Process) addSecret(secret []int32) {
+//func (p *Process) addSecret(secret []int32, author int32) {
+func (p *Process) addSecret(secret []byte, author int32) {
+	//
+	line := author % int32(p.historyLines)
+	//
+	/*
 	secretBytes := make([]byte, bytes*len(secret))
 	for i := 0; i < len(secret); i++ {
 		currBytes := utils.Int32ToBytes(secret[i])
@@ -551,10 +599,13 @@ func (p *Process) addSecret(secret []int32) {
 			secretBytes[i*bytes+j] = currByte
 		}
 	}
+	*/
 
 	for i := 0; i < p.processCount; i++ {
-		p.historyHashes[i].Insert(secretBytes)
+		//p.historyHashes[i].Insert(secretBytes)
+		p.historyHashes[line][i].Insert(secret)
 	}
+	
 }
 
 func (p *Process) processCommitmentProtocolMessage(
@@ -596,12 +647,16 @@ func (p *Process) processCommitmentProtocolMessage(
 
 		msgState.revealFromProcesses[senderId] = true
 
-		if msgState.decryptedShares == nil {
-			msgState.decryptedShares = make([][]byte, p.processCount)
+		//if msgState.decryptedShares == nil {
+		if msgState.shares == nil {
+			//msgState.decryptedShares = make([][]byte, p.processCount)
+			msgState.shares = make([][]byte, p.processCount)
 		}
-		decryptedShare := commitmentMessage.DecryptedShare
-		msgState.decryptedShares[senderId] = decryptedShare
-
+		//decryptedShare := commitmentMessage.DecryptedShare
+		//msgState.decryptedShares[senderId] = decryptedShare
+		msgState.shares[senderId] = commitmentMessage.Share
+		
+		/*
 		if msgState.encryptedShares != nil && len(msgState.encryptedShares) > 0 {
 			encryptedShare := Encrypt(p.PublicKeys[senderId], decryptedShare, p.logger)
 
@@ -616,20 +671,96 @@ func (p *Process) processCommitmentProtocolMessage(
 				)
 			}
 		}
+		*/
 
-		if len(msgState.revealFromProcesses) >= 2*p.faultyProcesses+1 {
-			err := p.encoder.Reconstruct(msgState.decryptedShares)
+		if len(msgState.revealFromProcesses) >= p.faultyProcesses+1 {
+			//err := p.encoder.Reconstruct(msgState.decryptedShares)
+			gathered := make([][]byte,p.faultyProcesses+1)
+			count := 0
+			for i := 0; i < p.processCount; i++ {
+				if msgState.shares[i] != nil {
+					gathered[count] = msgState.shares[i]
+					count++
+				}
+				if count == p.faultyProcesses + 1 {
+					break
+				}
+			}
+			
+			if count < p.faultyProcesses + 1 {
+				return
+			}
+			
+			xPrime, err := sss.Combine(gathered)
+			
 			if err != nil {
-				p.logger.Fatal("Error while decoding decrypted shares: " + err.Error())
+				//p.logger.Fatal("Error while decoding decrypted shares: " + err.Error())
+				//fmt.Println(err)
+				p.logger.Println(
+					fmt.Sprintf(
+						"Error while decoding decrypted shares: " + err.Error(),
+					),
+				)
+				p.broadcastCommitmentMessage(
+					bInstance,
+					&messages.CommitmentProtocolMessage{
+						Stage: messages.CommitmentProtocolMessage_FAILED,
+					},
+				)
+				msgState.revealStage = SentFailedToProcesses
+				return
 			}
 
-			xPrime := make([]int32, p.dataShares)
+			//xPrime := make([]int32, p.dataShares)
+			//xPrime := msgState.shares[0]
+			
+			/*
 			for i := 0; i < p.dataShares; i++ {
-				xPrime[i] = utils.ToInt32(msgState.decryptedShares[i])
+				//xPrime[i] = utils.ToInt32(msgState.decryptedShares[i])
+				xPrime[i] = msgState.shares[i]
+			}
+			*/
+			
+			messageString := strconv.Itoa(int(bInstance.Author))+strconv.Itoa(int(bInstance.SeqNumber))
+			messageHash := sha256.Sum256([]byte(messageString))
+			
+			signature, err := schnorr.ParseSignature(xPrime)
+			if err != nil {
+				p.logger.Println(
+					fmt.Sprintf(
+						"Error while parsing signature: " + err.Error(),
+					),
+				)
+				p.broadcastCommitmentMessage(
+					bInstance,
+					&messages.CommitmentProtocolMessage{
+						Stage: messages.CommitmentProtocolMessage_FAILED,
+					},
+				)
+				msgState.revealStage = SentFailedToProcesses
+				return
+			}
+			verified := signature.Verify(messageHash[:], p.PublicKeys[int(bInstance.Author)])
+			
+			if !verified{
+				p.logger.Println(
+					fmt.Sprintf(
+						"Error while verifying signature: " + err.Error(),
+					),
+				)
+				p.broadcastCommitmentMessage(
+					bInstance,
+					&messages.CommitmentProtocolMessage{
+						Stage: messages.CommitmentProtocolMessage_FAILED,
+					},
+				)
+				msgState.revealStage = SentFailedToProcesses
+				return
 			}
 
-			xPrimeHash := hash(xPrime)
-
+			//xPrimeHash := hash(xPrime)
+			
+			/*
 			if xPrimeHash == deliveredBroadcast.XHash {
 				p.broadcastCommitmentMessage(
 					bInstance,
@@ -654,36 +785,60 @@ func (p *Process) processCommitmentProtocolMessage(
 				)
 				msgState.revealStage = SentFailedToProcesses
 			}
+			*/
+			
+			p.broadcastCommitmentMessage(
+				bInstance,
+				&messages.CommitmentProtocolMessage{
+					Stage: messages.CommitmentProtocolMessage_DONE,
+					//X:     xPrime,
+					Share: xPrime,
+				},
+			)
+			msgState.revealStage = SentDoneToProcesses
 		}
 	case messages.CommitmentProtocolMessage_DONE:
-		if hash(commitmentMessage.X) == deliveredBroadcast.XHash {
+		messageString := strconv.Itoa(int(bInstance.Author))+strconv.Itoa(int(bInstance.SeqNumber))
+		messageHash := sha256.Sum256([]byte(messageString))
+		
+		signature, err := schnorr.ParseSignature(commitmentMessage.Share)
+		if err != nil {
+			return
+		}
+		verified := signature.Verify(messageHash[:], p.PublicKeys[int(bInstance.Author)])
+		
+		//if hash(commitmentMessage.X) == deliveredBroadcast.XHash {
+		if verified {
 			if p.isWitness(msgState) && msgState.revealStage != SentDoneToProcesses {
 				p.broadcastCommitmentMessage(
 					bInstance,
 					&messages.CommitmentProtocolMessage{
 						Stage: messages.CommitmentProtocolMessage_DONE,
-						X:     commitmentMessage.X,
+						//X:     commitmentMessage.X,
+						Share:     commitmentMessage.Share,
 					},
 				)
 				msgState.revealStage = SentDoneToProcesses
 			}
 
 			checkpoint := p.transactionToCheckpoint[ProcessId(bInstance.Author)][bInstance.SeqNumber]
-			if msgState.ownWitnessSet[senderPid] &&
-				p.deliveredMessagesCount-checkpoint >= p.MixingTime {
+			//if msgState.ownWitnessSet[senderPid] && p.deliveredMessagesCount-checkpoint >= p.MixingTime {
+			if p.deliveredMessagesCount-checkpoint >= p.MixingTime {
 				if msgState.revealStage != SentDoneToWitnesses {
 					p.broadcastCommitmentToWitnesses(
 						bInstance,
 						&messages.CommitmentProtocolMessage{
 							Stage: messages.CommitmentProtocolMessage_DONE,
-							X:     commitmentMessage.X,
+							//X:     commitmentMessage.X,
+							Share:     commitmentMessage.Share,
 						},
 						msgState,
 					)
 					msgState.revealStage = SentDoneToWitnesses
 				}
-				p.addSecret(commitmentMessage.X)
+				p.addSecret(commitmentMessage.Share, bInstance.Author)
 				p.cleanUp(bInstance, deliveredBroadcast.Value)
+				//fmt.Println("Added a secret!")
 			}
 		}
 	case messages.CommitmentProtocolMessage_FAILED:
@@ -746,22 +901,57 @@ func (p *Process) Broadcast(
 		SeqNumber: p.transactionCounter,
 	}
 
-	x := p.sample()
-	xHash := hash(x)
+	//x := p.sample()
+	//xHash := hash(x)
 
-	data, err := p.encodeEntropy(x)
+	//data, err := p.encodeEntropy(x)
+	
+	messageString := strconv.Itoa(int(p.processIndex))+strconv.Itoa(int(p.transactionCounter))
+	messageHash := sha256.Sum256([]byte(messageString))
+	
+	signature, err := schnorr.Sign(p.PrivateKey, messageHash[:])
+	if err != nil {
+		p.logger.Fatal("Error when signing a message.")
+		return
+	}
+	
+	//shares, err := p.encodeEntropy(x)
+	//shares, err := p.encodeEntropy(signature.Serialize())
+	shares, err := sss.Split(p.processCount, p.dataShares, signature.Serialize())
 
 	if err != nil {
-		p.logger.Fatal("Error when encoding data using RS: " + err.Error())
+		//p.logger.Fatal("Error when encoding data using RS: " + err.Error())
+		p.logger.Fatal("Error when splitting data using SSS: " + err.Error())
+		return
 	}
+	
+	/*
 
 	encryptedShares := make([][]byte, p.processCount)
 	for i := 0; i < p.processCount; i++ {
 		encryptedShares[i] = Encrypt(p.PublicKeys[i], data[i], p.logger)
 	}
+	
+	*/
 
-	msgState := p.initMessageState(broadcastInstance)
+	//msgState := p.initMessageState(broadcastInstance)
+	
+	for i := 0; i < p.processCount; i++ {
+		share := shares[i]
+		p.sendProtocolMessage(
+			ProcessId(i),
+			broadcastInstance,
+			&messages.ReliableProtocolMessage{
+				Stage: messages.ReliableProtocolMessage_NOTIFY,
+				BroadcastMessage: &messages.Broadcast{
+					Value: value,
+				},
+				Share: share,
+			},
+		)
+	}
 
+	/*
 	p.broadcastToWitnesses(
 		broadcastInstance,
 		&messages.ReliableProtocolMessage{
@@ -773,6 +963,7 @@ func (p *Process) Broadcast(
 			EncryptedShares: encryptedShares,
 		},
 		msgState)
+	*/
 
 	p.logger.OnTransactionInit(broadcastInstance)
 
@@ -790,6 +981,7 @@ func (p *Process) sample() []int32 {
 	return sample
 }
 
+/*
 func (p *Process) encodeEntropy(x []int32) ([][]byte, error) {
 	data := make([][]byte, p.processCount)
 
@@ -805,6 +997,25 @@ func (p *Process) encodeEntropy(x []int32) ([][]byte, error) {
 
 	return data, err
 }
+*/
+
+/*
+
+func (p *Process) encodeEntropy(x []byte) ([][]byte, error) {
+	data := make([][]byte, p.processCount)
+
+	data[0] = x
+
+	for i := 1; i < p.processCount; i++ {
+		data[i] = make([]byte, bytes)
+	}
+
+	err := p.encoder.Encode(data)
+
+	return data, err
+}
+
+*/
 
 type CommitmentMessageAndSender struct {
 	sender  ProcessId

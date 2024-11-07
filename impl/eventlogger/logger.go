@@ -49,6 +49,7 @@ func (el *EventLogger) OnWitnessSetSelected(
 	broadcastInstance *messages.BroadcastInstance,
 	ws map[string]bool,
 ) {
+	/*
 	pids := make([]string, len(ws))
 	i := 0
 	for pid := range ws {
@@ -59,12 +60,15 @@ func (el *EventLogger) OnWitnessSetSelected(
 	el.logger.Printf(
 		"Witness set selected; type: %s, transaction: %s, pids: %v, timestamp: %d\n",
 		wsType, broadcastInstance.ToString(), pids, utils.GetNow())
+	*/
 }
 
 func (el *EventLogger) OnRecoveryProtocolSwitch(broadcastInstance *messages.BroadcastInstance) {
+	/*
 	el.logger.Printf(
 		"Switching to the recovery protocol; transaction: %s, timestamp: %d\n",
 		broadcastInstance.ToString(), utils.GetNow())
+	*/
 }
 
 func (el *EventLogger) OnDeliver(
@@ -82,12 +86,14 @@ func (el *EventLogger) OnHistoryUsedInWitnessSetSelection(
 	historyHash *hashing.HistoryHash,
 	deliveredMessagesHistory []string,
 ) {
+	/*
 	el.logger.Printf(
 		"Witness set selection; transaction: %s, history hash: %s, history: %v, timestamp: %d\n",
 		broadcastInstance.ToString(),
 		historyHash.ToString(),
 		deliveredMessagesHistory,
 		utils.GetNow())
+	*/
 }
 
 func (el *EventLogger) OnAttack(
@@ -95,6 +101,7 @@ func (el *EventLogger) OnAttack(
 	receivedValue int32,
 	committedValue int32,
 ) {
+	/*
 	el.logger.Printf(
 		"Detected a duplicated seq number attack; "+
 			"transaction: %s, received value: %d, committed value: %d, timestamp: %d\n",
@@ -102,22 +109,27 @@ func (el *EventLogger) OnAttack(
 		receivedValue,
 		committedValue,
 		utils.GetNow())
+	*/
 }
 
 func (el *EventLogger) OnMessageSent(msgId int32) {
+	/*
 	el.logger.Printf(
 		"Sent message: {%d;%d}, timestamp: %d\n",
 		el.pid, msgId, utils.GetNow())
+	*/
 }
 
 func (el *EventLogger) OnMessageReceived(senderPid int32, msgId int32) {
+	/*
 	el.logger.Printf(
 		"Received message: {%d;%d}, timestamp: %d\n",
 		senderPid, msgId, utils.GetNow())
+	*/
 }
 
 func (el *EventLogger) OnAckReceived(msgId int32) {
-	el.logger.Printf("Received ack: %d\n", msgId)
+	//el.logger.Printf("Received ack: %d\n", msgId)
 }
 
 func (el *EventLogger) Fatal(message string) {

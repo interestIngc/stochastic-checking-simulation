@@ -1,23 +1,15 @@
 {
-  "protocol": "reliable_accountability",
-  "parameters": {
-    "n": 2,
-    "f": 0,
-    "w": 2,
-    "v": 2,
-    "wr": 1900.0,
-    "vr": 1910.0,
-    "u": 3,
-    "recovery_timeout": 1000000,
-    "node_id_size": 256,
-    "number_of_bins": 32,
-    "g_size": 2,
-    "e_size": 2,
-    "e_threshold": 1,
-    "r_size": 2,
-    "r_threshold": 1,
-    "d_size": 2,
-    "d_threshold": 1,
-    "clean_up_timeout": 20000000000
-  }
+    "protocol": "reliable_accountability",
+    "parameters": {
+        "n": 256,
+        "f": 10,
+        "w": 5,
+        "v": 7,
+        "wr": 10,
+        "vr": 10,
+        "u": 3,
+        "recovery_timeout": 60000000000,
+        "node_id_size": 44,
+        "number_of_bins": 4
+    }
 }

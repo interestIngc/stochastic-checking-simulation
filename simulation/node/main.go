@@ -1,8 +1,8 @@
 package main
 
 import (
-	"crypto/rsa"
-	"crypto/x509"
+	//"crypto/rsa"
+	//"crypto/x509"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -17,6 +17,8 @@ import (
 	"stochastic-checking-simulation/impl/protocols/scalable"
 	"stochastic-checking-simulation/impl/utils"
 	"stochastic-checking-simulation/simulation/actor"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	//"github.com/decred/dcrd/dcrec/secp256k1/v4/schnorr"
 )
 
 var (
@@ -105,8 +107,10 @@ func main() {
 
 	switch input.Protocol {
 	case "reliable_accountability":
-		publicKeys := make([]*rsa.PublicKey, processCount)
-		var ownPrivateKey *rsa.PrivateKey
+		//publicKeys := make([]*rsa.PublicKey, processCount)
+		publicKeys := make([]*secp256k1.PublicKey, processCount)
+		//var ownPrivateKey *rsa.PrivateKey
+		var ownPrivateKey *secp256k1.PrivateKey
 
 		for i := 0; i < processCount; i++ {
 			filename := fmt.Sprintf("%s/%d.txt", *keysDirPath, i)
@@ -118,18 +122,22 @@ func main() {
 				)
 			}
 
-			privateKey, err := x509.ParsePKCS1PrivateKey(privateKeyBytes)
+			//privateKey, err := x509.ParsePKCS1PrivateKey(privateKeyBytes)
+			privateKey := secp256k1.PrivKeyFromBytes(privateKeyBytes)
+			/*
 			if err != nil {
 				logger.Fatal(
 					fmt.Sprintf("Error while generating a private key from bytes: %e", err),
 				)
 			}
+			*/
 
 			if i == id {
 				ownPrivateKey = privateKey
 			}
 
-			publicKeys[i] = &privateKey.PublicKey
+			//publicKeys[i] = &privateKey.PublicKey
+			publicKeys[i] = privateKey.PubKey()
 		}
 
 		process = &reliable.Process{

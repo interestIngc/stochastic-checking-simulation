@@ -10,7 +10,8 @@ import (
 	"time"
 )
 
-const BufferSize = 1024
+//const BufferSize = 1024
+const BufferSize = 65536
 
 var ReadBufferSize = int(math.Pow(2, 20))
 

@@ -29,7 +29,7 @@ func (m *Broadcast) Copy() *Broadcast {
 
 	return &Broadcast{
 		Value: m.Value,
-		XHash: m.XHash,
+		//XHash: m.XHash,
 	}
 }
 
@@ -58,13 +58,16 @@ func (m *ReliableProtocolMessage) Copy() *ReliableProtocolMessage {
 		return nil
 	}
 
-	encryptedShares := make([][]byte, len(m.EncryptedShares))
-	copy(encryptedShares, m.EncryptedShares)
+	//encryptedShares := make([][]byte, len(m.EncryptedShares))
+	//copy(encryptedShares, m.EncryptedShares)
+	
+	share := make([]byte, len(m.Share))
+	copy(share, m.Share)
 
 	return &ReliableProtocolMessage{
 		Stage:            m.Stage,
 		BroadcastMessage: m.BroadcastMessage.Copy(),
-		EncryptedShares: encryptedShares,
+		Share: share,
 	}
 }
 

@@ -68,14 +68,19 @@ func (node *Node) ProcessMessage(message *messages.Message) {
 
 func (node *Node) simulate() {
 	if node.stressTest {
+		time.Sleep(time.Duration(node.processIndex*500000000))
 		node.doBroadcast()
 		for {
+			t := time.NewTicker(time.Duration(len(node.pids)*500000000))
 			select {
 			case <-node.ownDeliveredTransactions:
+				node.doBroadcast()
+			case <-t.C:
 				node.doBroadcast()
 			}
 		}
 	} else {
+		time.Sleep(time.Duration(node.processIndex*500000000))
 		for i := 0; i < node.transactionsToSendOut; i++ {
 			node.doBroadcast()
 			time.Sleep(time.Duration(node.transactionInitTimeoutNs))
