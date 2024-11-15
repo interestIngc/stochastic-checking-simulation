@@ -8,7 +8,6 @@ message Simulate {}
 
 message Broadcast {
   int32 value = 1;
-  int32 xHash = 2;
 }
 
 message Ack {
@@ -54,7 +53,7 @@ message ReliableProtocolMessage {
 
   Stage stage = 1;
   Broadcast broadcastMessage = 2;
-  repeated bytes encryptedShares = 3;
+  bytes share = 3;
 }
 
 message CommitmentProtocolMessage {
@@ -65,8 +64,7 @@ message CommitmentProtocolMessage {
   }
 
   Stage stage = 1;
-  bytes decryptedShare = 2;
-  repeated int32 x = 3;
+  bytes share = 2;
 }
 
 message RecoveryProtocolMessage {

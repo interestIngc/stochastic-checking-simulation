@@ -1,11 +1,10 @@
 package main
 
 import (
-	"crypto/rsa"
-	"crypto/x509"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"io"
 	"log"
 	"os"
@@ -44,7 +43,7 @@ var (
 		"Topology used to run the simulation on Mininet. One of: 'star', 'tree'")
 	numberOfChildren = flag.Int("number_of_children", 4, "Number of children in a tree topology")
 	messageDelay     = flag.Int("message_delay", 0, "Minimal delay between consecutive message dispatches")
-	mixingTime = flag.Int(
+	mixingTime       = flag.Int(
 		"mixing_time",
 		2,
 		"Mixing time, used in the reveal phase of the protocol")
@@ -105,8 +104,8 @@ func main() {
 
 	switch input.Protocol {
 	case "reliable_accountability":
-		publicKeys := make([]*rsa.PublicKey, processCount)
-		var ownPrivateKey *rsa.PrivateKey
+		publicKeys := make([]*secp256k1.PublicKey, processCount)
+		var ownPrivateKey *secp256k1.PrivateKey
 
 		for i := 0; i < processCount; i++ {
 			filename := fmt.Sprintf("%s/%d.txt", *keysDirPath, i)
@@ -118,18 +117,13 @@ func main() {
 				)
 			}
 
-			privateKey, err := x509.ParsePKCS1PrivateKey(privateKeyBytes)
-			if err != nil {
-				logger.Fatal(
-					fmt.Sprintf("Error while generating a private key from bytes: %e", err),
-				)
-			}
+			privateKey := secp256k1.PrivKeyFromBytes(privateKeyBytes)
 
 			if i == id {
 				ownPrivateKey = privateKey
 			}
 
-			publicKeys[i] = &privateKey.PublicKey
+			publicKeys[i] = privateKey.PubKey()
 		}
 
 		process = &reliable.Process{

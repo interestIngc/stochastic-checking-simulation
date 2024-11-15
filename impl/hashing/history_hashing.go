@@ -20,9 +20,8 @@ func NewHistoryHash(binNum uint, binCapacity uint, hasher Hasher, seed int32) *H
 	hh.binNum = binNum
 	hh.binCapacity = binCapacity
 	hh.hasher = hasher
-	hh.bins = NewMultiRing(binCapacity, binNum)
-
 	hh.seed = utils.Int32ToBytes(seed)
+	hh.bins = multiRingFromBytes(binCapacity, binNum, hh.hasher.Hash(hh.seed))
 
 	return hh
 }
